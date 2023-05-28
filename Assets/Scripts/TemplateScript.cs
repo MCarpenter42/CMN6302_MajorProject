@@ -28,27 +28,29 @@ using NeoCambion.Unity.IO;
 
 public class TemplateScript : Core
 {
-	#region [ OBJECTS / COMPONENTS ]
+    #region [ OBJECTS / COMPONENTS ]
 
 
 
-	#endregion
+    #endregion
 
-	#region [ PROPERTIES ]
-
-
-
-	#endregion
-
-	#region [ COROUTINES ]
+    #region [ PROPERTIES ]
 
 
 
-	#endregion
+    #endregion
 
-	/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    #region [ COROUTINES ]
 
-	void Awake()
+
+
+    #endregion
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    #region [ BUILT-IN UNITY FUNCTIONS ]
+
+    void Awake()
 	{
 		
 	}
@@ -68,7 +70,9 @@ public class TemplateScript : Core
 		
 	}
 
-	/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    #endregion
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
 }

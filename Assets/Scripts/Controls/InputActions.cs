@@ -74,6 +74,15 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""cameraTurn"",
+                    ""type"": ""Value"",
+                    ""id"": ""a8b8d67b-c1ee-4332-9545-c02dc5d86ebc"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -142,6 +151,28 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""action"": ""move"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""961db870-bc2a-4bed-8428-06e01404a1f5"",
+                    ""path"": ""<Gamepad>/rightStick"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""cameraTurn"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""f4da7b94-10f2-4858-977c-c852921acdf2"",
+                    ""path"": ""<Mouse>/delta"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""cameraTurn"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         },
@@ -172,6 +203,34 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""isPartOfComposite"": false
                 }
             ]
+        },
+        {
+            ""name"": ""InDev"",
+            ""id"": ""46628c27-0fe6-4c97-bea3-4d2bb6685497"",
+            ""actions"": [
+                {
+                    ""name"": ""cursorLockToggle"",
+                    ""type"": ""Button"",
+                    ""id"": ""22c46e02-ab0a-40b9-9bf9-8e5cb23ca9b7"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                }
+            ],
+            ""bindings"": [
+                {
+                    ""name"": """",
+                    ""id"": ""edfb5c77-bc10-461b-8f52-18c4b8b0e95b"",
+                    ""path"": ""<Keyboard>/l"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""cursorLockToggle"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                }
+            ]
         }
     ],
     ""controlSchemes"": []
@@ -182,9 +241,13 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         // World
         m_World = asset.FindActionMap("World", throwIfNotFound: true);
         m_World_move = m_World.FindAction("move", throwIfNotFound: true);
+        m_World_cameraTurn = m_World.FindAction("cameraTurn", throwIfNotFound: true);
         // Combat
         m_Combat = asset.FindActionMap("Combat", throwIfNotFound: true);
         m_Combat_Newaction = m_Combat.FindAction("New action", throwIfNotFound: true);
+        // InDev
+        m_InDev = asset.FindActionMap("InDev", throwIfNotFound: true);
+        m_InDev_cursorLockToggle = m_InDev.FindAction("cursorLockToggle", throwIfNotFound: true);
     }
 
     public void Dispose()
@@ -293,11 +356,13 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
     private readonly InputActionMap m_World;
     private List<IWorldActions> m_WorldActionsCallbackInterfaces = new List<IWorldActions>();
     private readonly InputAction m_World_move;
+    private readonly InputAction m_World_cameraTurn;
     public struct WorldActions
     {
         private @InputActions m_Wrapper;
         public WorldActions(@InputActions wrapper) { m_Wrapper = wrapper; }
         public InputAction @move => m_Wrapper.m_World_move;
+        public InputAction @cameraTurn => m_Wrapper.m_World_cameraTurn;
         public InputActionMap Get() { return m_Wrapper.m_World; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -310,6 +375,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @move.started += instance.OnMove;
             @move.performed += instance.OnMove;
             @move.canceled += instance.OnMove;
+            @cameraTurn.started += instance.OnCameraTurn;
+            @cameraTurn.performed += instance.OnCameraTurn;
+            @cameraTurn.canceled += instance.OnCameraTurn;
         }
 
         private void UnregisterCallbacks(IWorldActions instance)
@@ -317,6 +385,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @move.started -= instance.OnMove;
             @move.performed -= instance.OnMove;
             @move.canceled -= instance.OnMove;
+            @cameraTurn.started -= instance.OnCameraTurn;
+            @cameraTurn.performed -= instance.OnCameraTurn;
+            @cameraTurn.canceled -= instance.OnCameraTurn;
         }
 
         public void RemoveCallbacks(IWorldActions instance)
@@ -380,6 +451,52 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         }
     }
     public CombatActions @Combat => new CombatActions(this);
+
+    // InDev
+    private readonly InputActionMap m_InDev;
+    private List<IInDevActions> m_InDevActionsCallbackInterfaces = new List<IInDevActions>();
+    private readonly InputAction m_InDev_cursorLockToggle;
+    public struct InDevActions
+    {
+        private @InputActions m_Wrapper;
+        public InDevActions(@InputActions wrapper) { m_Wrapper = wrapper; }
+        public InputAction @cursorLockToggle => m_Wrapper.m_InDev_cursorLockToggle;
+        public InputActionMap Get() { return m_Wrapper.m_InDev; }
+        public void Enable() { Get().Enable(); }
+        public void Disable() { Get().Disable(); }
+        public bool enabled => Get().enabled;
+        public static implicit operator InputActionMap(InDevActions set) { return set.Get(); }
+        public void AddCallbacks(IInDevActions instance)
+        {
+            if (instance == null || m_Wrapper.m_InDevActionsCallbackInterfaces.Contains(instance)) return;
+            m_Wrapper.m_InDevActionsCallbackInterfaces.Add(instance);
+            @cursorLockToggle.started += instance.OnCursorLockToggle;
+            @cursorLockToggle.performed += instance.OnCursorLockToggle;
+            @cursorLockToggle.canceled += instance.OnCursorLockToggle;
+        }
+
+        private void UnregisterCallbacks(IInDevActions instance)
+        {
+            @cursorLockToggle.started -= instance.OnCursorLockToggle;
+            @cursorLockToggle.performed -= instance.OnCursorLockToggle;
+            @cursorLockToggle.canceled -= instance.OnCursorLockToggle;
+        }
+
+        public void RemoveCallbacks(IInDevActions instance)
+        {
+            if (m_Wrapper.m_InDevActionsCallbackInterfaces.Remove(instance))
+                UnregisterCallbacks(instance);
+        }
+
+        public void SetCallbacks(IInDevActions instance)
+        {
+            foreach (var item in m_Wrapper.m_InDevActionsCallbackInterfaces)
+                UnregisterCallbacks(item);
+            m_Wrapper.m_InDevActionsCallbackInterfaces.Clear();
+            AddCallbacks(instance);
+        }
+    }
+    public InDevActions @InDev => new InDevActions(this);
     public interface IMenuActions
     {
         void OnShowHide(InputAction.CallbackContext context);
@@ -387,9 +504,14 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
     public interface IWorldActions
     {
         void OnMove(InputAction.CallbackContext context);
+        void OnCameraTurn(InputAction.CallbackContext context);
     }
     public interface ICombatActions
     {
         void OnNewaction(InputAction.CallbackContext context);
+    }
+    public interface IInDevActions
+    {
+        void OnCursorLockToggle(InputAction.CallbackContext context);
     }
 }

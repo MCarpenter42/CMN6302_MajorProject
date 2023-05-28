@@ -52,6 +52,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "cameraTurn",
+                    "type": "Value",
+                    "id": "a8b8d67b-c1ee-4332-9545-c02dc5d86ebc",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -120,6 +129,28 @@
                     "action": "move",
                     "isComposite": false,
                     "isPartOfComposite": true
+                },
+                {
+                    "name": "",
+                    "id": "961db870-bc2a-4bed-8428-06e01404a1f5",
+                    "path": "<Gamepad>/rightStick",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "cameraTurn",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f4da7b94-10f2-4858-977c-c852921acdf2",
+                    "path": "<Mouse>/delta",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "cameraTurn",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 }
             ]
         },
@@ -146,6 +177,34 @@
                     "processors": "",
                     "groups": "",
                     "action": "New action",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        },
+        {
+            "name": "InDev",
+            "id": "46628c27-0fe6-4c97-bea3-4d2bb6685497",
+            "actions": [
+                {
+                    "name": "cursorLockToggle",
+                    "type": "Button",
+                    "id": "22c46e02-ab0a-40b9-9bf9-8e5cb23ca9b7",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "edfb5c77-bc10-461b-8f52-18c4b8b0e95b",
+                    "path": "<Keyboard>/l",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "cursorLockToggle",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

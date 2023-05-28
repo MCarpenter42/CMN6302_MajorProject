@@ -26,13 +26,7 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
 
-#region [ ENUM TYPES ]
-
-public enum ControlState { Menu, World, Combat }
-
-#endregion
-
-public class Core : MonoBehaviour
+public class WorldEntityCore : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 
@@ -42,7 +36,7 @@ public class Core : MonoBehaviour
 
     #region [ PROPERTIES ]
 
-
+    [HideInInspector] public Vector3 movement;
 
     #endregion
 
@@ -54,29 +48,35 @@ public class Core : MonoBehaviour
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public static void Pause()
+    #region [ BUILT-IN UNITY FUNCTIONS ]
+
+    protected virtual void Awake()
     {
-        GameManager.Instance.OnPause();
+
     }
 
-    public static void Resume()
+    protected virtual void Start()
     {
-        GameManager.Instance.OnResume();
+
     }
 
-    public static void TogglePause()
+    protected virtual void Update()
     {
-        if (GameManager.gamePaused)
-            GameManager.Instance.OnResume();
-        else
-            GameManager.Instance.OnPause();
+
     }
 
-    public static void ExitGame()
+    protected virtual void FixedUpdate()
     {
-        Application.Quit();
-#if UNITY_EDITOR
-        EditorApplication.ExitPlaymode();
-#endif
+        if (movement.magnitude > 0.0f)
+            Move(movement * Time.fixedDeltaTime);
+    }
+
+    #endregion
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public virtual void Move(Vector3 velocity)
+    {
+        transform.position += velocity;
     }
 }

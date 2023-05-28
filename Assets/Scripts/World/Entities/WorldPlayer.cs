@@ -26,13 +26,7 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
 
-#region [ ENUM TYPES ]
-
-public enum ControlState { Menu, World, Combat }
-
-#endregion
-
-public class Core : MonoBehaviour
+public class WorldPlayer : WorldEntityCore
 {
     #region [ OBJECTS / COMPONENTS ]
 
@@ -54,29 +48,31 @@ public class Core : MonoBehaviour
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public static void Pause()
+    #region [ BUILT-IN UNITY FUNCTIONS ]
+
+    protected override void Awake()
     {
-        GameManager.Instance.OnPause();
+        base.Awake();
     }
 
-    public static void Resume()
+    protected override void Start()
     {
-        GameManager.Instance.OnResume();
+        base.Start();
     }
 
-    public static void TogglePause()
+    protected override void Update()
     {
-        if (GameManager.gamePaused)
-            GameManager.Instance.OnResume();
-        else
-            GameManager.Instance.OnPause();
+        base.Update();
     }
 
-    public static void ExitGame()
+    protected override void FixedUpdate()
     {
-        Application.Quit();
-#if UNITY_EDITOR
-        EditorApplication.ExitPlaymode();
-#endif
+        base.FixedUpdate();
     }
+
+    #endregion
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 }

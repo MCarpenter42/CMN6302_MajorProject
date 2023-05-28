@@ -25,6 +25,7 @@ using NeoCambion.Unity;
 using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
+using UnityEditor.Experimental.Rendering;
 
 [RequireComponent(typeof(UIManager))]
 [RequireComponent(typeof(ControlsHandler))]
@@ -59,6 +60,9 @@ public class GameManager : Core
         }
     }
 
+    public WorldPlayer playerW = null;
+    public PlayerCam cameraW = null;
+
     #endregion
 
     #region [ PROPERTIES ]
@@ -75,6 +79,9 @@ public class GameManager : Core
     public static bool onGameLoad = true;
 
     public static bool gamePaused = false;
+    public static ControlState controlState = ControlState.World;
+
+    public static Vector2 windowCentre;
 
     #endregion
 
@@ -196,7 +203,25 @@ public class GameManager : Core
 
     public void OnAwake()
     {
+        float xPos = Camera.main.pixelWidth / 2.0f;
+        float yPos = Camera.main.pixelHeight / 2.0f;
+        windowCentre = new Vector3(xPos, yPos, 0.0f);
 
+        switch (controlState)
+        {
+            default:
+            case ControlState.Menu:
+                break;
+
+            case ControlState.World:
+                Cursor.lockState = CursorLockMode.Locked;
+                playerW = FindObjectOfType<WorldPlayer>();
+                cameraW = FindObjectOfType<PlayerCam>();
+                break;
+
+            case ControlState.Combat:
+                break;
+        }
     }
 
     public void OnPause()

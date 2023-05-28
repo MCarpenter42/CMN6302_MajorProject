@@ -26,23 +26,20 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
 
-#region [ ENUM TYPES ]
-
-public enum ControlState { Menu, World, Combat }
-
-#endregion
-
-public class Core : MonoBehaviour
+public class PlayerCam : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 
-
+    [SerializeField] GameObject toFollow;
+    [SerializeField] GameObject pivot;
+    public GameObject cam;
 
     #endregion
 
     #region [ PROPERTIES ]
 
-
+    private Vector3 rot = Vector3.zero;
+    private Vector3 rotSpeed = Vector3.zero;
 
     #endregion
 
@@ -54,29 +51,43 @@ public class Core : MonoBehaviour
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public static void Pause()
+    #region [ BUILT-IN UNITY FUNCTIONS ]
+
+    void Awake()
     {
-        GameManager.Instance.OnPause();
+
     }
 
-    public static void Resume()
+    void Start()
     {
-        GameManager.Instance.OnResume();
+
     }
 
-    public static void TogglePause()
+    void Update()
     {
-        if (GameManager.gamePaused)
-            GameManager.Instance.OnResume();
-        else
-            GameManager.Instance.OnPause();
+        if (toFollow != null)
+            transform.position = toFollow.transform.position;
+        Rotate(rotSpeed);
     }
 
-    public static void ExitGame()
+    void FixedUpdate()
     {
-        Application.Quit();
-#if UNITY_EDITOR
-        EditorApplication.ExitPlaymode();
-#endif
+
+    }
+
+    #endregion
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void Rotate(Vector3 angle)
+    {
+        rot.x = Mathf.Clamp(rot.x + angle.x, -30.0f, 30.0f);
+        rot.y = (rot.y + angle.y).WrapClamp(0.0f, 360.0f);
+        pivot.transform.eulerAngles = rot;
+    }
+
+    public void SetRotSpeed(Vector3 rotation)
+    {
+        rotSpeed = rotation;
     }
 }
