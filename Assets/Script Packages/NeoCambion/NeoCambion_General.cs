@@ -1669,6 +1669,27 @@ namespace NeoCambion
                 }
                 return new Vector3(xSum / (float)n, ySum / (float)n, zSum / (float)n);
             }
+
+            public static Vector3 Flatten(this Vector3 vect, Axis axis = Axis.Y)
+            {
+                float m = vect.magnitude;
+                switch (axis)
+                {
+                    case Axis.X:
+                        vect.x = 0.0f;
+                        break;
+
+                    default:
+                    case Axis.Y:
+                        vect.y = 0.0f;
+                        break;
+
+                    case Axis.Z:
+                        vect.z = 0.0f;
+                        break;
+                }
+                return vect = vect.normalized * m;
+            }
         }
 
         public static class UnityExt_Coroutine

@@ -133,7 +133,7 @@ public class ControlsHandler : Core
 		public static void OnMove(InputAction.CallbackContext context)
 		{
 			Vector2 mv = context.ReadValue<Vector2>();
-            GameManager.Instance.playerW.movement = new Vector3(mv.x, 0, mv.y);
+            GameManager.Instance.playerW.velScale = new Vector3(mv.x, 0, mv.y);
         }
 
 		public static void OnCameraTurn(InputAction.CallbackContext context)

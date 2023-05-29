@@ -66,10 +66,13 @@ public class Core : MonoBehaviour
 
     public static void TogglePause()
     {
-        if (GameManager.gamePaused)
-            GameManager.Instance.OnResume();
-        else
-            GameManager.Instance.OnPause();
+        if (GameManager.allowPauseToggle)
+        {
+            if (GameManager.gamePaused)
+                GameManager.Instance.OnResume();
+            else
+                GameManager.Instance.OnPause();
+        }
     }
 
     public static void ExitGame()

@@ -25,6 +25,7 @@ using NeoCambion.Unity;
 using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
+using System;
 
 public class PlayerCam : Core
 {
@@ -40,6 +41,7 @@ public class PlayerCam : Core
 
     private Vector3 rot = Vector3.zero;
     private Vector3 rotSpeed = Vector3.zero;
+    public Vector3 facingVector { get { return GetFacingVector(); } }
 
     #endregion
 
@@ -79,9 +81,14 @@ public class PlayerCam : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    public Vector3 GetFacingVector()
+    {
+        return pivot.transform.forward;
+    }
+
     public void Rotate(Vector3 angle)
     {
-        rot.x = Mathf.Clamp(rot.x + angle.x, -30.0f, 30.0f);
+        rot.x = Mathf.Clamp(rot.x + angle.x, -20.0f, 70.0f);
         rot.y = (rot.y + angle.y).WrapClamp(0.0f, 360.0f);
         pivot.transform.eulerAngles = rot;
     }

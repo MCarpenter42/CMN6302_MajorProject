@@ -79,6 +79,7 @@ public class GameManager : Core
     public static bool onGameLoad = true;
 
     public static bool gamePaused = false;
+    public static bool allowPauseToggle = true;
     public static ControlState controlState = ControlState.World;
 
     public static Vector2 windowCentre;
@@ -228,14 +229,18 @@ public class GameManager : Core
     {
         gamePaused = true;
         Time.timeScale = 0.0f;
-        Debug.Log("Pause");
+        if (controlState == ControlState.World)
+            Cursor.lockState = CursorLockMode.None;
+        Debug.Log("Paused");
     }
 
     public void OnResume()
     {
         gamePaused = false;
         Time.timeScale = 1.0f;
-        Debug.Log("Resume");
+        if (controlState == ControlState.World)
+            Cursor.lockState = CursorLockMode.Locked;
+        Debug.Log("Resumed");
     }
 
     public void OnLog()
