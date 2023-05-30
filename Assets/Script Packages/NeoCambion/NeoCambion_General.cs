@@ -493,6 +493,7 @@ namespace NeoCambion
     {
         using UnityEngine;
         using UnityEditor;
+        using System.Collections;
 
         public static class UnityExt_Float
         {
@@ -1707,6 +1708,13 @@ namespace NeoCambion
                 routine.Stop();
                 routine = null;
             }
+
+            /*public static Coroutine Override(this MonoBehaviour source, Coroutine routine, IEnumerator method)
+            {
+                if (routine != null)
+                    source.StopCoroutine(routine);
+                return routine = source.StartCoroutine(method);
+            }*/
         }
 
         public static class UnityExt_Mesh

@@ -30,13 +30,18 @@ public class WorldPlayer : WorldEntityCore
 {
     #region [ OBJECTS / COMPONENTS ]
 
-
+    private List<InteractPoint> interactions = new List<InteractPoint>();
 
     #endregion
 
     #region [ PROPERTIES ]
 
+    private Vector3 camDir { get { return UnityExt_Vector3.Flatten(GameManager.Instance.cameraW.facingVector); } }
 
+    [SerializeField] float interactionRange = 3.0f;
+    [SerializeField] float maxInteractAngle = 40.0f;
+    private List<int> inRangeInteracts = new List<int>();
+    private int targetInteract = -1;
 
     #endregion
 
@@ -63,6 +68,10 @@ public class WorldPlayer : WorldEntityCore
     protected override void Update()
     {
         base.Update();
+        GetInRangeInteracts();
+        int newTarget = GetTargetInteract();
+        if (newTarget != targetInteract)
+            UpdateTargetInteract(newTarget);
     }
 
     protected override void FixedUpdate()
@@ -93,9 +102,66 @@ public class WorldPlayer : WorldEntityCore
     {
         float m = velocity.magnitude;
         float velAngle = velocity.x >= 0.0f ? Vector3.Angle(Vector3.forward, velocity) : -Vector3.Angle(Vector3.forward, velocity);
-        Vector3 camDir = UnityExt_Vector3.Flatten(GameManager.Instance.cameraW.facingVector);
         float camAngle = camDir.x >= 0.0f ? Vector3.Angle(Vector3.forward, camDir) : -Vector3.Angle(Vector3.forward, camDir);
         float angle = (velAngle + camAngle).WrapClamp(0.0f, 360.0f).ToRad();
         return new Vector3(Mathf.Sin(angle), 0, Mathf.Cos(angle)) * m;
+    }
+
+    public void AddInteraction(InteractPoint interaction)
+    {
+        interactions.Add(interaction);
+    }
+
+    public void RemoveInteraction(InteractPoint interaction)
+    {
+        if (interactions.Contains(interaction))
+            interactions.Remove(interaction);
+    }
+
+    private void GetInRangeInteracts()
+    {
+        for (int i = 0; i < interactions.Count; i++)
+        {
+            if (interactions[i].inRange && interactions[i].distanceToPlayer > interactionRange)
+            {
+                inRangeInteracts.Remove(i);
+                interactions[i].inRange = false;
+            }
+            else if (!interactions[i].inRange && interactions[i].distanceToPlayer <= interactionRange)
+            {
+                inRangeInteracts.Add(i);
+                interactions[i].inRange = true;
+            }
+        }
+    }
+
+    private int GetTargetInteract()
+    {
+        float targetAngle = maxInteractAngle, angle;
+        int targetIndex = -1;
+        Vector3 dir = Vector3.forward;
+        for (int i = 0; i < inRangeInteracts.Count; i++)
+        {
+            dir = (interactions[inRangeInteracts[i]].transform.position - transform.position).Flatten();
+            angle = Vector3.Angle(dir, camDir);
+            if (angle < targetAngle)
+            {
+                targetAngle = angle;
+                targetIndex = inRangeInteracts[i];
+            }
+        }
+        return targetIndex;
+    }
+
+    private void UpdateTargetInteract(int index)
+    {
+        if (index == -1)
+        {
+
+        }
+        else
+        {
+
+        }
     }
 }

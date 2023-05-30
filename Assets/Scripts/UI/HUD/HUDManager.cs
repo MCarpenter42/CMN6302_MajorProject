@@ -26,17 +26,17 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
 
-public class GenericMenu : UIObject
+public class HUDManager : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 
-    
+    [SerializeField] UIObject interactHighlight;
 
     #endregion
 
     #region [ PROPERTIES ]
 
-    
+
 
     #endregion
 
@@ -47,5 +47,32 @@ public class GenericMenu : UIObject
     #endregion
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    #region [ BUILT-IN UNITY FUNCTIONS ]
+
+    void Awake()
+    {
+
+    }
+
+    void Start()
+    {
+
+    }
+
+    void Update()
+    {
+
+    }
+
+    void FixedUpdate()
+    {
+
+    }
+
+    #endregion
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 
 }

@@ -26,7 +26,7 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
 
-public class UICore : Core
+public class UIObject : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 

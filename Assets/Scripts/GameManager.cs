@@ -27,7 +27,6 @@ using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
 using UnityEditor.Experimental.Rendering;
 
-[RequireComponent(typeof(UIManager))]
 [RequireComponent(typeof(ControlsHandler))]
 public class GameManager : Core
 {
@@ -40,9 +39,11 @@ public class GameManager : Core
     {
         get
         {
-            if (_UIManager != null)
+            if (_UIManager == null)
             {
-                _UIManager = Instance.gameObject.GetComponent<UIManager>();
+                _UIManager = FindObjectOfType<UIManager>();
+                if (_UIManager == null)
+                    throw new System.Exception("ERROR: No UI Manager present in scene!");
             }
             return _UIManager;
         }
@@ -52,7 +53,7 @@ public class GameManager : Core
     {
         get
         {
-            if (_ControlsHandler != null)
+            if (_ControlsHandler == null)
             {
                 _ControlsHandler = Instance.gameObject.GetComponent<ControlsHandler>();
             }
