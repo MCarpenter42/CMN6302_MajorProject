@@ -30,7 +30,7 @@ public class UIManager : Core
 {
 	#region [ OBJECTS / COMPONENTS ]
 
-	[SerializeField] HUDManager hudManager;
+	public HUDManager hudManager;
 
 	#endregion
 

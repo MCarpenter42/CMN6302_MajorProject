@@ -33,7 +33,7 @@ public class PlayerCam : Core
 
     [SerializeField] GameObject toFollow;
     [SerializeField] GameObject pivot;
-    public GameObject cam;
+    public Camera cam;
 
     #endregion
 

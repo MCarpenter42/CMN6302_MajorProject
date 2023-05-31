@@ -26,25 +26,23 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
 
-public class InDevDoor : Core
+public class PathingHandler : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 
-    [SerializeField] GameObject pivot;
+    public List<PathPointSet> pointSets = new List<PathPointSet>();
 
     #endregion
 
     #region [ PROPERTIES ]
 
-    [SerializeField] bool openClockwise = true;
-    private bool isOpen = false;
-    private bool moving = false;
+
 
     #endregion
 
     #region [ COROUTINES ]
 
-    private Coroutine c_rotate = null;
+
 
     #endregion
 
@@ -76,38 +74,5 @@ public class InDevDoor : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public void Toggle()
-    {
-        SetOpen(!isOpen);
-    }
 
-    public void SetOpen(bool open)
-    {
-        if (!moving)
-        {
-            if (c_rotate != null)
-                StopCoroutine(c_rotate);
-            c_rotate = StartCoroutine(ISetOpen(open));
-        }
-    }
-
-    private IEnumerator ISetOpen(bool open)
-    {
-        moving = true;
-        float rotStart = pivot.transform.localEulerAngles.y, rotCurrent;
-        float rotTarget = open ? (openClockwise ? 90.0f : -90.0f) : 0.0f;
-        float rotDiff = rotTarget - rotStart;
-        float t = 0.0f, delta;
-        while (t <= 0.25f)
-        {
-            yield return null;
-            t += Time.deltaTime;
-            delta = t / 0.25f;
-            rotCurrent = rotStart + rotDiff * delta;
-            pivot.transform.localEulerAngles = new Vector3(0.0f, rotCurrent, 0.0f);
-        }
-        pivot.transform.localEulerAngles = new Vector3(0.0f, rotTarget, 0.0f);
-        moving  = false;
-        isOpen = open;
-    }
 }

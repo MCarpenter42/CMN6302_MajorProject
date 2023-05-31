@@ -25,12 +25,14 @@ using NeoCambion.Unity;
 using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
+using Unity.VisualScripting;
 
 public class WorldPlayer : WorldEntityCore
 {
     #region [ OBJECTS / COMPONENTS ]
 
     private List<InteractPoint> interactions = new List<InteractPoint>();
+    public InteractPoint targetInteract { get { return targetInteractInd > -1 ? interactions[targetInteractInd] : null; } }
 
     #endregion
 
@@ -38,10 +40,13 @@ public class WorldPlayer : WorldEntityCore
 
     private Vector3 camDir { get { return UnityExt_Vector3.Flatten(GameManager.Instance.cameraW.facingVector); } }
 
+    public float sprintMultiplier = 2.0f;
+    [HideInInspector] public bool sprintActive = false;
+
     [SerializeField] float interactionRange = 3.0f;
     [SerializeField] float maxInteractAngle = 40.0f;
     private List<int> inRangeInteracts = new List<int>();
-    private int targetInteract = -1;
+    private int targetInteractInd = -1;
 
     #endregion
 
@@ -70,7 +75,7 @@ public class WorldPlayer : WorldEntityCore
         base.Update();
         GetInRangeInteracts();
         int newTarget = GetTargetInteract();
-        if (newTarget != targetInteract)
+        if (newTarget != targetInteractInd)
             UpdateTargetInteract(newTarget);
     }
 
@@ -85,17 +90,15 @@ public class WorldPlayer : WorldEntityCore
 
     public override void Move(Vector3 velocity, bool turnToFace = true)
     {
-        string vStr = velocity.magnitude.ToString() + ", ";
-        velocity = VelCamTransform(velocity * maxSpeed * Time.fixedDeltaTime);
-        vStr += velocity.magnitude.ToString();
-        transform.position += velocity;
+        velocity = VelCamTransform(velocity * maxSpeed * (sprintActive ? sprintMultiplier : 1.0f));
+        //transform.position += velocity;
+        rb.velocity = velocity;
         if (turnToFace)
         {
             Vector2 vDir = new Vector2(velocity.x, velocity.z);
             float dir = vDir.Angle2D();
             RotateTo(dir, 0.1f);
         }
-        Debug.Log(vStr);
     }
 
     private Vector3 VelCamTransform(Vector3 velocity)
@@ -139,7 +142,7 @@ public class WorldPlayer : WorldEntityCore
     {
         float targetAngle = maxInteractAngle, angle;
         int targetIndex = -1;
-        Vector3 dir = Vector3.forward;
+        Vector3 dir;
         for (int i = 0; i < inRangeInteracts.Count; i++)
         {
             dir = (interactions[inRangeInteracts[i]].transform.position - transform.position).Flatten();
@@ -157,11 +160,12 @@ public class WorldPlayer : WorldEntityCore
     {
         if (index == -1)
         {
-
+            GameManager.Instance.UIManager.hudManager.interactHLVisible = false;
         }
         else
         {
-
+            GameManager.Instance.UIManager.hudManager.interactHLVisible = true;
         }
+        targetInteractInd = index;
     }
 }

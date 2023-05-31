@@ -34,7 +34,7 @@ public class GameManager : Core
 
     private static GameManager instance = null;
 
-    private UIManager _UIManager = null;
+    /*private UIManager _UIManager = null;
     public UIManager UIManager
     {
         get
@@ -47,7 +47,8 @@ public class GameManager : Core
             }
             return _UIManager;
         }
-    }
+    }*/
+    public UIManager UIManager = null;
     private ControlsHandler _ControlsHandler = null;
     public ControlsHandler ControlsHandler
     {
@@ -208,6 +209,8 @@ public class GameManager : Core
         float xPos = Camera.main.pixelWidth / 2.0f;
         float yPos = Camera.main.pixelHeight / 2.0f;
         windowCentre = new Vector3(xPos, yPos, 0.0f);
+
+        UIManager = FindObjectOfType<UIManager>();
 
         switch (controlState)
         {

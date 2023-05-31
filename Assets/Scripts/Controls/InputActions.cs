@@ -42,7 +42,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""name"": """",
                     ""id"": ""dadd05e7-720d-43ee-9a58-4a0e18a5484e"",
                     ""path"": ""<Gamepad>/start"",
-                    ""interactions"": """",
+                    ""interactions"": ""Tap"",
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""showHide"",
@@ -53,7 +53,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""name"": """",
                     ""id"": ""9e49c5d3-e371-4522-9581-b6cc640109b1"",
                     ""path"": ""<Keyboard>/escape"",
-                    ""interactions"": """",
+                    ""interactions"": ""Tap"",
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""showHide"",
@@ -76,6 +76,15 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": true
                 },
                 {
+                    ""name"": ""sprint"",
+                    ""type"": ""Button"",
+                    ""id"": ""8b20e364-e444-44db-8e8a-adc250195725"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
                     ""name"": ""cameraTurn"",
                     ""type"": ""Value"",
                     ""id"": ""a8b8d67b-c1ee-4332-9545-c02dc5d86ebc"",
@@ -83,6 +92,15 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""interact"",
+                    ""type"": ""Button"",
+                    ""id"": ""b8893bc8-6c35-405b-9a97-8e0954199031"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -173,6 +191,50 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
                     ""action"": ""cameraTurn"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""6f7aed3a-5de2-4863-83b1-bb503e778b29"",
+                    ""path"": ""<Gamepad>/buttonSouth"",
+                    ""interactions"": ""Tap"",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""interact"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c826d893-ea31-4808-ab20-9afff2cd195c"",
+                    ""path"": ""<Keyboard>/e"",
+                    ""interactions"": ""Tap"",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""interact"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""d4c93aae-8aaa-4845-b64d-82b3b2fb472f"",
+                    ""path"": ""<Gamepad>/leftTrigger"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""sprint"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""f354b499-7446-494e-8ea3-ad5085f06578"",
+                    ""path"": ""<Keyboard>/leftShift"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""sprint"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         },
@@ -241,7 +303,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
         // World
         m_World = asset.FindActionMap("World", throwIfNotFound: true);
         m_World_move = m_World.FindAction("move", throwIfNotFound: true);
+        m_World_sprint = m_World.FindAction("sprint", throwIfNotFound: true);
         m_World_cameraTurn = m_World.FindAction("cameraTurn", throwIfNotFound: true);
+        m_World_interact = m_World.FindAction("interact", throwIfNotFound: true);
         // Combat
         m_Combat = asset.FindActionMap("Combat", throwIfNotFound: true);
         m_Combat_Newaction = m_Combat.FindAction("New action", throwIfNotFound: true);
@@ -356,13 +420,17 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
     private readonly InputActionMap m_World;
     private List<IWorldActions> m_WorldActionsCallbackInterfaces = new List<IWorldActions>();
     private readonly InputAction m_World_move;
+    private readonly InputAction m_World_sprint;
     private readonly InputAction m_World_cameraTurn;
+    private readonly InputAction m_World_interact;
     public struct WorldActions
     {
         private @InputActions m_Wrapper;
         public WorldActions(@InputActions wrapper) { m_Wrapper = wrapper; }
         public InputAction @move => m_Wrapper.m_World_move;
+        public InputAction @sprint => m_Wrapper.m_World_sprint;
         public InputAction @cameraTurn => m_Wrapper.m_World_cameraTurn;
+        public InputAction @interact => m_Wrapper.m_World_interact;
         public InputActionMap Get() { return m_Wrapper.m_World; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -375,9 +443,15 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @move.started += instance.OnMove;
             @move.performed += instance.OnMove;
             @move.canceled += instance.OnMove;
+            @sprint.started += instance.OnSprint;
+            @sprint.performed += instance.OnSprint;
+            @sprint.canceled += instance.OnSprint;
             @cameraTurn.started += instance.OnCameraTurn;
             @cameraTurn.performed += instance.OnCameraTurn;
             @cameraTurn.canceled += instance.OnCameraTurn;
+            @interact.started += instance.OnInteract;
+            @interact.performed += instance.OnInteract;
+            @interact.canceled += instance.OnInteract;
         }
 
         private void UnregisterCallbacks(IWorldActions instance)
@@ -385,9 +459,15 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @move.started -= instance.OnMove;
             @move.performed -= instance.OnMove;
             @move.canceled -= instance.OnMove;
+            @sprint.started -= instance.OnSprint;
+            @sprint.performed -= instance.OnSprint;
+            @sprint.canceled -= instance.OnSprint;
             @cameraTurn.started -= instance.OnCameraTurn;
             @cameraTurn.performed -= instance.OnCameraTurn;
             @cameraTurn.canceled -= instance.OnCameraTurn;
+            @interact.started -= instance.OnInteract;
+            @interact.performed -= instance.OnInteract;
+            @interact.canceled -= instance.OnInteract;
         }
 
         public void RemoveCallbacks(IWorldActions instance)
@@ -504,7 +584,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
     public interface IWorldActions
     {
         void OnMove(InputAction.CallbackContext context);
+        void OnSprint(InputAction.CallbackContext context);
         void OnCameraTurn(InputAction.CallbackContext context);
+        void OnInteract(InputAction.CallbackContext context);
     }
     public interface ICombatActions
     {

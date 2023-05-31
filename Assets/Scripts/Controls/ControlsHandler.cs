@@ -56,8 +56,11 @@ public class ControlsHandler : Core
 
 		actions.World.move.performed += ActWorld.OnMove;
 		actions.World.move.canceled += ActWorld.OnMove;
+		actions.World.sprint.performed += ActWorld.OnSprint;
+		actions.World.sprint.canceled += ActWorld.OnSprint;
         actions.World.cameraTurn.performed += ActWorld.OnCameraTurn;
         actions.World.cameraTurn.canceled += ActWorld.OnCameraTurn;
+		actions.World.interact.performed += ActWorld.OnInteract;
 
 		actions.InDev.cursorLockToggle.performed += ActInDev.OnCursorLockToggle;
     }
@@ -136,6 +139,11 @@ public class ControlsHandler : Core
             GameManager.Instance.playerW.velScale = new Vector3(mv.x, 0, mv.y);
         }
 
+		public static void OnSprint(InputAction.CallbackContext context)
+		{
+			GameManager.Instance.playerW.sprintActive = context.ReadValueAsButton();
+		}
+
 		public static void OnCameraTurn(InputAction.CallbackContext context)
 		{
             if (Cursor.lockState == CursorLockMode.Locked)
@@ -145,6 +153,12 @@ public class ControlsHandler : Core
 				GameManager.Instance.cameraW.SetRotSpeed(rot);
 			}
 		}
+
+		public static void OnInteract(InputAction.CallbackContext context)
+		{
+			if (GameManager.controlState == ControlState.World && GameManager.Instance.playerW.targetInteract != null)
+                GameManager.Instance.playerW.targetInteract.Trigger();
+        }
 	}
 
 	private class ActCombat

@@ -84,5 +84,8 @@ public class InteractPoint : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-
+    public void Trigger()
+    {
+        onInteract.Invoke();
+    }
 }

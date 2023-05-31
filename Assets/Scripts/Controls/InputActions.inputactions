@@ -20,7 +20,7 @@
                     "name": "",
                     "id": "dadd05e7-720d-43ee-9a58-4a0e18a5484e",
                     "path": "<Gamepad>/start",
-                    "interactions": "",
+                    "interactions": "Tap",
                     "processors": "",
                     "groups": "",
                     "action": "showHide",
@@ -31,7 +31,7 @@
                     "name": "",
                     "id": "9e49c5d3-e371-4522-9581-b6cc640109b1",
                     "path": "<Keyboard>/escape",
-                    "interactions": "",
+                    "interactions": "Tap",
                     "processors": "",
                     "groups": "",
                     "action": "showHide",
@@ -54,6 +54,15 @@
                     "initialStateCheck": true
                 },
                 {
+                    "name": "sprint",
+                    "type": "Button",
+                    "id": "8b20e364-e444-44db-8e8a-adc250195725",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
                     "name": "cameraTurn",
                     "type": "Value",
                     "id": "a8b8d67b-c1ee-4332-9545-c02dc5d86ebc",
@@ -61,6 +70,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "interact",
+                    "type": "Button",
+                    "id": "b8893bc8-6c35-405b-9a97-8e0954199031",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -149,6 +167,50 @@
                     "processors": "",
                     "groups": "",
                     "action": "cameraTurn",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "6f7aed3a-5de2-4863-83b1-bb503e778b29",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "Tap",
+                    "processors": "",
+                    "groups": "",
+                    "action": "interact",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "c826d893-ea31-4808-ab20-9afff2cd195c",
+                    "path": "<Keyboard>/e",
+                    "interactions": "Tap",
+                    "processors": "",
+                    "groups": "",
+                    "action": "interact",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d4c93aae-8aaa-4845-b64d-82b3b2fb472f",
+                    "path": "<Gamepad>/leftTrigger",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "sprint",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f354b499-7446-494e-8ea3-ad5085f06578",
+                    "path": "<Keyboard>/leftShift",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "sprint",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

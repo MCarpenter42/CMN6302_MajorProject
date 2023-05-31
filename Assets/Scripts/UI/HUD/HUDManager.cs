@@ -36,7 +36,7 @@ public class HUDManager : Core
 
     #region [ PROPERTIES ]
 
-
+    [HideInInspector] public bool interactHLVisible = false;
 
     #endregion
 
@@ -52,7 +52,7 @@ public class HUDManager : Core
 
     void Awake()
     {
-
+        interactHighlight.Show(false);
     }
 
     void Start()
@@ -62,7 +62,10 @@ public class HUDManager : Core
 
     void Update()
     {
-
+        if (interactHLVisible != interactHighlight.visible)
+            interactHighlight.Show(interactHLVisible);
+        if (interactHLVisible)
+            UpdateInteractHighlight();
     }
 
     void FixedUpdate()
@@ -74,5 +77,9 @@ public class HUDManager : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-
+    private void UpdateInteractHighlight()
+    {
+        Vector3 objPos = GameManager.Instance.playerW.targetInteract.transform.position;
+        interactHighlight.transform.position = GameManager.Instance.cameraW.cam.WorldToScreenPoint(objPos);
+    }
 }

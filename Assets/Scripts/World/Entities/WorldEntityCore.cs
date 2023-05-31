@@ -32,6 +32,16 @@ public class WorldEntityCore : Core
     #region [ OBJECTS / COMPONENTS ]
 
     [SerializeField] GameObject model;
+    protected Rigidbody _rb;
+    public Rigidbody rb
+    {
+        get
+        {
+            if (_rb == null)
+                _rb = gameObject.GetOrAddComponent<Rigidbody>();
+            return _rb;
+        }
+    }
 
     #endregion
 
@@ -72,6 +82,8 @@ public class WorldEntityCore : Core
     {
         if (velScale.magnitude > 0.0f)
             Move(velScale);
+        else
+            rb.velocity = Vector3.zero;
     }
 
     #endregion
@@ -80,7 +92,8 @@ public class WorldEntityCore : Core
 
     public virtual void Move(Vector3 velocity, bool turnToFace = true)
     {
-        transform.position += velocity * maxSpeed * Time.fixedDeltaTime;
+        rb.velocity = velocity * maxSpeed;
+        //transform.position += velocity * maxSpeed * Time.fixedDeltaTime;
         if (turnToFace)
         {
             Vector2 vDir = new Vector2(velocity.x, velocity.z);
@@ -97,7 +110,7 @@ public class WorldEntityCore : Core
         model.transform.eulerAngles = rot;
     }
 
-    public virtual void Turn(float angle)
+    public virtual void Rotate(float angle)
     {
         SetRot(facing + angle);
     }
