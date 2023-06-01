@@ -6,6 +6,7 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
+using UnityEngine.AI;
 using UnityEditor;
 using TMPro;
 
@@ -47,6 +48,8 @@ public class WorldEntityCore : Core
 
     #region [ PROPERTIES ]
 
+    private bool hasNavMeshAgent;
+
     public float maxSpeed = 1.0f;
     [HideInInspector] public Vector3 velScale;
     [HideInInspector] public float facing = 0.0f;
@@ -65,7 +68,7 @@ public class WorldEntityCore : Core
 
     protected virtual void Awake()
     {
-
+        hasNavMeshAgent = GetComponent<NavMeshAgent>() != null;
     }
 
     protected virtual void Start()
@@ -80,10 +83,13 @@ public class WorldEntityCore : Core
 
     protected virtual void FixedUpdate()
     {
-        if (velScale.magnitude > 0.0f)
-            Move(velScale);
-        else
-            rb.velocity = Vector3.zero;
+        if (!hasNavMeshAgent)
+        {
+            if (velScale.magnitude > 0.0f)
+                Move(velScale);
+            else
+                rb.velocity = Vector3.zero;
+        }
     }
 
     #endregion

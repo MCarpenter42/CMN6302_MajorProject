@@ -152,6 +152,10 @@ public class ControlsHandler : Core
 				Vector2 rot = new Vector2(-val.y, val.x) * 0.1f;
 				GameManager.Instance.cameraW.SetRotSpeed(rot);
 			}
+			else
+            {
+				GameManager.Instance.cameraW.SetRotSpeed(Vector3.zero);
+			}
 		}
 
 		public static void OnInteract(InputAction.CallbackContext context)

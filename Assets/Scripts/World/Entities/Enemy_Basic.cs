@@ -42,6 +42,9 @@ public class Enemy_Basic : WorldEntityCore
     [SerializeField] bool move = true;
     private float moveDir = 0.0f;
 
+    private Vector3 lastPos = Vector3.zero;
+    private float targetRot = 0.0f;
+
     private List<int> availableRooms = new List<int>();
     private int targetRoom = -1, targetPoint = -1;
     [HideInInspector] public bool navigating = false;
@@ -87,9 +90,10 @@ public class Enemy_Basic : WorldEntityCore
         {
             if (!navAgent.hasPath && !gettingDestination)
                 GetNewTarget();
-            else
-                UpdateRotation();
+            /*else
+                UpdateRotation();*/
         }
+        lastPos = transform.position;
     }
 
     #endregion
@@ -104,9 +108,9 @@ public class Enemy_Basic : WorldEntityCore
         {
             roomMin = pathHandler.pointSets[i].boundaryArea.position - pathHandler.pointSets[i].boundaryArea.localScale / 2.0f;
             roomMax = roomMin + pathHandler.pointSets[i].boundaryArea.localScale;
-            bool xInRange = transform.position.x >= roomMin.x && transform.position.x <= roomMin.x;
-            bool yInRange = transform.position.y >= roomMin.y && transform.position.y <= roomMin.y;
-            bool zInRange = transform.position.z >= roomMin.z && transform.position.z <= roomMin.z;
+            bool xInRange = transform.position.x >= roomMin.x && transform.position.x <= roomMax.x;
+            bool yInRange = transform.position.y >= roomMin.y && transform.position.y <= roomMax.y;
+            bool zInRange = transform.position.z >= roomMin.z && transform.position.z <= roomMax.z;
             if (xInRange && yInRange && zInRange)
             {
                 return i;
@@ -119,18 +123,17 @@ public class Enemy_Basic : WorldEntityCore
         return initialRoom;
     }
 
-    private float rotFactor = 15.0f;
-
-    private void UpdateRotation()
+    /*private void UpdateRotation()
     {
-        Vector3 v = navAgent.nextPosition - transform.position;
+        Vector3 v = transform.position - lastPos;
         Vector2 vDir = new Vector2(v.x, v.z);
         float vFacing = vDir.Angle2D();
-        facing = transform.eulerAngles.y.WrapClamp(-180.0f, 180.0f);
-        float fDiff = (vFacing - facing);
-        Debug.Log(vDir + ", " + vFacing + ", " + facing + ", " + fDiff);
-        Rotate(fDiff > rotFactor * Time.fixedDeltaTime ? rotFactor * Time.fixedDeltaTime : fDiff);
-    }
+        if (Mathf.Abs(vFacing - targetRot.WrapClamp(-180.0f, 180.0f)) > 2.0f && Mathf.Abs(vFacing.WrapClamp(0.0f, 360.0f) - targetRot) > 2.0f)
+        {
+            targetRot = vFacing;
+            RotateTo(vFacing, 0.1f);
+        }
+    }*/
 
     private void GetNewTarget()
     {
