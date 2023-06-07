@@ -164,172 +164,102 @@ namespace NeoCambion.Unity.Editor
             }
         }
 
-        private static GUIStyle _textButtonRed = null;
         public static GUIStyle textButtonRed
         {
             get
             {
-                if (_textButtonRed == null)
-                {
-                    _textButtonRed = new GUIStyle(GUI.skin.button)
-                    {
-                        fontStyle = FontStyle.Bold,
-                        normal = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.normal.background,
-                            scaledBackgrounds = GUI.skin.button.normal.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(1.000f, 0.700f, 0.700f) : new Color(0.560f, 0.120f, 0.120f)
-                        },
-                        hover = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.hover.background,
-                            scaledBackgrounds = GUI.skin.button.hover.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(1.000f, 0.200f, 0.200f) : new Color(0.820f, 0.120f, 0.120f)
-                        }
-                    };
-                }
-                return _textButtonRed;
+                return ColouredTextButton(
+                    new Color(1.000f, 0.700f, 0.700f),
+                    new Color(1.000f, 0.200f, 0.200f),
+                    new Color(0.560f, 0.120f, 0.120f),
+                    new Color(0.820f, 0.120f, 0.120f)
+                    );
             }
         }
 
-        private static GUIStyle _textButtonGreen = null;
         public static GUIStyle textButtonGreen
         {
             get
             {
-                if (_textButtonGreen == null)
-                {
-                    _textButtonGreen = new GUIStyle(GUI.skin.button)
-                    {
-                        fontStyle = FontStyle.Bold,
-                        normal = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.normal.background,
-                            scaledBackgrounds = GUI.skin.button.normal.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(0.700f, 1.000f, 0.700f) : new Color(0.120f, 0.560f, 0.120f)
-                        },
-                        hover = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.hover.background,
-                            scaledBackgrounds = GUI.skin.button.hover.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(0.200f, 1.000f, 0.200f) : new Color(0.120f, 0.820f, 0.120f)
-                        }
-                    };
-                }
-                return _textButtonGreen;
+                return ColouredTextButton(
+                    new Color(0.700f, 1.000f, 0.700f),
+                    new Color(0.200f, 1.000f, 0.200f),
+                    new Color(0.120f, 0.560f, 0.120f),
+                    new Color(0.120f, 0.820f, 0.120f)
+                );
             }
         }
 
-        private static GUIStyle _textButtonBlue = null;
         public static GUIStyle textButtonBlue
         {
             get
             {
-                if (_textButtonBlue == null)
-                {
-                    _textButtonBlue = new GUIStyle(GUI.skin.button)
-                    {
-                        fontStyle = FontStyle.Bold,
-                        normal = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.normal.background,
-                            scaledBackgrounds = GUI.skin.button.normal.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(0.700f, 0.700f, 1.000f) : new Color(0.120f, 0.120f, 0.560f)
-                        },
-                        hover = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.hover.background,
-                            scaledBackgrounds = GUI.skin.button.hover.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(0.200f, 0.200f, 1.000f) : new Color(0.120f, 0.120f, 0.820f)
-                        }
-                    };
-                }
-                return _textButtonBlue;
+                return ColouredTextButton(
+                    new Color(0.700f, 0.700f, 1.000f),
+                    new Color(0.200f, 0.200f, 1.000f),
+                    new Color(0.120f, 0.120f, 0.560f),
+                    new Color(0.120f, 0.120f, 0.820f)
+                );
             }
         }
 
-        private static GUIStyle _textButtonLightBlue = null;
         public static GUIStyle textButtonLightBlue
         {
             get
             {
-                if (_textButtonLightBlue == null)
-                {
-                    _textButtonLightBlue = new GUIStyle(GUI.skin.button)
-                    {
-                        fontStyle = FontStyle.Bold,
-                        normal = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.normal.background,
-                            scaledBackgrounds = GUI.skin.button.normal.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(0.700f, 1.000f, 1.000f) : new Color(0.120f, 0.560f, 0.560f)
-                        },
-                        hover = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.hover.background,
-                            scaledBackgrounds = GUI.skin.button.hover.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(0.200f, 1.000f, 1.000f) : new Color(0.120f, 0.820f, 0.820f)
-                        }
-                    };
-                }
-                return _textButtonLightBlue;
+                return ColouredTextButton(
+                    new Color(0.700f, 1.000f, 1.000f),
+                    new Color(0.200f, 1.000f, 1.000f),
+                    new Color(0.120f, 0.560f, 0.560f),
+                    new Color(0.120f, 0.820f, 0.820f)
+                );
             }
         }
 
-        private static GUIStyle _textButtonOrange = null;
         public static GUIStyle textButtonOrange
         {
             get
             {
-                if (_textButtonOrange == null)
-                {
-                    _textButtonOrange = new GUIStyle(GUI.skin.button)
-                    {
-                        fontStyle = FontStyle.Bold,
-                        normal = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.normal.background,
-                            scaledBackgrounds = GUI.skin.button.normal.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(1.000f, 0.850f, 0.700f) : new Color(0.560f, 0.340f, 0.120f)
-                        },
-                        hover = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.hover.background,
-                            scaledBackgrounds = GUI.skin.button.hover.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(1.000f, 0.600f, 0.200f) : new Color(0.820f, 0.470f, 0.120f)
-                        }
-                    };
-                }
-                return _textButtonOrange; 
+                return ColouredTextButton(
+                    new Color(1.000f, 0.850f, 0.700f),
+                    new Color(1.000f, 0.600f, 0.200f),
+                    new Color(0.560f, 0.340f, 0.120f),
+                    new Color(0.820f, 0.470f, 0.120f)
+                );
             }
         }
 
-        private static GUIStyle _textButtonPurple = null;
         public static GUIStyle textButtonPurple
         {
             get
             {
-                if (_textButtonPurple == null)
-                {
-                    _textButtonPurple = new GUIStyle(GUI.skin.button)
-                    {
-                        fontStyle = FontStyle.Bold,
-                        normal = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.normal.background,
-                            scaledBackgrounds = GUI.skin.button.normal.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(0.850f, 0.700f, 1.000f) : new Color(0.340f, 0.120f, 0.560f)
-                        },
-                        hover = new GUIStyleState()
-                        {
-                            background = GUI.skin.button.hover.background,
-                            scaledBackgrounds = GUI.skin.button.hover.scaledBackgrounds,
-                            textColor = darkTheme ? new Color(0.700f, 0.400f, 1.000f) : new Color(0.470f, 0.120f, 0.820f)
-                        }
-                    };
-                }
-                return _textButtonPurple; 
+                return ColouredTextButton(
+                    new Color(0.850f, 0.700f, 1.000f),
+                    new Color(0.700f, 0.400f, 1.000f),
+                    new Color(0.340f, 0.120f, 0.560f),
+                    new Color(0.470f, 0.120f, 0.820f)
+                );
             }
+        }
+
+        public static GUIStyle ColouredTextButton(Color clrNormalDark, Color clrHoverDark, Color clrNormalLight, Color clrHoverLight, FontStyle fontStyle = FontStyle.Bold)
+        {
+            return new GUIStyle(GUI.skin.button)
+            {
+                fontStyle = fontStyle,
+                normal = new GUIStyleState()
+                {
+                    background = GUI.skin.button.normal.background,
+                    scaledBackgrounds = GUI.skin.button.normal.scaledBackgrounds,
+                    textColor = darkTheme ? clrNormalDark : clrNormalLight
+                },
+                hover = new GUIStyleState()
+                {
+                    background = GUI.skin.button.hover.background,
+                    scaledBackgrounds = GUI.skin.button.hover.scaledBackgrounds,
+                    textColor = darkTheme ? clrHoverDark : clrHoverLight
+                }
+            };
         }
     }
 
@@ -592,7 +522,7 @@ namespace NeoCambion.Unity.Editor
                 border = new RectOffset(0, 0, 0, 0),
                 stretchHeight = true
             };
-            GUILayout.Label("", greyRectStyle, GUILayout.Width(width), GUILayout.Height(height), GUILayout.ExpandWidth(expandWidth), GUILayout.ExpandHeight(expandHeight));
+            GUILayout.Label("", greyRectStyle, GUILayout.Width(width), GUILayout.Height(height), GUILayout.ExpandWidth(expandWidth), GUILayout.ExpandHeight(expandHeight || height <= 0.0f));
         }
         
         public static void GreyRect(float minWidth, float maxWidth, float minHeight, float maxHeight)
@@ -1153,3 +1083,104 @@ namespace NeoCambion.Unity.Editor
         }
     }
 }
+
+// CUSTOM EDITOR WINDOW CLASS TEMPLATE
+/*public class PH_CLASS_NAME : EditorWindow
+{
+    protected static EditorWindow _Window = null;
+    public static EditorWindow Window
+    {
+        get
+        {
+            if (_Window == null)
+                _Window = GetWindow(typeof(PH_CLASS_NAME));
+            return _Window;
+        }
+    }
+
+    #region [ OBJECTS / COMPONENTS ]
+
+
+
+    #endregion
+
+    #region [ OBJECT-COMPONENT VALIDATION ]
+
+
+
+    #endregion
+
+    #region [ PROPERTIES ]
+
+    private Vector2 scrollPos = new Vector2();
+
+    #region < REGION TOGGLES >
+
+    bool showGuide = false;
+
+    bool showObjectFields = true;
+
+    private bool showChunkSel = true;
+    private bool showChunkSelType = true;
+    private int chunkSelType = 0;
+    private string[] chunkSelOptions = new string[] { "Single Chunk", "Chunk Range" };
+
+    private bool showOptions = true;
+
+    #endregion
+
+    #region < UTILITY OBJECTS / DATA >
+
+    GUIContent label = new GUIContent();
+    Rect elementRect;
+
+    #endregion
+
+    private float lastAvWidth;
+
+    #endregion
+
+    / * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - * /
+
+    #region [ BUILT-IN UNITY FUNCTIONS ]
+
+    void OnGUI()
+    {
+        GUI.enabled = true;
+
+        float slHeight = EditorGUIUtility.singleLineHeight;
+        bool darkTheme = GUI.skin.label.normal.textColor.ApproximatelyEquals(new Color(0.824f, 0.824f, 0.824f, 1.000f), 0.005f);
+        RectOffset rOffZero = new RectOffset(0, 0, 0, 0);
+
+        EditorGUILayout.BeginHorizontal(EditorStyles.inspectorFullWidthMargins);
+        {
+            float avWidth = EditorGUILayout.BeginVertical(EditorStylesExtras.noMarginsNoPadding).width;
+            if (avWidth > 0.0f)
+                lastAvWidth = avWidth;
+            else
+                avWidth = lastAvWidth;
+            {
+ 
+            }
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.EndHorizontal();
+    }
+
+    void OnValidate()
+    {
+        // <Cache loading & w/e here>
+    }
+
+    [MenuItem("Window/<Submenu Path>/<Window Name>")]
+    public static void ShowWindow()
+    {
+        _Window = GetWindow(typeof(PH_CLASS_NAME));
+        Window.titleContent = new GUIContent("<Window Title>");
+    }
+
+    #endregion
+
+    / * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - * /
+
+}*/

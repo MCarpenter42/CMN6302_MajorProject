@@ -138,6 +138,12 @@ public class WorldPlayer : WorldEntityCore
         }
     }
 
+    private bool IsInteractVisible(InteractPoint interact)
+    {
+        Vector3 rayDir = interact.transform.position - transform.position;
+        return !Physics.Raycast(transform.position, rayDir.normalized, rayDir.magnitude);
+    }
+
     private int GetTargetInteract()
     {
         float targetAngle = maxInteractAngle, angle;
@@ -145,12 +151,15 @@ public class WorldPlayer : WorldEntityCore
         Vector3 dir;
         for (int i = 0; i < inRangeInteracts.Count; i++)
         {
-            dir = (interactions[inRangeInteracts[i]].transform.position - transform.position).Flatten();
-            angle = Vector3.Angle(dir, camDir);
-            if (angle < targetAngle)
+            if (IsInteractVisible(interactions[inRangeInteracts[i]]))
             {
-                targetAngle = angle;
-                targetIndex = inRangeInteracts[i];
+                dir = (interactions[inRangeInteracts[i]].transform.position - transform.position).Flatten();
+                angle = Vector3.Angle(dir, camDir);
+                if (angle < targetAngle)
+                {
+                    targetAngle = angle;
+                    targetIndex = inRangeInteracts[i];
+                }
             }
         }
         return targetIndex;

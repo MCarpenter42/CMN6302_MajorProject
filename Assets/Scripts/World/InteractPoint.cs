@@ -55,6 +55,7 @@ public class InteractPoint : Core
 
     void Awake()
     {
+
     }
 
     void Start()

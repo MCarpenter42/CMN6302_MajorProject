@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 5921c02495d5d7d40a9fe9c4e735d68d
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - m_ViewDataDictionary: {instanceID: 0}
+  - gameManager: {fileID: 6093536486883756753, guid: c5274dd0c7ee73845a05222cb1add373, type: 3}
+  - ddBtnDownNormal: {fileID: 2800000, guid: 440fa5dd73532514eae13856e8392012, type: 3}
+  - ddBtnDownHover: {fileID: 2800000, guid: f94e3447e15b46d448379f0acb0e055b, type: 3}
+  - ddBtnUpNormal: {fileID: 2800000, guid: d87fb685dfd184b4cb05c3a050b05b21, type: 3}
+  - ddBtnUpHover: {fileID: 2800000, guid: 366fe4ba9dfadf841bf84ab91ac10cbb, type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

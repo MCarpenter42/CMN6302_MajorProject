@@ -25,9 +25,9 @@ using NeoCambion.Unity;
 using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
-using UnityEditor.Experimental.Rendering;
 
 [RequireComponent(typeof(ControlsHandler))]
+[RequireComponent(typeof(ElementDataStorage))]
 public class GameManager : Core
 {
     #region [ OBJECTS / COMPONENTS ]
@@ -59,6 +59,18 @@ public class GameManager : Core
                 _ControlsHandler = Instance.gameObject.GetComponent<ControlsHandler>();
             }
             return _ControlsHandler;
+        }
+    }
+    private ElementDataStorage _ElementDataStorage = null;
+    public ElementDataStorage ElementDataStorage
+    {
+        get
+        {
+            if (_ElementDataStorage == null)
+            {
+                _ElementDataStorage = Instance.gameObject.GetComponent<ElementDataStorage>();
+            }
+            return _ElementDataStorage;
         }
     }
 
@@ -117,6 +129,7 @@ public class GameManager : Core
 
                     Debug.Log(obj.name);
                 }
+                instance = inst;
             }
             return instance;
         }

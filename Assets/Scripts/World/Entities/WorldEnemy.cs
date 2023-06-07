@@ -28,7 +28,7 @@ using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
 
 [RequireComponent(typeof(NavMeshAgent))]
-public class Enemy_Basic : WorldEntityCore
+public class WorldEnemy : WorldEntityCore
 {
     #region [ OBJECTS / COMPONENTS ]
 
@@ -49,6 +49,8 @@ public class Enemy_Basic : WorldEntityCore
     private int targetRoom = -1, targetPoint = -1;
     [HideInInspector] public bool navigating = false;
     private bool gettingDestination = false;
+
+    public EnemyType[] enemyTypes;
 
     #endregion
 
