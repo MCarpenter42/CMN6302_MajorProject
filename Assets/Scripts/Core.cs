@@ -28,7 +28,7 @@ using NeoCambion.Unity.IO;
 
 #region [ ENUM TYPES ]
 
-public enum ControlState { Menu, World, Combat }
+public enum ControlState { None, Menu, World, Combat }
 
 #endregion
 

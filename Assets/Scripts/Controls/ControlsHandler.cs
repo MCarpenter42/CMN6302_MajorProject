@@ -135,39 +135,54 @@ public class ControlsHandler : Core
 	{
 		public static void OnMove(InputAction.CallbackContext context)
 		{
-			Vector2 mv = context.ReadValue<Vector2>();
-            GameManager.Instance.playerW.velScale = new Vector3(mv.x, 0, mv.y);
+			if (GameManager.controlState == ControlState.World)
+            {
+				Vector2 mv = context.ReadValue<Vector2>();
+				GameManager.Instance.playerW.velScale = new Vector3(mv.x, 0, mv.y);
+			}
         }
 
 		public static void OnSprint(InputAction.CallbackContext context)
 		{
-			GameManager.Instance.playerW.sprintActive = context.ReadValueAsButton();
+			if (GameManager.controlState == ControlState.World)
+			{
+				GameManager.Instance.playerW.sprintActive = context.ReadValueAsButton();
+			}
 		}
 
 		public static void OnCameraTurn(InputAction.CallbackContext context)
 		{
-            if (Cursor.lockState == CursorLockMode.Locked)
+			if (GameManager.controlState == ControlState.World)
 			{
-                Vector2 val = context.ReadValue<Vector2>();
-				Vector2 rot = new Vector2(-val.y, val.x) * 0.1f;
-				GameManager.Instance.cameraW.SetRotSpeed(rot);
-			}
-			else
-            {
-				GameManager.Instance.cameraW.SetRotSpeed(Vector3.zero);
+				if (Cursor.lockState == CursorLockMode.Locked)
+				{
+					Vector2 val = context.ReadValue<Vector2>();
+					Vector2 rot = new Vector2(-val.y, val.x) * 0.1f;
+					GameManager.Instance.cameraW.SetRotSpeed(rot);
+				}
+				else
+				{
+					GameManager.Instance.cameraW.SetRotSpeed(Vector3.zero);
+				}
 			}
 		}
 
 		public static void OnInteract(InputAction.CallbackContext context)
 		{
-			if (GameManager.controlState == ControlState.World && GameManager.Instance.playerW.targetInteract != null)
-                GameManager.Instance.playerW.targetInteract.Trigger();
+			if (GameManager.controlState == ControlState.World)
+			{
+				if (GameManager.controlState == ControlState.World && GameManager.Instance.playerW.targetInteract != null)
+					GameManager.Instance.playerW.targetInteract.Trigger();
+			}
         }
 	}
 
 	private class ActCombat
 	{
+		/*if (GameManager.controlState == ControlState.Combat)
+		{
 
+		}*/
 	}
 
 	private class ActInDev

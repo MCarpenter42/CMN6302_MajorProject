@@ -39,7 +39,8 @@ public class WorldEnemy : WorldEntityCore
 
     #region [ PROPERTIES ]
 
-    [SerializeField] bool move = true;
+    [Header("World Options")]
+    [SerializeField] bool roam = true;
     private float moveDir = 0.0f;
 
     private Vector3 lastPos = Vector3.zero;
@@ -50,6 +51,9 @@ public class WorldEnemy : WorldEntityCore
     [HideInInspector] public bool navigating = false;
     private bool gettingDestination = false;
 
+    [Header("Combat Options")]
+    [Range(1, 30)]
+    public int level = 1;
     public EnemyType[] enemyTypes;
 
     #endregion
@@ -74,6 +78,7 @@ public class WorldEnemy : WorldEntityCore
     protected override void Start()
     {
         base.Start();
+        GameManager.Instance.enemyListW.Add(this);
         int initialRoom = GetInitialRoom();
         int startPoint = Random.Range(0, pathHandler.pointSets[initialRoom].pathPoints.Count);
         transform.position = pathHandler.pointSets[initialRoom].pathPoints[startPoint];
@@ -88,7 +93,7 @@ public class WorldEnemy : WorldEntityCore
     protected override void FixedUpdate()
     {
         base.FixedUpdate();
-        if (move)
+        if (roam && !navAgent.isStopped)
         {
             if (!navAgent.hasPath && !gettingDestination)
                 GetNewTarget();
@@ -151,5 +156,22 @@ public class WorldEnemy : WorldEntityCore
         //Debug.Log(availableRooms[targetRoom] + ", " + targetPoint);
         navAgent.SetDestination(pathHandler.pointSets[availableRooms[targetRoom]].pathPoints[targetPoint]);
         gettingDestination = false;
+    }
+
+    public void GoToCombat()
+    {
+        GameManager.Instance.OnCombatStart(this);
+    }
+
+    public void PauseBehaviour(bool pause)
+    {
+        if (pause)
+        {
+            navAgent.isStopped = true;
+        }
+        else
+        {
+            navAgent.isStopped = false;
+        }
     }
 }

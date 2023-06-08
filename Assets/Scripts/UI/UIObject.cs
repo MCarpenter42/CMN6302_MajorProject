@@ -26,11 +26,22 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
 
+[RequireComponent(typeof(RectTransform))]
 public class UIObject : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 
     protected GameObject[] contents;
+    protected RectTransform _rTransform = null;
+    public RectTransform rTransform
+    {
+        get
+        {
+            if (_rTransform == null)
+                _rTransform = GetComponent<RectTransform>();
+            return _rTransform;
+        }
+    }
 
     #endregion
 

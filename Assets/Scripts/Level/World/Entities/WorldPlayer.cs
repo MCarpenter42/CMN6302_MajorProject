@@ -40,6 +40,7 @@ public class WorldPlayer : WorldEntityCore
 
     private Vector3 camDir { get { return UnityExt_Vector3.Flatten(GameManager.Instance.cameraW.facingVector); } }
 
+    [Header("Player")]
     public float sprintMultiplier = 2.0f;
     [HideInInspector] public bool sprintActive = false;
 
@@ -169,11 +170,11 @@ public class WorldPlayer : WorldEntityCore
     {
         if (index == -1)
         {
-            GameManager.Instance.UIManager.hudManager.interactHLVisible = false;
+            GameManager.Instance.UI.HUD.interactHLVisible = false;
         }
         else
         {
-            GameManager.Instance.UIManager.hudManager.interactHLVisible = true;
+            GameManager.Instance.UI.HUD.interactHLVisible = true;
         }
         targetInteractInd = index;
     }

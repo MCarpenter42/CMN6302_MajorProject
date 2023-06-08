@@ -24,8 +24,7 @@ public class Window_Enemies : EditorWindow
 
     #region [ OBJECTS / COMPONENTS ]
 
-    public GameManager gameManager;
-    public string gmPrefabPath { get { return AssetDatabase.GetAssetPath(gameManager.gameObject); } }
+
 
     #endregion
 
@@ -69,7 +68,6 @@ public class Window_Enemies : EditorWindow
     void OnGUI()
     {
         GUI.enabled = true;
-        bool dataModified = false;
 
         float slHeight = EditorGUIUtility.singleLineHeight;
         bool darkTheme = GUI.skin.label.normal.textColor.ApproximatelyEquals(new Color(0.824f, 0.824f, 0.824f, 1.000f), 0.005f);
@@ -104,168 +102,160 @@ public class Window_Enemies : EditorWindow
             {
                 EditorGUILayout.Space(8.0f);
 
-                label.text = "GameManager Prefab";
+                label.text = "ENEMIES";
                 label.tooltip = null;
 
-                gameManager = (GameManager)EditorGUILayout.ObjectField(label, gameManager, typeof(GameManager), false);
+                elementRect = EditorGUILayout.GetControlRect(true, slHeight);
+                EditorElements.Header(elementRect, label, 18);
 
-                if (gameManager != null)
+                Vector2 bSize;
+                Rect btnRect;
+
+                if (Window.docked)
                 {
-                    LoadCache();
-                    if (enemyList.Count == 0)
-                        enemyList = gameManager.ElementDataStorage.Enemies;
-
-                    //EditorGUILayout.Space(8.0f);
-
-                    EditorElements.SeparatorBar();
-
-                    label.text = "ENEMIES";
-                    label.tooltip = null;
-
-                    elementRect = EditorGUILayout.GetControlRect(true, slHeight);
-                    EditorElements.Header(elementRect, label, 18);
-
-                    Vector2 bSize;
-                    Rect btnRect;
-
-                    if (Window.docked)
-                    {
-                        btnRect = new Rect(elementRect);
-                        btnRect.size = new Vector2(56, 20);
-                        btnRect.y += (elementRect.height - btnRect.height) / 2;
-                        if (GUI.Button(btnRect, "Undock", GUI.skin.button))
-                        {
-                            Window.position = Window.position;
-                        }
-                    }
-
-                    EditorElements.SeparatorBar();
-
-                    elementRect = EditorGUILayout.GetControlRect(true, slHeight + 2);
-                    bSize = Vector2.one * (elementRect.height + 4);
-                    elementRect.width -= bSize.x + 4;
-
-                    bool showPickListTemp = enemyList.Count > 0 ? showPickList : true;
-
-                    label.text = showPickListTemp ? "Select Enemy to Edit" : "Editing: \"" + enemyList[selectedEnemy].displayName + "\"";
-                    label.tooltip = null;
-
-                    EditorElements.Header(elementRect, label, 13, TextAnchor.MiddleLeft);
-
-                    label.text = showPickListTemp ? "-" : "+";
-                    label.tooltip = (showPickListTemp ? "Hide" : "Show") + " list of\ncreated enemies";
-
                     btnRect = new Rect(elementRect);
-                    btnRect.size = bSize;
-                    btnRect.x += elementRect.width + 4;
-                    if (GUI.Button(btnRect, label, boldButton))
+                    btnRect.size = new Vector2(56, 20);
+                    btnRect.y += (elementRect.height - btnRect.height) / 2;
+                    if (GUI.Button(btnRect, "Undock", GUI.skin.button))
                     {
-                        showPickList = enemyList.Count > 0 ? !showPickList : true;
+                        Window.position = Window.position;
                     }
+                }
 
-                    EditorGUILayout.Space(4.0f);
+                EditorElements.SeparatorBar();
 
-                    if (showPickListTemp)
+                elementRect = EditorGUILayout.GetControlRect(true, slHeight + 2);
+                bSize = Vector2.one * (elementRect.height + 4);
+                elementRect.width -= bSize.x + 4;
+
+                bool _showPickList = (enemyList.Count > 0 && enemyList.InBounds(selectedEnemy)) ? showPickList : true;
+
+                label.text = _showPickList ? "Select Enemy to Edit" : "Editing: \"" + enemyList[selectedEnemy].displayName + "\"";
+                label.tooltip = null;
+
+                EditorElements.Header(elementRect, label, 13, TextAnchor.MiddleLeft);
+
+                label.text = _showPickList ? "-" : "+";
+                label.tooltip = (_showPickList ? "Hide" : "Show") + " list of\ncreated enemies";
+
+                btnRect = new Rect(elementRect);
+                btnRect.size = bSize;
+                btnRect.x += elementRect.width + 4;
+                if (GUI.Button(btnRect, label, boldButton))
+                {
+                    showPickList = enemyList.Count > 0 ? !showPickList : true;
+                }
+
+                EditorGUILayout.Space(4.0f);
+
+                if (_showPickList)
+                {
+                    EditorGUILayout.BeginHorizontal(enemyListBg);
+                }
+                Vector2 scrollPos = _showPickList ? scrollPosList : scrollPosMain;
+                scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false);
+                {
+                    if (_showPickList)
                     {
-                        EditorGUILayout.BeginHorizontal(enemyListBg);
-                    }
-                    Vector2 scrollPos = showPickList ? scrollPosList : scrollPosMain;
-                    scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false);
-                    {
-                        if (showPickListTemp)
+                        if (enemyList.Count > 0)
                         {
-                            if (enemyList.Count > 0)
+                            //EnemyData enemy in enemyList
+                            for (int i = 0; i < enemyList.Count; i++)
                             {
-                                //EnemyData enemy in enemyList
-                                for (int i = 0; i < enemyList.Count; i++)
+                                elementRect = EditorGUILayout.GetControlRect(true, slHeight + 4);
+                                bSize.y = elementRect.height;
+                                bSize.x = elementRect.height + 6;
+                                elementRect.width -= bSize.x + 4;
+                                if (GUI.Button(elementRect, enemyList[i].displayName))
                                 {
-                                    elementRect = EditorGUILayout.GetControlRect(true, slHeight + 4);
-                                    bSize.y = elementRect.height;
-                                    bSize.x = elementRect.height + 6;
-                                    elementRect.width -= bSize.x + 4;
-                                    if (GUI.Button(elementRect, enemyList[i].displayName))
-                                    {
-                                        selectedEnemy = i;
-                                        showPickList = false;
-                                    }
-
-                                    label.text = "X";
-                                    label.tooltip = "Delete \"" + enemyList[i].displayName + "\"";
-
-                                    elementRect.x += elementRect.width + 4;
-                                    elementRect.size = bSize;
-                                    if (GUI.Button(elementRect, label, EditorStylesExtras.textButtonRed))
-                                    {
-                                        enemyList.RemoveAt(i);
-                                        selectedEnemy = 0;
-                                        showPickList = true;
-                                        dataModified = true;
-                                    }
+                                    selectedEnemy = i;
+                                    showPickList = false;
                                 }
 
-                                EditorGUILayout.Space(2.0f);
+                                label.text = "X";
+                                label.tooltip = "Delete \"" + enemyList[i].displayName + "\"";
 
-                                elementRect = EditorGUILayout.GetControlRect(true, slHeight);
-                                elementRect.x += 40;
-                                elementRect.width -= 80;
-                                elementRect.height += 10;
-                                if (GUI.Button(elementRect, "Create New Enemy"))
+                                elementRect.x += elementRect.width + 4;
+                                elementRect.size = bSize;
+                                if (GUI.Button(elementRect, label, EditorStylesExtras.textButtonRed))
                                 {
-                                    enemyList.Add(new EnemyData("New Enemy"));
-                                    selectedEnemy = enemyList.Count - 1;
-                                    showPickList = false;
-                                    dataModified = true;
+                                    enemyList.RemoveAt(i);
+                                    selectedEnemy = 0;
+                                    showPickList = true;
+                                    //dataModified = true;
                                 }
                             }
-                            else
+
+                            EditorGUILayout.Space(2.0f);
+
+                            elementRect = EditorGUILayout.GetControlRect(true, slHeight);
+                            elementRect.x += 40;
+                            elementRect.width -= 80;
+                            elementRect.height += 10;
+                            if (GUI.Button(elementRect, "Create New Enemy"))
                             {
-                                EditorGUILayout.Space(4.0f);
-                                EditorGUILayout.LabelField("No enemies created yet! Click below to add one", centreWrapLabel);
-                                EditorGUILayout.Space(2.0f);
-                                elementRect = EditorGUILayout.GetControlRect(true, slHeight);
-                                elementRect.x += 40;
-                                elementRect.width -= 80;
-                                elementRect.height += 10;
-                                if (GUI.Button(elementRect, "Create New Enemy"))
-                                {
-                                    enemyList.Add(new EnemyData("New Enemy"));
-                                    selectedEnemy = 0;
-                                    showPickList = false;
-                                    dataModified = true;
-                                }
+                                enemyList.Add(new EnemyData("New Enemy"));
+                                selectedEnemy = enemyList.Count - 1;
+                                showPickList = false;
+                                //dataModified = true;
                             }
                         }
                         else
                         {
-                            if (selectedEnemy > -1 && enemyList.Count > 0)
+                            EditorGUILayout.Space(4.0f);
+                            EditorGUILayout.LabelField("No enemies created yet! Click below to add one", centreWrapLabel);
+                            EditorGUILayout.Space(2.0f);
+                            elementRect = EditorGUILayout.GetControlRect(true, slHeight);
+                            elementRect.x += 40;
+                            elementRect.width -= 80;
+                            elementRect.height += 10;
+                            if (GUI.Button(elementRect, "Create New Enemy"))
                             {
-                                EditorGUILayout.Space(4.0f);
-
-                                string dispName = enemyList[selectedEnemy].displayName;
-
-                                label.text = "Display Name";
-                                label.tooltip = null;
-
-                                dispName = EditorGUILayout.DelayedTextField(label, dispName);
-                                if (dispName != enemyList[selectedEnemy].displayName)
-                                {
-                                    dataModified = true;
-                                }
-                                enemyList[selectedEnemy].displayName = dispName;
+                                enemyList.Add(new EnemyData("New Enemy"));
+                                selectedEnemy = 0;
+                                showPickList = false;
+                                //dataModified = true;
                             }
                         }
                     }
-                    EditorGUILayout.EndScrollView();
-                    if (showPickListTemp)
-                    {
-                        EditorGUILayout.EndHorizontal();
-                        scrollPosList = scrollPos;
-
-                    }
                     else
                     {
-                        scrollPosMain = scrollPos;
+                        if (selectedEnemy > -1 && enemyList.Count > 0)
+                        {
+                            EditorGUILayout.Space(4.0f);
+
+                            string dispName = enemyList[selectedEnemy].displayName;
+
+                            label.text = "Display Name";
+                            label.tooltip = null;
+
+                            dispName = EditorGUILayout.DelayedTextField(label, dispName);
+                            /*if (dispName != enemyList[selectedEnemy].displayName)
+                                dataModified = true;*/
+                            enemyList[selectedEnemy].displayName = dispName;
+
+                            EntityModel mdl = enemyList[selectedEnemy].model;
+
+                            label.text = "Model";
+                            label.tooltip = null;
+
+                            mdl = (EntityModel)EditorGUILayout.ObjectField(label, mdl, typeof(EntityModel), false);
+                            /*if (mdl != enemyList[selectedEnemy].model)
+                                dataModified = true;*/
+                            enemyList[selectedEnemy].model = mdl;
+                        }
                     }
+                }
+                EditorGUILayout.EndScrollView();
+                if (_showPickList)
+                {
+                    EditorGUILayout.EndHorizontal();
+                    scrollPosList = scrollPos;
+
+                }
+                else
+                {
+                    scrollPosMain = scrollPos;
                 }
                 EditorGUILayout.GetControlRect(false, 2.0f);
             }
@@ -273,12 +263,12 @@ public class Window_Enemies : EditorWindow
         }
         EditorGUILayout.EndHorizontal();
 
-        SaveCache(dataModified);
+        ElementDataStorage.SaveEnemyCache(enemyList);
     }
 
     void OnValidate()
     {
-        SaveCache();
+        enemyList = ElementDataStorage.LoadEnemyCache();
     }
 
     [MenuItem("Window/Game Elements/Enemy Maker")]
@@ -292,32 +282,4 @@ public class Window_Enemies : EditorWindow
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    string filepath { get { return Application.dataPath + "/Editor/Data/CACHE_EnemyData.json"; } }
-
-    private void SaveCache(bool overwritePrefab = false)
-    {
-        string jsonString = JsonUtility.ToJson(new EnemyList(enemyList));
-        File.WriteAllText(filepath, jsonString);
-        if (overwritePrefab)
-        {
-            GameManager.Instance.ElementDataStorage.Enemies = enemyList;
-            PrefabUtility.ApplyObjectOverride(GameManager.Instance.gameObject, gmPrefabPath, InteractionMode.AutomatedAction);
-        }
-    }
-
-    private void LoadCache()
-    {
-        if (File.Exists(filepath))
-        {
-            string jsonString = File.ReadAllText(filepath);
-            enemyList = jsonString.Length > 2 ? JsonUtility.FromJson<EnemyList>(jsonString).Enemies : new List<EnemyData>();
-        }
-        else
-        {
-            enemyList = new List<EnemyData>();
-            File.Create(filepath);
-            string jsonString = JsonUtility.ToJson(new EnemyList(enemyList));
-            File.WriteAllText(filepath, jsonString);
-        }
-    }
 }

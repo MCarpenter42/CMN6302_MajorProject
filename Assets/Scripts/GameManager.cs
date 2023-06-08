@@ -30,25 +30,12 @@ using NeoCambion.Unity.IO;
 [RequireComponent(typeof(ElementDataStorage))]
 public class GameManager : Core
 {
+    public static string prefabPath { get { return AssetDatabase.GetAssetPath(Instance.gameObject); } }
+
     #region [ OBJECTS / COMPONENTS ]
 
     private static GameManager instance = null;
 
-    /*private UIManager _UIManager = null;
-    public UIManager UIManager
-    {
-        get
-        {
-            if (_UIManager == null)
-            {
-                _UIManager = FindObjectOfType<UIManager>();
-                if (_UIManager == null)
-                    throw new System.Exception("ERROR: No UI Manager present in scene!");
-            }
-            return _UIManager;
-        }
-    }*/
-    public UIManager UIManager = null;
     private ControlsHandler _ControlsHandler = null;
     public ControlsHandler ControlsHandler
     {
@@ -74,8 +61,13 @@ public class GameManager : Core
         }
     }
 
+    public UIManager UI = null;
+    public LevelManager Level = null;
+
     public WorldPlayer playerW = null;
     public PlayerCam cameraW = null;
+
+    public List<WorldEnemy> enemyListW = new List<WorldEnemy>();
 
     #endregion
 
@@ -96,13 +88,13 @@ public class GameManager : Core
     public static bool allowPauseToggle = true;
     public static ControlState controlState = ControlState.World;
 
-    public static Vector2 windowCentre;
+    public static Vector2 windowCentre { get { return new Vector2(Screen.width, Screen.height) / 2.0f; } }
 
     #endregion
 
     #region [ COROUTINES ]
 
-
+    private Coroutine c_OnCombatEnd = null;
 
     #endregion
 
@@ -219,26 +211,30 @@ public class GameManager : Core
 
     public void OnAwake()
     {
-        float xPos = Camera.main.pixelWidth / 2.0f;
+        /*float xPos = Camera.main.pixelWidth / 2.0f;
         float yPos = Camera.main.pixelHeight / 2.0f;
-        windowCentre = new Vector3(xPos, yPos, 0.0f);
+        windowCentre = new Vector3(xPos, yPos, 0.0f);*/
 
-        UIManager = FindObjectOfType<UIManager>();
+        UI = FindObjectOfType<UIManager>();
+        Level = FindObjectOfType<LevelManager>();
 
-        switch (controlState)
+        if (controlState == ControlState.Menu)
         {
-            default:
-            case ControlState.Menu:
-                break;
 
-            case ControlState.World:
-                Cursor.lockState = CursorLockMode.Locked;
-                playerW = FindObjectOfType<WorldPlayer>();
-                cameraW = FindObjectOfType<PlayerCam>();
-                break;
+        }
+        else if (controlState == ControlState.World)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            playerW = FindObjectOfType<WorldPlayer>();
+            cameraW = FindObjectOfType<PlayerCam>();
 
-            case ControlState.Combat:
-                break;
+            enemyListW.Clear();
+
+            UI.HUD.ShowHUD(ControlState.World);
+        }
+        else
+        {
+
         }
     }
 
@@ -263,6 +259,40 @@ public class GameManager : Core
     public void OnLog()
     {
 
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    public void UpdateElementData()
+    {
+        Instance.ElementDataStorage.Enemies = ElementDataStorage.LoadEnemyCache();
+        PrefabUtility.ApplyObjectOverride(Instance, prefabPath, InteractionMode.AutomatedAction);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    public void OnCombatStart(WorldEnemy triggerEnemy)
+    {
+        foreach(WorldEnemy enemy in enemyListW)
+        {
+            enemy.PauseBehaviour(true);
+        }
+        Level.CombatTransition(true, 1.0f);
+    }
+
+    public void OnCombatEnd()
+    {
+        Level.CombatTransition(false, 1.0f);
+        c_OnCombatEnd = StartCoroutine(IOnCombatEnd(1.0f));
+    }
+
+    private IEnumerator IOnCombatEnd(float duration)
+    {
+        yield return new WaitForSeconds(duration);
+        foreach (WorldEnemy enemy in enemyListW)
+        {
+            enemy.PauseBehaviour(false);
+        }
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
