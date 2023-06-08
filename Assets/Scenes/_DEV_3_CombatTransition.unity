@@ -1436,6 +1436,8 @@ MonoBehaviour:
   facing: 0
   move: 1
   navigating: 0
+  enemyTypes:
+  - typeInd: 0
 --- !u!54 &292774862
 Rigidbody:
   m_ObjectHideFlags: 0
