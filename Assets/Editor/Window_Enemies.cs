@@ -67,6 +67,8 @@ public class Window_Enemies : EditorWindow
 
     void OnGUI()
     {
+        bool updateGameManager = false;
+
         GUI.enabled = true;
 
         float slHeight = EditorGUIUtility.singleLineHeight;
@@ -141,9 +143,12 @@ public class Window_Enemies : EditorWindow
                 btnRect = new Rect(elementRect);
                 btnRect.size = bSize;
                 btnRect.x += elementRect.width + 4;
-                if (GUI.Button(btnRect, label, boldButton))
+                if (selectedEnemy > -1)
                 {
-                    showPickList = enemyList.Count > 0 ? !showPickList : true;
+                    if (GUI.Button(btnRect, label, boldButton))
+                    {
+                        showPickList = enemyList.Count > 0 ? !showPickList : true;
+                    }
                 }
 
                 EditorGUILayout.Space(4.0f);
@@ -166,7 +171,7 @@ public class Window_Enemies : EditorWindow
                                 bSize.y = elementRect.height;
                                 bSize.x = elementRect.height + 6;
                                 elementRect.width -= bSize.x + 4;
-                                if (GUI.Button(elementRect, enemyList[i].displayName))
+                                if (GUI.Button(elementRect, enemyList[i].displayName, i == selectedEnemy ? EditorStylesExtras.ColouredTextButton(DynamicTextColour.lightBlue, FontStyle.Normal) : GUI.skin.button))
                                 {
                                     selectedEnemy = i;
                                     showPickList = false;
@@ -182,7 +187,7 @@ public class Window_Enemies : EditorWindow
                                     enemyList.RemoveAt(i);
                                     selectedEnemy = 0;
                                     showPickList = true;
-                                    //dataModified = true;
+                                    updateGameManager = true;
                                 }
                             }
 
@@ -197,7 +202,7 @@ public class Window_Enemies : EditorWindow
                                 enemyList.Add(new EnemyData("New Enemy"));
                                 selectedEnemy = enemyList.Count - 1;
                                 showPickList = false;
-                                //dataModified = true;
+                                updateGameManager = true;
                             }
                         }
                         else
@@ -214,7 +219,7 @@ public class Window_Enemies : EditorWindow
                                 enemyList.Add(new EnemyData("New Enemy"));
                                 selectedEnemy = 0;
                                 showPickList = false;
-                                //dataModified = true;
+                                updateGameManager = true;
                             }
                         }
                     }
@@ -263,12 +268,15 @@ public class Window_Enemies : EditorWindow
         }
         EditorGUILayout.EndHorizontal();
 
-        ElementDataStorage.SaveEnemyCache(enemyList);
+        ElementDataStorage.SaveCache(enemyList);
+
+        if (updateGameManager)
+            GameManager.Instance.UpdateElementData();
     }
 
     void OnValidate()
     {
-        enemyList = ElementDataStorage.LoadEnemyCache();
+        enemyList = ElementDataStorage.LoadCache<EnemyData>();
     }
 
     [MenuItem("Window/Game Elements/Enemy Maker")]

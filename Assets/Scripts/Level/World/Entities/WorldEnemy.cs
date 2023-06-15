@@ -160,7 +160,7 @@ public class WorldEnemy : WorldEntityCore
 
     public void GoToCombat()
     {
-        GameManager.Instance.OnCombatStart(this);
+        GameManager.Instance.OnCombatStart(gameObject.GetComponent<WorldEnemy>());
     }
 
     public void PauseBehaviour(bool pause)

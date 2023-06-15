@@ -27,10 +27,10 @@ using NeoCambion.Unity.Events;
 using NeoCambion.Unity.IO;
 
 [RequireComponent(typeof(ControlsHandler))]
-[RequireComponent(typeof(ElementDataStorage))]
 public class GameManager : Core
 {
     public static string prefabPath { get { return AssetDatabase.GetAssetPath(Instance.gameObject); } }
+    public TextAsset dataJSON;
 
     #region [ OBJECTS / COMPONENTS ]
 
@@ -48,18 +48,7 @@ public class GameManager : Core
             return _ControlsHandler;
         }
     }
-    private ElementDataStorage _ElementDataStorage = null;
-    public ElementDataStorage ElementDataStorage
-    {
-        get
-        {
-            if (_ElementDataStorage == null)
-            {
-                _ElementDataStorage = Instance.gameObject.GetComponent<ElementDataStorage>();
-            }
-            return _ElementDataStorage;
-        }
-    }
+    public ElementDataStorage ElementDataStorage = new ElementDataStorage();
 
     public UIManager UI = null;
     public LevelManager Level = null;
@@ -83,6 +72,18 @@ public class GameManager : Core
     #endregion
 
     public static bool onGameLoad = true;
+
+    public static bool applicationPlaying
+    {
+        get
+        {
+            bool playing = Application.isPlaying;
+#if UNITY_EDITOR
+            playing = playing || EditorApplication.isPlaying;
+#endif
+            return playing;
+        }
+    }
 
     public static bool gamePaused = false;
     public static bool allowPauseToggle = true;
@@ -211,6 +212,9 @@ public class GameManager : Core
 
     public void OnAwake()
     {
+        ElementDataStorage.LoadData();
+        // MAKE SURE THINGS PULL FROM THIS AT RUNTIME
+
         /*float xPos = Camera.main.pixelWidth / 2.0f;
         float yPos = Camera.main.pixelHeight / 2.0f;
         windowCentre = new Vector3(xPos, yPos, 0.0f);*/
@@ -265,12 +269,15 @@ public class GameManager : Core
     
     public void UpdateElementData()
     {
-        Instance.ElementDataStorage.Enemies = ElementDataStorage.LoadEnemyCache();
+        //EditorUtility.SetDirty(Instance.gameObject);
+        Instance.ElementDataStorage.Enemies = ElementDataStorage.LoadCache<EnemyData>();
         PrefabUtility.ApplyObjectOverride(Instance, prefabPath, InteractionMode.AutomatedAction);
+        //PrefabUtility.SavePrefabAsset((GameObject)Resources.Load("Prefabs/GameManager"));
+        AssetDatabase.SaveAssets();
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    
+
     public void OnCombatStart(WorldEnemy triggerEnemy)
     {
         foreach(WorldEnemy enemy in enemyListW)
@@ -278,6 +285,7 @@ public class GameManager : Core
             enemy.PauseBehaviour(true);
         }
         Level.CombatTransition(true, 1.0f);
+        Level.Combat.StartCombatDelayed(triggerEnemy.enemyTypes.AsData(), 0.5f);
     }
 
     public void OnCombatEnd()

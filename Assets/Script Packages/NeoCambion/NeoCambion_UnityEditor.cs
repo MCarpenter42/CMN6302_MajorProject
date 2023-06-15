@@ -61,6 +61,82 @@ namespace NeoCambion.Unity.Editor
         }
     }
 
+    public struct DynamicTextColour
+    {
+        public readonly Color normalDark;
+        public readonly Color hoverDark;
+        public readonly Color normalLight;
+        public readonly Color hoverLight;
+
+        #region [ DEFAULTS ]
+        public static DynamicTextColour red = new DynamicTextColour(
+            new Color(1.000f, 0.700f, 0.700f),
+            new Color(1.000f, 0.200f, 0.200f),
+            new Color(0.560f, 0.120f, 0.120f),
+            new Color(0.820f, 0.120f, 0.120f)
+        );
+        public static DynamicTextColour green = new DynamicTextColour(
+            new Color(0.700f, 1.000f, 0.700f),
+            new Color(0.200f, 1.000f, 0.200f),
+            new Color(0.120f, 0.560f, 0.120f),
+            new Color(0.120f, 0.820f, 0.120f)
+        );
+        public static DynamicTextColour blue = new DynamicTextColour(
+            new Color(0.700f, 0.700f, 1.000f),
+            new Color(0.200f, 0.200f, 1.000f),
+            new Color(0.120f, 0.120f, 0.560f),
+            new Color(0.120f, 0.120f, 0.820f)
+        );
+        public static DynamicTextColour lightBlue = new DynamicTextColour(
+            new Color(0.700f, 1.000f, 1.000f),
+            new Color(0.200f, 1.000f, 1.000f),
+            new Color(0.120f, 0.560f, 0.560f),
+            new Color(0.120f, 0.820f, 0.820f)
+        );
+        public static DynamicTextColour orange = new DynamicTextColour(
+            new Color(1.000f, 0.850f, 0.700f),
+            new Color(1.000f, 0.600f, 0.200f),
+            new Color(0.560f, 0.340f, 0.120f),
+            new Color(0.820f, 0.470f, 0.120f)
+        );
+        public static DynamicTextColour purple = new DynamicTextColour(
+            new Color(0.850f, 0.700f, 1.000f),
+            new Color(0.700f, 0.400f, 1.000f),
+            new Color(0.340f, 0.120f, 0.560f),
+            new Color(0.470f, 0.120f, 0.820f)
+        );
+        #endregion
+
+        public DynamicTextColour(Color normalDark, Color hoverDark, Color normalLight, Color hoverLight)
+        {
+            this.normalDark = normalDark;
+            this.hoverDark = hoverDark;
+            this.normalLight = normalLight;
+            this.hoverLight = hoverLight;
+        }
+
+        public Color this[bool hover, bool lightTheme]
+        {
+            get
+            {
+                if (hover)
+                {
+                    if (lightTheme)
+                        return hoverLight;
+                    else
+                        return hoverDark;
+                }
+                else
+                {
+                    if (lightTheme)
+                        return normalLight;
+                    else
+                        return normalDark;
+                }
+            }
+        }
+    }
+
     public class EditorStylesExtras
     {
         private static bool darkTheme { get { return GUI.skin.label.normal.textColor.ApproximatelyEquals(new Color(0.824f, 0.824f, 0.824f, 1.000f), 0.005f); } }
@@ -164,83 +240,17 @@ namespace NeoCambion.Unity.Editor
             }
         }
 
-        public static GUIStyle textButtonRed
-        {
-            get
-            {
-                return ColouredTextButton(
-                    new Color(1.000f, 0.700f, 0.700f),
-                    new Color(1.000f, 0.200f, 0.200f),
-                    new Color(0.560f, 0.120f, 0.120f),
-                    new Color(0.820f, 0.120f, 0.120f)
-                    );
-            }
-        }
+        public static GUIStyle textButtonRed { get { return ColouredTextButton(DynamicTextColour.red); } }
 
-        public static GUIStyle textButtonGreen
-        {
-            get
-            {
-                return ColouredTextButton(
-                    new Color(0.700f, 1.000f, 0.700f),
-                    new Color(0.200f, 1.000f, 0.200f),
-                    new Color(0.120f, 0.560f, 0.120f),
-                    new Color(0.120f, 0.820f, 0.120f)
-                );
-            }
-        }
+        public static GUIStyle textButtonGreen { get { return ColouredTextButton(DynamicTextColour.green); } }
 
-        public static GUIStyle textButtonBlue
-        {
-            get
-            {
-                return ColouredTextButton(
-                    new Color(0.700f, 0.700f, 1.000f),
-                    new Color(0.200f, 0.200f, 1.000f),
-                    new Color(0.120f, 0.120f, 0.560f),
-                    new Color(0.120f, 0.120f, 0.820f)
-                );
-            }
-        }
+        public static GUIStyle textButtonBlue { get { return ColouredTextButton(DynamicTextColour.blue); } }
 
-        public static GUIStyle textButtonLightBlue
-        {
-            get
-            {
-                return ColouredTextButton(
-                    new Color(0.700f, 1.000f, 1.000f),
-                    new Color(0.200f, 1.000f, 1.000f),
-                    new Color(0.120f, 0.560f, 0.560f),
-                    new Color(0.120f, 0.820f, 0.820f)
-                );
-            }
-        }
+        public static GUIStyle textButtonLightBlue { get { return ColouredTextButton(DynamicTextColour.lightBlue); } }
 
-        public static GUIStyle textButtonOrange
-        {
-            get
-            {
-                return ColouredTextButton(
-                    new Color(1.000f, 0.850f, 0.700f),
-                    new Color(1.000f, 0.600f, 0.200f),
-                    new Color(0.560f, 0.340f, 0.120f),
-                    new Color(0.820f, 0.470f, 0.120f)
-                );
-            }
-        }
+        public static GUIStyle textButtonOrange { get { return ColouredTextButton(DynamicTextColour.orange); } }
 
-        public static GUIStyle textButtonPurple
-        {
-            get
-            {
-                return ColouredTextButton(
-                    new Color(0.850f, 0.700f, 1.000f),
-                    new Color(0.700f, 0.400f, 1.000f),
-                    new Color(0.340f, 0.120f, 0.560f),
-                    new Color(0.470f, 0.120f, 0.820f)
-                );
-            }
-        }
+        public static GUIStyle textButtonPurple { get { return ColouredTextButton(DynamicTextColour.purple); } }
 
         public static GUIStyle ColouredTextButton(Color clrNormalDark, Color clrHoverDark, Color clrNormalLight, Color clrHoverLight, FontStyle fontStyle = FontStyle.Bold)
         {
@@ -258,6 +268,26 @@ namespace NeoCambion.Unity.Editor
                     background = GUI.skin.button.hover.background,
                     scaledBackgrounds = GUI.skin.button.hover.scaledBackgrounds,
                     textColor = darkTheme ? clrHoverDark : clrHoverLight
+                }
+            };
+        }
+
+        public static GUIStyle ColouredTextButton(DynamicTextColour clr, FontStyle fontStyle = FontStyle.Bold)
+        {
+            return new GUIStyle(GUI.skin.button)
+            {
+                fontStyle = fontStyle,
+                normal = new GUIStyleState()
+                {
+                    background = GUI.skin.button.normal.background,
+                    scaledBackgrounds = GUI.skin.button.normal.scaledBackgrounds,
+                    textColor = darkTheme ? clr[false, false] : clr[false, true]
+                },
+                hover = new GUIStyleState()
+                {
+                    background = GUI.skin.button.hover.background,
+                    scaledBackgrounds = GUI.skin.button.hover.scaledBackgrounds,
+                    textColor = darkTheme ? clr[true, false] : clr[true, true]
                 }
             };
         }

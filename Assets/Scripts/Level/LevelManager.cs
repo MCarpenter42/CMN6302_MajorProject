@@ -55,6 +55,8 @@ public class LevelManager : Core
     void Awake()
     {
         Combat = FindObjectOfType<CombatManager>();
+        if (Combat == null)
+            Debug.LogError("Combat manager not found!");
     }
 
     void Start()

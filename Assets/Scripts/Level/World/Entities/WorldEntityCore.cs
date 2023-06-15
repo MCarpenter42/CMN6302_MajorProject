@@ -71,7 +71,7 @@ public class WorldEntityCoreEditor : Editor
         }
         EditorGUILayout.PropertyField(maxSpeed, new GUIContent("Maximum Speed"));
         DrawPropertiesExcluding(serializedObject, propertiesInBaseClass);
-        Debug.Log(propertiesInBaseClass[0]);
+        //Debug.Log(propertiesInBaseClass[0]);
         serializedObject.ApplyModifiedProperties();
     }
 }
