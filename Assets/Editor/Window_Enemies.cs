@@ -65,6 +65,11 @@ public class Window_Enemies : EditorWindow
 
     #region [ BUILT-IN UNITY FUNCTIONS ]
 
+    void Awake()
+    {
+        enemyList = ElementDataStorage.LoadCache<EnemyData>();
+    }
+
     void OnGUI()
     {
         bool updateGameManager = false;
@@ -208,12 +213,10 @@ public class Window_Enemies : EditorWindow
                         else
                         {
                             EditorGUILayout.Space(4.0f);
-                            EditorGUILayout.LabelField("No enemies created yet! Click below to add one", centreWrapLabel);
-                            EditorGUILayout.Space(2.0f);
-                            elementRect = EditorGUILayout.GetControlRect(true, slHeight);
+                            EditorGUILayout.LabelField("No enemy data found! Click below to add one:", centreWrapLabel);
+                            elementRect = EditorGUILayout.GetControlRect(true, slHeight + 10);
                             elementRect.x += 40;
                             elementRect.width -= 80;
-                            elementRect.height += 10;
                             if (GUI.Button(elementRect, "Create New Enemy"))
                             {
                                 enemyList.Add(new EnemyData("New Enemy"));
@@ -221,6 +224,17 @@ public class Window_Enemies : EditorWindow
                                 showPickList = false;
                                 updateGameManager = true;
                             }
+
+                            /*EditorGUILayout.Space(12.0f);
+                            EditorGUILayout.LabelField("Alternatively, retrieve existing data:", centreWrapLabel);
+
+                            elementRect = EditorGUILayout.GetControlRect(true, slHeight + 10);
+                            elementRect.x += 40;
+                            elementRect.width -= 80;
+                            if (GUI.Button(elementRect, "Retrieve Enemy Data"))
+                            {
+                                enemyList = ElementDataStorage.LoadCache<EnemyData>();
+                            }*/
                         }
                     }
                     else

@@ -89,7 +89,7 @@ public class ElementDataStorage
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    private static string cachePath { get { return Application.dataPath + "/Resources/_ElementData.json"; } }
+    private static string cachePath { get { return Application.dataPath + "/Resources/Data/_ElementData.json"; } }
 
     public static void SaveCache()
     {
@@ -100,21 +100,27 @@ public class ElementDataStorage
         }
     }
 
-    public static void SaveCache(List<EnemyData> list)
+    public static void SaveCache(List<EnemyData> list, bool overwriteIfEmpty = false)
     {
         if (!GameManager.applicationPlaying)
         {
-            ElementData.Enemies = list;
-            SaveCache();
+            if (overwriteIfEmpty || (!overwriteIfEmpty && list.Count > 0))
+            {
+                ElementData.Enemies = list;
+                SaveCache();
+            }
         }
     }
     
-    public static void SaveCache(List<ItemData> list)
+    public static void SaveCache(List<ItemData> list, bool overwriteIfEmpty = false)
     {
         if (!GameManager.applicationPlaying)
         {
-            ElementData.Items = list;
-            SaveCache();
+            if (overwriteIfEmpty || (!overwriteIfEmpty && list.Count > 0))
+            {
+                ElementData.Items = list;
+                SaveCache();
+            }
         }
     }
 
@@ -154,14 +160,17 @@ public class ElementDataStorage
         }
     }
 
-    private static string cachePath_Enemies { get { return Application.dataPath + "/Editor/Data/CACHE_EnemyData.json"; } }
+    // private static string cachePath_Enemies { get { return Application.dataPath + "/Editor/Data/CACHE_EnemyData.json"; } }
 
-    public static void SaveEnemyCache(List<EnemyData> list)
+    public static void SaveEnemyCache(List<EnemyData> list, bool overwriteIfEmpty = false)
     {
         /*string jsonString = JsonUtility.ToJson(new EnemyList(list));
         File.WriteAllText(cachePath_Enemies, jsonString);*/
-        ElementData.Enemies = list;
-        SaveCache();
+        if (list.Count > 0 || overwriteIfEmpty)
+        {
+            ElementData.Enemies = list;
+            SaveCache();
+        }
     }
 
     public static List<EnemyData> LoadEnemyCache()

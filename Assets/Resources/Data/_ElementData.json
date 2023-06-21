@@ -1,1 +1,1 @@
-{"enemyList":{"Enemies":[{"displayName":"[PH] Generic Enemy 1","model":{"instanceID":24590}},{"displayName":"[PH] Generic Enemy 2","model":{"instanceID":25002}},{"displayName":"[PH] Generic Enemy 3","model":{"instanceID":25064}}]},"itemList":{"Items":[]}}
+{"loaded":false,"enemyList":{"Data":[{"displayName":"[PH] Generic 1","model":{"instanceID":24766}},{"displayName":"[PH] Generic 2","model":{"instanceID":24788}},{"displayName":"[PH] Generic 3","model":{"instanceID":24790}}],"label":"Enemies:"},"itemList":{"Data":[],"label":"Items:"}}
