@@ -222,6 +222,9 @@ public class GameManager : Core
         UI = FindObjectOfType<UIManager>();
         Level = FindObjectOfType<LevelManager>();
 
+        if (Level == null)
+            controlState = ControlState.Menu;
+
         if (controlState == ControlState.Menu)
         {
 

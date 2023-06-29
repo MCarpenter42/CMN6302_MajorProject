@@ -1921,6 +1921,38 @@ namespace NeoCambion
 
                 return meshOut;
             }
+
+            public static Mesh MergeFrom(this Mesh mesh, GameObject[] templateObjects, bool destroyObjects = false)
+            {
+                CombineInstance[] combine = new CombineInstance[templateObjects.Length];
+                for (int i = templateObjects.Length - 1; i >= 0; i--)
+                {
+                    combine[i].mesh = templateObjects[i].GetComponent<MeshFilter>().sharedMesh;
+                    combine[i].transform = templateObjects[i].transform.localToWorldMatrix;
+                    if (destroyObjects)
+                        templateObjects[i].DestroyThis();
+                    else
+                        templateObjects[i].SetActive(false);
+                }
+                mesh.CombineMeshes(combine);
+                return mesh;
+            }
+
+            public static Mesh MergeFrom(this Mesh mesh, List<GameObject> templateObjects, bool destroyObjects = false)
+            {
+                CombineInstance[] combine = new CombineInstance[templateObjects.Count];
+                for (int i = templateObjects.Count - 1; i >= 0; i--)
+                {
+                    combine[i].mesh = templateObjects[i].GetComponent<MeshFilter>().sharedMesh;
+                    combine[i].transform = templateObjects[i].transform.localToWorldMatrix;
+                    if (destroyObjects)
+                        templateObjects[i].DestroyThis();
+                    else
+                        templateObjects[i].SetActive(false);
+                }
+                mesh.CombineMeshes(combine);
+                return mesh;
+            }
         }
 
         public static class UnityExt_Color

@@ -31,23 +31,7 @@ public class LevelTile : MonoBehaviour
     public enum TileType { None, Empty, Corridor, Room }
     public enum ConnectionState { None, Block, Connect, Merge }
 
-    private TileType _type = TileType.None;
-    public TileType type
-    {
-        get
-        {
-            if (_type == TileType.None)
-            {
-                int t = Random.Range(1, 4);
-                _type = (TileType)t;
-            }
-            return _type;
-        }
-        set
-        {
-            _type = value;
-        }
-    }
+    public TileType type = TileType.None;
     public bool emptySpace { get { return type == TileType.None || type == TileType.Empty; } }
     public ConnectionState[] connections = new ConnectionState[6]
     {
@@ -58,4 +42,11 @@ public class LevelTile : MonoBehaviour
         ConnectionState.None,
         ConnectionState.None
     };
+    public float chanceForEmpty = 0.0f;
+
+    public bool ConnectedAt(int ind)
+    {
+        ind.WrapClamp(0, 5);
+        return !(connections[ind] == ConnectionState.None || connections[ind] == ConnectionState.Block);
+    }
 }
