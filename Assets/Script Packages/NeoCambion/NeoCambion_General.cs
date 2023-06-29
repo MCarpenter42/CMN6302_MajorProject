@@ -494,6 +494,7 @@ namespace NeoCambion
         using UnityEngine;
         using UnityEditor;
         using System.Collections;
+        using NeoCambion.Maths;
 
         public static class UnityExt_Float
         {
@@ -1815,6 +1816,110 @@ namespace NeoCambion
                 mesh.SetUVs(0, uvs);
 
                 return mesh;
+            }
+
+            public static Mesh Clone(this Mesh mesh)
+            {
+                Mesh meshOut = new Mesh();
+                meshOut.vertices = mesh.vertices;
+                meshOut.normals = mesh.normals;
+                meshOut.triangles = mesh.triangles;
+                meshOut.colors = mesh.colors.Clone() as Color[];
+                meshOut.uv = mesh.uv;
+                meshOut.uv2 = mesh.uv2;
+                meshOut.uv3 = mesh.uv3;
+                meshOut.uv4 = mesh.uv4;
+                meshOut.uv5 = mesh.uv5;
+                meshOut.uv6 = mesh.uv6;
+                meshOut.uv7 = mesh.uv7;
+                meshOut.uv8 = mesh.uv8;
+                meshOut.RecalculateBounds();
+                meshOut.RecalculateTangents();
+                return meshOut;
+            }
+
+            public static Mesh Rotate(this Mesh mesh, Vector3 radians, Vector3 centre)
+            {
+                // x' = x cos a - y sin a
+                // y' = y cos a + x sin a
+                Vector3[] vertices = mesh.vertices;
+                Vector3[] normals = mesh.normals;
+
+                if (radians.magnitude != 0.0f)
+                {
+                    for (int i = 0; i < vertices.Length; i++)
+                    {
+                        Vector3 vert_A = vertices[i] - centre, vert_B = Vector3.zero;
+                        // x radians --> Y/Z
+                        if (radians.x != 0.0f)
+                        {
+                            vert_B.x = vert_A.x;
+                            vert_B.y = vert_A.y * Mathf.Cos(radians.x) - vert_A.z * Mathf.Sin(radians.x);
+                            vert_B.z = vert_A.z * Mathf.Cos(radians.x) + vert_A.y * Mathf.Sin(radians.x);
+                            vert_A = vert_B;
+                            vert_B = Vector3.zero;
+                        }
+                        // y radians --> X/Z
+                        if (radians.y != 0.0f)
+                        {
+                            vert_B.x = vert_A.x * Mathf.Cos(radians.y) - vert_A.z * Mathf.Sin(radians.y);
+                            vert_B.y = vert_A.y;
+                            vert_B.z = vert_A.z * Mathf.Cos(radians.y) + vert_A.x * Mathf.Sin(radians.y);
+                            vert_A = vert_B;
+                            vert_B = Vector3.zero;
+                        }
+                        // z radians --> X/Y
+                        if (radians.z != 0.0f)
+                        {
+                            vert_B.x = vert_A.x * Mathf.Cos(radians.z) - vert_A.y * Mathf.Sin(radians.z);
+                            vert_B.y = vert_A.y * Mathf.Cos(radians.z) + vert_A.x * Mathf.Sin(radians.z);
+                            vert_B.z = vert_A.z;
+                            vert_A = vert_B;
+                            vert_B = Vector3.zero;
+                        }
+                        vertices[i] = vert_A + centre;
+                    }
+                    for (int i = 0; i < normals.Length; i++)
+                    {
+                        Vector3 norm_A = normals[i], norm_B = Vector3.zero;
+                        // x radians --> Y/Z
+                        if (radians.x != 0.0f)
+                        {
+                            norm_B.x = norm_A.x;
+                            norm_B.y = norm_A.y * Mathf.Cos(radians.x) - norm_A.z * Mathf.Sin(radians.x);
+                            norm_B.z = norm_A.z * Mathf.Cos(radians.x) + norm_A.y * Mathf.Sin(radians.x);
+                            norm_A = norm_B;
+                            norm_B = Vector3.zero;
+                        }
+                        // y radians --> X/Z
+                        if (radians.y != 0.0f)
+                        {
+                            norm_B.x = norm_A.x * Mathf.Cos(radians.y) - norm_A.z * Mathf.Sin(radians.y);
+                            norm_B.y = norm_A.y;
+                            norm_B.z = norm_A.z * Mathf.Cos(radians.y) + norm_A.x * Mathf.Sin(radians.y);
+                            norm_A = norm_B;
+                            norm_B = Vector3.zero;
+                        }
+                        // z radians --> X/Y
+                        if (radians.z != 0.0f)
+                        {
+                            norm_B.x = norm_A.x * Mathf.Cos(radians.z) - norm_A.y * Mathf.Sin(radians.z);
+                            norm_B.y = norm_A.y * Mathf.Cos(radians.z) + norm_A.x * Mathf.Sin(radians.z);
+                            norm_B.z = norm_A.z;
+                            norm_A = norm_B;
+                            norm_B = Vector3.zero;
+                        }
+                        normals[i] = norm_A;
+                    }
+                }
+
+                Mesh meshOut = mesh.Clone();
+                meshOut.normals = normals;
+                meshOut.vertices = vertices;
+                meshOut.RecalculateBounds();
+                meshOut.RecalculateTangents();
+
+                return meshOut;
             }
         }
 

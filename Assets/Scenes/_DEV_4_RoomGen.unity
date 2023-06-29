@@ -123,6 +123,65 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &422471165
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 422471166}
+  - component: {fileID: 422471167}
+  m_Layer: 0
+  m_Name: Generator
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &422471166
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 422471165}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1756034062}
+  m_RootOrder: 1
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &422471167
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 422471165}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65e17a77f4ca6694c9058923d69916d9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  tileTemplate: {fileID: 6306396425230138095, guid: a10457613e4edfa4d8be40e831c5b7f9, type: 3}
+  connectorL: {fileID: -7574171413183296661, guid: 311c5f9fdc6e5374d9f0498e536c1dfb, type: 3}
+  connectorR: {fileID: 245833365980429178, guid: 311c5f9fdc6e5374d9f0498e536c1dfb, type: 3}
+  corridorConn120: {fileID: -7861077328549527178, guid: 311c5f9fdc6e5374d9f0498e536c1dfb, type: 3}
+  corridorConn180: {fileID: 8090093322691966952, guid: 311c5f9fdc6e5374d9f0498e536c1dfb, type: 3}
+  corridorConn240: {fileID: 4544525696463915414, guid: 311c5f9fdc6e5374d9f0498e536c1dfb, type: 3}
+  corridorConn300: {fileID: -2922832977155968540, guid: 311c5f9fdc6e5374d9f0498e536c1dfb, type: 3}
+  corridorEnd: {fileID: 3014561935078225948, guid: 311c5f9fdc6e5374d9f0498e536c1dfb, type: 3}
+  doorway: {fileID: 978912613816088730, guid: 311c5f9fdc6e5374d9f0498e536c1dfb, type: 3}
+  wall: {fileID: 8733429697405204941, guid: 311c5f9fdc6e5374d9f0498e536c1dfb, type: 3}
+  wallCorner: {fileID: 1385990396969797544, guid: 311c5f9fdc6e5374d9f0498e536c1dfb, type: 3}
+  roomRadius: 6
+  meshRotation: 180
+  size: {x: 5, y: 5}
+  centre: {x: 0, y: 0}
 --- !u!1 &832992184
 GameObject:
   m_ObjectHideFlags: 0
@@ -140,7 +199,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &832992185
 Transform:
   m_ObjectHideFlags: 0
@@ -256,7 +315,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.3
-  far clip plane: 1000
+  far clip plane: 400
   field of view: 60
   orthographic: 0
   orthographic size: 5
@@ -282,14 +341,14 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1019774240}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -10}
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 80, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
 --- !u!1 &1756034061
 GameObject:
   m_ObjectHideFlags: 0
@@ -319,6 +378,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5833552989288055278}
+  - {fileID: 422471166}
   m_Father: {fileID: 0}
   m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -601,7 +661,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2550675348355068316
 Transform:
   m_ObjectHideFlags: 0
@@ -634,7 +694,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!23 &3539264213504410935
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -694,7 +754,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!33 &3677247995125613172
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -846,7 +906,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!1 &5274956404214093676
 GameObject:
   m_ObjectHideFlags: 0
@@ -864,7 +924,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!23 &5418080162589398593
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -964,7 +1024,7 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6611039224330099540}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -981,7 +1041,7 @@ Transform:
   - {fileID: 832992185}
   m_Father: {fileID: 1756034062}
   m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
 --- !u!1 &6611039224330099540
 GameObject:
   m_ObjectHideFlags: 0
@@ -1015,7 +1075,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &7141673421615761575
 Transform:
   m_ObjectHideFlags: 0
@@ -1090,7 +1150,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &7758966662319657516
 Transform:
   m_ObjectHideFlags: 0
@@ -1146,7 +1206,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!33 &8604858523505156381
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -1203,4 +1263,4 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
