@@ -44,9 +44,47 @@ public class LevelTile : MonoBehaviour
     };
     public float chanceForEmpty = 0.0f;
 
+    public bool fullMerged
+    {
+        get
+        {
+            foreach (ConnectionState conn in connections)
+            {
+                if (conn != ConnectionState.Merge)
+                    return false;
+            }
+            return true;
+        }
+    }
+
     public bool ConnectedAt(int ind)
     {
         ind.WrapClamp(0, 5);
         return !(connections[ind] == ConnectionState.None || connections[ind] == ConnectionState.Block);
+    }
+
+    public void ReplaceConnections(ConnectionState replace, ConnectionState repaceWith)
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            if (connections[i] == replace)
+                connections[i] = repaceWith;
+        }
+    }
+
+    private Mesh _Mesh = null;
+    public Mesh Mesh
+    {
+        get
+        {
+            return _Mesh;
+        }
+        set
+        {
+            _Mesh = value;
+            gameObject.GetOrAddComponent<MeshFilter>().sharedMesh = _Mesh;
+            if (gameObject.GetComponent<MeshRenderer>() == null)
+                gameObject.AddComponent<MeshRenderer>();
+        }
     }
 }

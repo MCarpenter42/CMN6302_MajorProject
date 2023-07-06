@@ -1,5 +1,6 @@
 namespace NeoCambion.Collections
 {
+    using JetBrains.Annotations;
     using System;
     using System.Collections.Generic;
 
@@ -10,6 +11,14 @@ namespace NeoCambion.Collections
         public List<List<int>> indsPxNy = new List<List<int>>();
         public List<List<int>> indsNxPy = new List<List<int>>();
         public List<List<int>> indsNxNy = new List<List<int>>();
+
+        public string sizes
+        {
+            get
+            {
+                return "+X+Y: " + indsPxPy.Count + " | +X-Y: " + indsPxNy.Count + " | -X+Y: " + indsNxPy.Count + " | -X-Y: " + indsNxNy.Count;
+            }
+        }
 
         public T this[int x, int y]
         {
@@ -486,11 +495,12 @@ namespace NeoCambion.Collections
 
         #region [ RANDOMISATION ]
 
-        public static T PickFromList<T>(this List<T> itemList)
+        public static T Pick<T>(this List<T> itemList)
         {
+            Random rand = new Random();
             if (itemList.Count > 0)
             {
-                int n = UnityEngine.Random.Range(0, itemList.Count - 1);
+                int n = rand.Next(0, itemList.Count);
                 return itemList[n];
             }
             else
@@ -501,41 +511,26 @@ namespace NeoCambion.Collections
 
         public static T[] Shuffle<T>(this T[] array)
         {
-            int n = array.Length;
-            T[] output = new T[n];
-            List<T> vals = new List<T>();
-            for (int i = 0; i < n; i++)
+            Random rand = new Random();
+            int r;
+            for (int i = array.Length - 1; i > 0; i--)
             {
-                vals.Add(array[i]);
+                r = rand.Next(0, i + 1);
+                (array[i], array[r]) = (array[r], array[i]);
             }
-            for (int i = 0; i < n; i++)
-            {
-                int r = 0;
-                if (vals.Count > 1)
-                { r = UnityEngine.Random.Range(0, vals.Count - 1); }
-                output[i] = vals[r];
-                vals.RemoveAt(r);
-            }
-            return output;
+            return array;
         }
 
         public static List<T> Shuffle<T>(this List<T> list)
         {
-            int n = list.Count;
-            List<T> shuffled = new List<T>();
-            List<T> vals = new List<T>();
-            vals.CopyFrom(list);
-            for (int i = 0; i < n; i++)
+            Random rand = new Random();
+            int r;
+            for (int i = list.Count - 1; i > 0; i--)
             {
-                int r = 0;
-                if (vals.Count > 1)
-                { r = UnityEngine.Random.Range(0, vals.Count - 1); }
-                shuffled.Add(vals[r]);
-                vals.RemoveAt(r);
+                r = rand.Next(0, i + 1);
+                (list[i], list[r]) = (list[r], list[i]);
             }
-            list.Clear();
-            list.CopyFrom(shuffled);
-            return shuffled;
+            return list;
         }
 
         #endregion
@@ -804,6 +799,46 @@ namespace NeoCambion.Collections
             }
             return lInd;
         }
+
+        public static int FirstLessThan(this float[] arr, float value, bool allowEqualTo = false)
+        {
+            for (int i = 0; i < arr.Length; i++)
+            {
+                if (arr[i] < value || (allowEqualTo && arr[i] == value))
+                    return i;
+            }
+            return -1;
+        }
+
+        public static int FirstLessThan(this List<float> list, float value, bool allowEqualTo = false)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] < value || (allowEqualTo && list[i] == value))
+                    return i;
+            }
+            return -1;
+        }
+
+        public static int FirstGreaterThan(this float[] arr, float value, bool allowEqualTo = false)
+        {
+            for (int i = 0; i < arr.Length; i++)
+            {
+                if (arr[i] > value || (allowEqualTo && arr[i] == value))
+                    return i;
+            }
+            return -1;
+        }
+
+        public static int FirstGreaterThan(this List<float> list, float value, bool allowEqualTo = false)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] > value || (allowEqualTo && list[i] == value))
+                    return i;
+            }
+            return -1;
+        }
     }
 
     public static class Ext_IntCollection
@@ -837,6 +872,16 @@ namespace NeoCambion.Collections
                 list.Add(startValue + step * i);
 
             return list;
+        }
+        
+        public static int[] IncrementalShuffle(this int[] arr, int startValue = 0, int step = 1)
+        {
+            return arr.IncrementalPopulate(startValue, step).Shuffle();
+        }
+        
+        public static List<int> IncrementalShuffle(this List<int> list, int startValue = 0, int step = 1, int count = 8, bool overwrite = true)
+        {
+            return list.IncrementalPopulate(startValue, step, count, overwrite).Shuffle();
         }
 
         public static int IndexOfSmallest(this int[] arr)
@@ -897,6 +942,46 @@ namespace NeoCambion.Collections
                 }
             }
             return lInd;
+        }
+
+        public static int FirstLessThan(this int[] arr, int value, bool allowEqualTo = false)
+        {
+            for (int i = 0; i < arr.Length; i++)
+            {
+                if (arr[i] < value || (allowEqualTo && arr[i] == value))
+                    return i;
+            }
+            return -1;
+        }
+
+        public static int FirstLessThan(this List<int> list, int value, bool allowEqualTo = false)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] < value || (allowEqualTo && list[i] == value))
+                    return i;
+            }
+            return -1;
+        }
+
+        public static int FirstGreaterThan(this int[] arr, int value, bool allowEqualTo = false)
+        {
+            for (int i = 0; i < arr.Length; i++)
+            {
+                if (arr[i] > value || (allowEqualTo && arr[i] == value))
+                    return i;
+            }
+            return -1;
+        }
+
+        public static int FirstGreaterThan(this List<int> list, int value, bool allowEqualTo = false)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] > value || (allowEqualTo && list[i] == value))
+                    return i;
+            }
+            return -1;
         }
     }
 

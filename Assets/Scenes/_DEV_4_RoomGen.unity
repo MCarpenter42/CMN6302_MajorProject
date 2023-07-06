@@ -444,7 +444,7 @@ MonoBehaviour:
   roomRadius: 6
   meshRotation: 180
   size: {x: 7, y: 7}
-  centre: {x: 0, y: 0}
+  centre: {x: 3, y: 3}
   connectToExisting: 40
   mergeRooms: 25
 --- !u!1 &531435122

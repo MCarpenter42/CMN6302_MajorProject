@@ -284,92 +284,163 @@ namespace NeoCambion
         {
             using UnityEngine;
 
-            public static class UnityRandom
+            namespace Replace
             {
-                #region [ BASE STATIC PROPERTIES ]
-
-                public static Vector2 insideUnitCircle = UnityEngine.Random.insideUnitCircle;
-                public static Vector3 insideUnitSphere = UnityEngine.Random.insideUnitSphere;
-                public static Vector3 onUnitSphere = UnityEngine.Random.onUnitSphere;
-                public static Quaternion rotation = UnityEngine.Random.rotation;
-                public static Quaternion rotationUniform = UnityEngine.Random.rotationUniform;
-                public static UnityEngine.Random.State state = UnityEngine.Random.state;
-                public static float value = UnityEngine.Random.value;
-
-                #endregion
-
-                #region [ BASE STATIC METHODS ]
-
-                public static Color ColorHSV()
+                public static class UnityRandom
                 {
-                    return UnityEngine.Random.ColorHSV();
+                    #region [ BASE STATIC PROPERTIES ]
+
+                    public static Vector2 insideUnitCircle = UnityEngine.Random.insideUnitCircle;
+                    public static Vector3 insideUnitSphere = UnityEngine.Random.insideUnitSphere;
+                    public static Vector3 onUnitSphere = UnityEngine.Random.onUnitSphere;
+                    public static Quaternion rotation = UnityEngine.Random.rotation;
+                    public static Quaternion rotationUniform = UnityEngine.Random.rotationUniform;
+                    public static UnityEngine.Random.State state = UnityEngine.Random.state;
+                    public static float value = UnityEngine.Random.value;
+
+                    #endregion
+
+                    #region [ BASE STATIC METHODS ]
+
+                    public static Color ColorHSV()
+                    {
+                        return UnityEngine.Random.ColorHSV();
+                    }
+
+                    public static Color ColorHSV(float hueMin, float hueMax)
+                    {
+                        return UnityEngine.Random.ColorHSV(hueMin, hueMax);
+                    }
+
+                    public static Color ColorHSV(float hueMin, float hueMax, float saturationMin, float saturationMax)
+                    {
+                        return UnityEngine.Random.ColorHSV(hueMin, hueMax, saturationMin, saturationMax);
+                    }
+
+                    public static Color ColorHSV(float hueMin, float hueMax, float saturationMin, float saturationMax, float valueMin, float valueMax)
+                    {
+                        return UnityEngine.Random.ColorHSV(hueMin, hueMax, saturationMin, saturationMax, valueMin, valueMax);
+                    }
+
+                    public static Color ColorHSV(float hueMin, float hueMax, float saturationMin, float saturationMax, float valueMin, float valueMax, float alphaMin, float alphaMax)
+                    {
+                        return UnityEngine.Random.ColorHSV(hueMin, hueMax, saturationMin, saturationMax, valueMin, valueMax, alphaMin, alphaMax);
+                    }
+
+                    public static void InitState(int seed)
+                    {
+                        UnityEngine.Random.InitState(seed);
+                    }
+
+                    public static float Range(float minInclusive, float maxInclusive)
+                    {
+                        return UnityEngine.Random.Range(minInclusive, maxInclusive);
+                    }
+
+                    public static int Range(int minInclusive, int maxExclusive)
+                    {
+                        return UnityEngine.Random.Range(minInclusive, maxExclusive);
+                    }
+
+                    #endregion
+
+                    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+                    public static int NewRandomSeed()
+                    {
+                        int seed = (int)DateTime.Now.Ticks;
+                        InitState(seed);
+                        return seed;
+                    }
                 }
-                
-                public static Color ColorHSV(float hueMin, float hueMax)
-                {
-                    return UnityEngine.Random.ColorHSV(hueMin, hueMax);
-                }
-                
-                public static Color ColorHSV(float hueMin, float hueMax, float saturationMin, float saturationMax)
-                {
-                    return UnityEngine.Random.ColorHSV(hueMin, hueMax, saturationMin, saturationMax);
-                }
-                
-                public static Color ColorHSV(float hueMin, float hueMax, float saturationMin, float saturationMax, float valueMin, float valueMax)
-                {
-                    return UnityEngine.Random.ColorHSV(hueMin, hueMax, saturationMin, saturationMax, valueMin, valueMax);
-                }
-                
-                public static Color ColorHSV(float hueMin, float hueMax, float saturationMin, float saturationMax, float valueMin, float valueMax, float alphaMin, float alphaMax)
-                {
-                    return UnityEngine.Random.ColorHSV(hueMin, hueMax, saturationMin, saturationMax, valueMin, valueMax, alphaMin, alphaMax);
-                }
 
-                public static void InitState(int seed)
+                public static class UnityRandomUtility
                 {
-                    UnityEngine.Random.InitState(seed);
-                }
+                    #region [ EXTRACTING STATE DATA ]
+                    // https://answers.unity.com/questions/1670397/how-do-you-get-a-seed-value-from-unityenginerandom.html
 
-                public static float Range(float minInclusive, float maxInclusive)
-                {
-                    return UnityEngine.Random.Range(minInclusive, maxInclusive);
-                }
-                
-                public static int Range(int minInclusive, int maxExclusive)
-                {
-                    return UnityEngine.Random.Range(minInclusive, maxExclusive);
-                }
 
-                #endregion
 
-                /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+                    /*private int[] IntsFromRandomState(UnityEngine.Random.State state)
+                    {
 
-                public static int NewRandomSeed()
-                {
-                    int seed = (int)DateTime.Now.Ticks;
-                    InitState(seed);
-                    return seed;
+                    }
+
+                    private UnityEngine.Random.State RandomStateFromInts(int[] int4)
+                    {
+
+                    }*/
+
+                    #endregion
                 }
             }
 
-            public static class UnityRandomUtility
+            public static class Ext_Random
             {
-                #region [ EXTRACTING STATE DATA ]
-                // https://answers.unity.com/questions/1670397/how-do-you-get-a-seed-value-from-unityenginerandom.html
+                public enum WeightingCurve { Power, Log }
 
-
-
-                /*private int[] IntsFromRandomState(UnityEngine.Random.State state)
+                public static int RangeWeighted(int minInclusive, int maxExclusive, WeightingCurve curve = WeightingCurve.Power, bool reversed = false, float factor = 2.0f)
                 {
+                    if (minInclusive > maxExclusive)
+                        (minInclusive, maxExclusive) = (maxExclusive, minInclusive);
+                    float interval = 1.0f / (float)(maxExclusive - minInclusive);
 
+                    float r = Random.Range(0.0f, 1.0f);
+
+                    float f;
+                    switch (curve)
+                    {
+                        default:
+                        case WeightingCurve.Power:
+                            {
+                                f = Mathf.Pow(r, factor);
+                            }
+                            break;
+
+                        case WeightingCurve.Log:
+                            {
+                                float yA = Mathf.Log(0.1f, factor), yB = Mathf.Log(20.1f, factor), yC = yB - yA;
+                                f = (Mathf.Log(0.1f + (r * 20.0f), factor) - yA) / yC;
+                            }
+                            break;
+                    }
+
+                    if (reversed)
+                        return maxExclusive - 1 - (int)Mathf.Floor(f / interval);
+                    else
+                        return minInclusive + (int)Mathf.Floor(f / interval);
                 }
 
-                private UnityEngine.Random.State RandomStateFromInts(int[] int4)
+                public static float RangeWeighted(float minInclusive, float maxInclusive, WeightingCurve curve = WeightingCurve.Power, bool reversed = false, float factor = 2.0f)
                 {
+                    if (minInclusive > maxInclusive)
+                        (minInclusive, maxInclusive) = (maxInclusive, minInclusive);
 
-                }*/
+                    float r = Random.Range(0.0f, 1.0f);
 
-                #endregion
+                    float f;
+                    switch (curve)
+                    {
+                        default:
+                        case WeightingCurve.Power:
+                            {
+                                f = Mathf.Pow(r, factor);
+                            }
+                            break;
+
+                        case WeightingCurve.Log:
+                            {
+                                float yA = Mathf.Log(0.1f, factor), yB = Mathf.Log(20.1f, factor), yC = yB - yA;
+                                f = (Mathf.Log(0.1f + (r * 20.0f), factor) - yA) / yC;
+                            }
+                            break;
+                    }
+
+                    if (reversed)
+                        return Mathf.Lerp(maxInclusive, minInclusive, f);
+                    else
+                        return Mathf.Lerp(minInclusive, maxInclusive, f);
+                }
             }
         }
     }
