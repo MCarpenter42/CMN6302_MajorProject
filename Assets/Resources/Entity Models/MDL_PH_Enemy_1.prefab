@@ -95,7 +95,7 @@ GameObject:
   - component: {fileID: 6565933023328135375}
   m_Layer: 0
   m_Name: MDL_PH_Enemy_1
-  m_TagString: Untagged
+  m_TagString: EntityModel
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0

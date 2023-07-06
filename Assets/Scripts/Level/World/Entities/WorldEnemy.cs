@@ -80,9 +80,12 @@ public class WorldEnemy : WorldEntityCore
         base.Start();
         GameManager.Instance.enemyListW.Add(this);
         int initialRoom = GetInitialRoom();
-        int startPoint = Random.Range(0, pathHandler.pointSets[initialRoom].pathPoints.Count);
-        transform.position = pathHandler.pointSets[initialRoom].pathPoints[startPoint];
-        availableRooms.Add(initialRoom);
+        if (initialRoom > -1)
+        {
+            int startPoint = Random.Range(0, pathHandler.pointSets[initialRoom].pathPoints.Count);
+            transform.position = pathHandler.pointSets[initialRoom].pathPoints[startPoint];
+            availableRooms.Add(initialRoom);
+        }
     }
 
     protected override void Update()
@@ -111,20 +114,20 @@ public class WorldEnemy : WorldEntityCore
     {
         int initialRoom = -1;
         Vector3 roomMin, roomMax;
-        for (int i = 0; i < pathHandler.pointSets.Count; i++)
+        if (pathHandler != null && pathHandler.pointSets.Count > 0)
         {
-            roomMin = pathHandler.pointSets[i].boundaryArea.position - pathHandler.pointSets[i].boundaryArea.localScale / 2.0f;
-            roomMax = roomMin + pathHandler.pointSets[i].boundaryArea.localScale;
-            bool xInRange = transform.position.x >= roomMin.x && transform.position.x <= roomMax.x;
-            bool yInRange = transform.position.y >= roomMin.y && transform.position.y <= roomMax.y;
-            bool zInRange = transform.position.z >= roomMin.z && transform.position.z <= roomMax.z;
-            if (xInRange && yInRange && zInRange)
+            for (int i = 0; i < pathHandler.pointSets.Count; i++)
             {
-                return i;
+                roomMin = pathHandler.pointSets[i].boundaryArea.position - pathHandler.pointSets[i].boundaryArea.localScale / 2.0f;
+                roomMax = roomMin + pathHandler.pointSets[i].boundaryArea.localScale;
+                bool xInRange = transform.position.x >= roomMin.x && transform.position.x <= roomMax.x;
+                bool yInRange = transform.position.y >= roomMin.y && transform.position.y <= roomMax.y;
+                bool zInRange = transform.position.z >= roomMin.z && transform.position.z <= roomMax.z;
+                if (xInRange && yInRange && zInRange)
+                {
+                    return i;
+                }
             }
-        }
-        if (initialRoom == -1)
-        {
             initialRoom = Random.Range(0, pathHandler.pointSets.Count);
         }
         return initialRoom;
@@ -165,13 +168,9 @@ public class WorldEnemy : WorldEntityCore
 
     public void PauseBehaviour(bool pause)
     {
-        if (pause)
+        if (roam)
         {
-            navAgent.isStopped = true;
-        }
-        else
-        {
-            navAgent.isStopped = false;
+            navAgent.isStopped = pause;
         }
     }
 }

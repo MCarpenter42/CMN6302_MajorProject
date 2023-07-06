@@ -33,27 +33,25 @@ public class InDevRoomGen : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 
+    [Header("Base Mesh Objects")]
     [SerializeField] GameObject tileTemplate;
-    //[SerializeField] Mesh connectorL;
     [SerializeField] GameObject connectorL;
-    //[SerializeField] Mesh connectorR;
     [SerializeField] GameObject connectorR;
-    //[SerializeField] Mesh corridorConn120;
     [SerializeField] GameObject corridorConn120;
-    //[SerializeField] Mesh corridorConn180;
     [SerializeField] GameObject corridorConn180;
-    //[SerializeField] Mesh corridorConn240;
     [SerializeField] GameObject corridorConn240;
-    //[SerializeField] Mesh corridorConn300;
     [SerializeField] GameObject corridorConn300;
-    //[SerializeField] Mesh corridorEnd;
     [SerializeField] GameObject corridorEnd;
-    //[SerializeField] Mesh doorway;
     [SerializeField] GameObject doorway;
-    //[SerializeField] Mesh wall;
+    [SerializeField] GameObject floor;
     [SerializeField] GameObject wall;
-    //[SerializeField] Mesh wallCorner;
     [SerializeField] GameObject wallCorner;
+
+    [Header("Materials")]
+    [SerializeField] Material matWallRoom;
+    [SerializeField] Material matWallCorridor;
+    [SerializeField] Material matDoor;
+    [SerializeField] Material matFloor;
 
     private Grid2D<LevelTile> tiles = new Grid2D<LevelTile>();
 
@@ -61,8 +59,9 @@ public class InDevRoomGen : Core
 
     #region [ PROPERTIES ]
 
-    public static float zOffset { get { return Mathf.Sin(60.0f.ToRad()); } }
+    [Header("Other Settings")]
     public float roomRadius = 6.0f;
+    public float zOffset { get { return Mathf.Sin(60.0f.ToRad()) * roomRadius; } }
     [SerializeField] float meshRotation = 180.0f;
     [SerializeField] Vector2Int size = Vector2Int.one;
     [SerializeField] Vector2Int centre = Vector2Int.zero;
@@ -70,9 +69,10 @@ public class InDevRoomGen : Core
     [SerializeField] float connectToExisting = 40.0f;
     [Range(0.0f, 100.0f)]
     [SerializeField] float mergeRooms = 25.0f;
+    [SerializeField] ushort maxCorridorLength = 5;
 
-    private Vector2Int boundsMin;
-    private Vector2Int boundsMax;
+    private Vector2Int boundsMin = Vector2Int.zero;
+    private Vector2Int boundsMax = Vector2Int.zero;
 
     #endregion
 
@@ -168,7 +168,7 @@ public class InDevRoomGen : Core
     {
         Vector3 vect = Vector3.zero;
         vect.x = (float)tileX * 1.5f * roomRadius;
-        vect.z = ((float)tileZ * 2.0f + (tileX % 2 == 0 ? 0.0f : 1.0f)) * zOffset * roomRadius;
+        vect.z = ((float)tileZ * 2.0f + (tileX % 2 == 0 ? 0.0f : 1.0f)) * zOffset;
         return vect;
     }
 
@@ -322,14 +322,80 @@ public class InDevRoomGen : Core
         }
         else if (tiles[coords.x, coords.y].type == LevelTile.TileType.Corridor)
         {
+            bool[] blocked = new bool[connections.Length];
+            int startInd = -1;
+            Vector3 rot;
             for (int i = 0; i < connections.Length; i++)
             {
                 //int iMinus = i > 0 ? i - 1 : connections.Length - 1;
                 //int iPlus = i < connections.Length ? i + 1 : 0;
-                Vector3 rot = new Vector3(0.0f, (float)i * 60.0f + rotateByDegrees, 0.0f);
+                rot = new Vector3(0.0f, (float)i * 60.0f + rotateByDegrees, 0.0f);
                 if (connections[i] == LevelTile.ConnectionState.Connect || connections[i] == LevelTile.ConnectionState.Merge)
                 {
                     GameObject component = Instantiate(corridorEnd, null);
+                    component.transform.eulerAngles = rot;
+                    components.Add(component);
+                    blocked[i] = false;
+                    if (startInd == -1)
+                        startInd = i;
+                }
+                else if (connections[i] == LevelTile.ConnectionState.Block)
+                {
+                    blocked[i] = true;
+                }
+            }
+
+            int ind, lastSet = -1;
+            List<int[]> blockSets = new List<int[]>();
+            for (int i = 0; i < connections.Length; i++)
+            {
+                ind = (startInd + i).WrapClamp(0, 5);
+                if (!blocked[ind])
+                {
+                    if (blockSets.Count == 0 || (blockSets[lastSet].Length > 0 && blockSets[lastSet][0] >= 0))
+                    {
+                        blockSets.Add(new int[2] { -1, 0 });
+                        lastSet++;
+                    }
+                }
+                else if (lastSet >= 0)
+                {
+                    if (blockSets[lastSet].Length > 1)
+                    {
+                        if (blockSets[lastSet][0] == -1)
+                            blockSets[lastSet][0] = (ind > 0 ? ind : connections.Length) - 1;
+                        else
+                            blockSets[lastSet][1]++;
+                    }
+                }
+            }
+
+            foreach (int[] set in blockSets)
+            {
+                if (set[0] >= 0)
+                {
+                    rot = new Vector3(0.0f, (float)set[0] * 60.0f + rotateByDegrees, 0.0f);
+                    //Debug.Log(coords + " | " + set[0] + " | " + (set[0] * 60));
+                    GameObject component;
+                    switch (set[1])
+                    {
+                        default:
+                        case 0:
+                            component = Instantiate(corridorConn120, null);
+                            break;
+
+                        case 1:
+                            component = Instantiate(corridorConn180, null);
+                            break;
+
+                        case 2:
+                            component = Instantiate(corridorConn240, null);
+                            break;
+
+                        case 3:
+                            component = Instantiate(corridorConn300, null);
+                            break;
+                    }
                     component.transform.eulerAngles = rot;
                     components.Add(component);
                 }
@@ -358,6 +424,8 @@ public class InDevRoomGen : Core
                     {
                         tiles[x, y].gameObject.GetComponent<MeshRenderer>().enabled = false;
                     }
+                    GameObject floorObj = Instantiate(floor, tiles[x, y].gameObject.transform);
+                    floorObj.name = "Floor";
                 }
             }
         }
@@ -603,6 +671,18 @@ public class InDevRoomGen : Core
             Destroy(baseObj);
     }
 
+    private void AdjustBounds(Vector2Int newTile)
+    {
+        if (newTile.x < boundsMin.x)
+            boundsMin.x = newTile.x;
+        else if (newTile.x > boundsMax.x)
+            boundsMax.x = newTile.x;
+        if (newTile.y < boundsMin.y)
+            boundsMin.y = newTile.y;
+        else if (newTile.y > boundsMax.y)
+            boundsMax.y = newTile.y;
+    }
+
     private class InDevRoom
     {
         public List<Vector2Int> tiles = new List<Vector2Int>();
@@ -635,7 +715,8 @@ public class InDevRoomGen : Core
                 }
                 else
                 {
-                    tiles[tilePos.x, tilePos.y].connections[i] = LevelTile.ConnectionState.Block;
+                    if (tiles[tilePos.x, tilePos.y].connections[i] != LevelTile.ConnectionState.Connect)
+                        tiles[tilePos.x, tilePos.y].connections[i] = LevelTile.ConnectionState.Block;
                 }
             }
         }
@@ -733,7 +814,7 @@ public class InDevRoomGen : Core
         {
             InDevCorridor corridor = new InDevCorridor();
 
-            int lMax = Ext_Random.RangeWeighted(0, 6, Ext_Random.WeightingCurve.Power, true, 2.0f);
+            int lMax = Ext_Random.RangeWeighted(0, maxCorridorLength + 1, Ext_Random.WeightingCurve.Power, true, 2.0f);
             bool tryBranch = lMax > 2 ? (Random.Range(0.0f, 1.0f) <= 0.4f) : false;
             int branchInd = tryBranch ? Random.Range(0, lMax - 1) : -1;
 
@@ -859,109 +940,6 @@ public class InDevRoomGen : Core
                             corridor.endpoints.Add(new int[] { corridor.tiles.Count - 1, j });
                     }
                 }
-
-                /*branched = tryBranch && i > branchInd;
-                int br = branched ? 2 : 1;
-                for (int branch = 0; branch < br; branch++)
-                {
-                    tileTarg = nextTiles[branch];
-                    if (tileTarg != halted)
-                    {
-                        x = tileTarg.x;
-                        y = tileTarg.y;
-
-                        Vector2Int[] adjacent = AdjacentCoords(tileTarg);
-                        LevelTile.ConnectionState[] connections = tiles[x, y].connections;
-                        LevelTile.TileType[] types = new LevelTile.TileType[adjacent.Length];
-
-                        int[] chances = new int[6] { 0, 0, 0, 0, 0, 0 };
-                        int mod, totalChance = 0;
-                        for (int j = 0; j < 6; j++)
-                        {
-                            types[j] = tiles[adjacent[j].x, adjacent[j].y] == null ? LevelTile.TileType.None : tiles[adjacent[j].x, adjacent[j].y].type;
-                            if (connections[j] == LevelTile.ConnectionState.Block)
-                            {
-                                switch (types[j])
-                                {
-                                    case LevelTile.TileType.None:
-                                        mod = 8;
-                                        break;
-
-                                    case LevelTile.TileType.Room:
-                                        mod = 3;
-                                        break;
-
-                                    case LevelTile.TileType.Corridor:
-                                        mod = 1;
-                                        break;
-
-                                    default:
-                                        mod = 0;
-                                        break;
-                                }
-                                chances[j] += mod + (j > 0 ? chances[j - 1] : 0);
-                                totalChance += mod;
-                            }
-                            else
-                            {
-                                chances[j] += j > 0 ? chances[j - 1] : 0;
-                            }
-                        }
-
-                        int r = Random.Range(0, totalChance) + 1;
-                        //int ind = r <= chances[0] ? 0 : (r <= chances[1] ? 1 : (r <= chances[2] ? 2 : (r <= chances[3] ? 3 : (r <= chances[4] ? 4 : (r <= chances[5] ? 5 : -1)))));
-                        int ind = chances.FirstLessThan(r), ind2 = ind < 3 ? ind + 3 : ind - 3;
-                        nextTiles[branch] = adjacent[ind];
-
-                        x2 = nextTiles[branch].x;
-                        y2 = nextTiles[branch].y;
-                        if (types[ind] != LevelTile.TileType.Empty)
-                        {
-                            corridor.tiles.Add(nextTiles[branch]);
-                            if (types[ind] == LevelTile.TileType.None)
-                            {
-                                if (tiles[x2, y2] == null)
-                                {
-                                    GameObject tileObj = Instantiate(tileTemplate);
-                                    tiles[x2, y2] = tileObj.GetComponent<LevelTile>();
-                                    tileObj.name = "Tile [" + x2 + ", " + y2 + "]";
-                                    tileObj.transform.position = TilePosition(x2, y2);
-                                }
-
-                                if (i < lMax)
-                                {
-                                    tiles[x2, y2].type = LevelTile.TileType.Corridor;
-                                }
-                                else
-                                {
-                                    corridor.endpoints[branch] = corridor.tiles.Count - 1;
-                                    nextTiles[branch] = halted;
-                                }
-                            }
-                            else
-                            {
-                                corridor.endpoints[branch] = corridor.tiles.Count - 1;
-                                nextTiles[branch] = halted;
-                            }
-
-                            tiles[x, y].connections[ind] = LevelTile.ConnectionState.Connect;
-                            if (i < lMax)
-                            {
-                                tiles[x2, y2].connections[ind2] = LevelTile.ConnectionState.Connect;
-                                tiles[x2, y2].ReplaceConnections(LevelTile.ConnectionState.None, LevelTile.ConnectionState.Block);
-                            }
-                        }
-
-                        if (!branched && i == branchInd && branch == 0)
-                        {
-                            chances[ind] = 0;
-                            r = Random.Range(0, totalChance) + 1;
-                            //ind = r <= chances[0] ? 0 : (r <= chances[1] ? 1 : (r <= chances[2] ? 2 : (r <= chances[3] ? 3 : (r <= chances[4] ? 4 : (r <= chances[5] ? 5 : -1)))));
-                            ind = chances.FirstLessThan(r);
-                            nextTiles[1] = adjacent[ind];
-                        }
-                    }
-                }*/
             }
 
             return corridor;
@@ -970,6 +948,28 @@ public class InDevRoomGen : Core
         {
             return null;
         }
+    }
+
+    private void FloorTransform(GameObject floorObj)
+    {
+        floorObj.transform.localPosition = Vector3.up * -0.5f;
+        floorObj.transform.localScale = new Vector3(roomRadius * 2.0f, 1.0f, roomRadius * 2.0f);
+    }
+
+    private void CreateFloorCollider()
+    {
+        Vector3 posMin = TilePosition(boundsMin) - Vector3.forward * (boundsMin.x % 2 == 0 ? 0.0f : 1.0f) * zOffset;
+        Vector3 posMax = TilePosition(boundsMax) + Vector3.forward * (boundsMax.x % 2 == 0 ? 1.0f : 0.0f) * zOffset;
+        Vector3 centre = (posMin + posMax) / 2.0f;
+        float w = posMax.x - posMin.x + 2.0f * roomRadius;
+        float d = posMax.z - posMin.z + 2.0f * zOffset;
+
+        GameObject floorCollider = new GameObject("Floor Collider");
+        floorCollider.transform.parent = transform;
+        floorCollider.transform.SetAsFirstSibling();
+        floorCollider.transform.position = new Vector3(centre.x, -0.5f, centre.z);
+        floorCollider.transform.localScale = new Vector3(w, 1.0f, d);
+        BoxCollider coll = floorCollider.AddComponent<BoxCollider>();
     }
 
     public void GenerateV3(Vector2Int size, Vector2Int centre)
@@ -990,8 +990,8 @@ public class InDevRoomGen : Core
         else if (centre.y < 0)
             offset.y = 0;
 
-        boundsMin = -centre;
-        boundsMax = boundsMin + size - Vector2Int.one;
+        //boundsMin = -centre;
+        //boundsMax = boundsMin + size - Vector2Int.one;
         //Debug.Log(boundsMin + " | " + boundsMax);
 
         tiles.Clear();
@@ -1108,7 +1108,7 @@ public class InDevRoomGen : Core
                             if (tiles[endpoint.x, endpoint.y] == null || tiles[endpoint.x, endpoint.y].type == LevelTile.TileType.None)
                             {
                                 roomStarts.Add(endpoint);
-                                Debug.Log("Adding new room starting point at " + endpoint + " - type of " + (tiles[endpoint.x, endpoint.y] == null ? "NULL" : tiles[endpoint.x, endpoint.y].type));
+                                //Debug.Log("Adding new room starting point at " + endpoint + " - type of " + (tiles[endpoint.x, endpoint.y] == null ? "NULL" : tiles[endpoint.x, endpoint.y].type));
                             }
                         }
                         else
@@ -1128,13 +1128,18 @@ public class InDevRoomGen : Core
         {
             foreach (Vector2Int tilePos in room.tiles)
             {
-                Debug.Log(tilePos);
                 x = tilePos.x;
                 y = tilePos.y;
                 if (tiles[x, y] != null && tiles[x, y].Mesh == null)
                 {
                     tiles[x, y].Mesh = TileMesh(tilePos, meshRotation);
                     tiles[x, y].gameObject.name += " (Room)";
+                    tiles[x, y].gameObject.GetComponent<MeshRenderer>().material = matWallRoom;
+                    GameObject floorObj = Instantiate(floor, tiles[x, y].gameObject.transform);
+                    FloorTransform(floorObj);
+                    floorObj.name = "Floor";
+                    floorObj.GetComponent<MeshRenderer>().material = matFloor;
+                    AdjustBounds(tilePos);
                 }
             }
         }
@@ -1151,10 +1156,39 @@ public class InDevRoomGen : Core
                     {
                         tiles[x, y].Mesh = TileMesh(tilePos, meshRotation);
                         tiles[x, y].gameObject.name += " (Corridor)";
+                        tiles[x, y].gameObject.GetComponent<MeshRenderer>().material = matWallCorridor;
+                        GameObject floorObj = Instantiate(floor, tiles[x, y].gameObject.transform);
+                        FloorTransform(floorObj);
+                        floorObj.name = "Floor";
+                        floorObj.GetComponent<MeshRenderer>().material = matFloor;
+                        AdjustBounds(tilePos);
                     }
                 }
             }
         }
+
+        GameObject blankObj = new GameObject();
+        for (x = boundsMin.x; x <= boundsMax.x; x++)
+        {
+            for (y = boundsMin.y; y <= boundsMax.y; y++)
+            {
+                if (tiles[x, y] == null || tiles[x, y].emptySpace)
+                {
+                    if (tiles[x, y] != null)
+                        Destroy(tiles[x, y].gameObject);
+                    GameObject emptySpace = Instantiate(blankObj, transform);
+                    emptySpace.name = "Tile [" + x + ", " + y + "] (Empty)";
+                    emptySpace.transform.position = TilePosition(x, y);
+                    GameObject floorObj = Instantiate(floor, emptySpace.transform);
+                    FloorTransform(floorObj);
+                    floorObj.name = "Floor";
+                    floorObj.GetComponent<MeshRenderer>().material = matFloor;
+                }
+            }
+        }
+        Destroy(blankObj);
+
+        CreateFloorCollider();
 
         if (destroyAtEnd)
             Destroy(baseObj);

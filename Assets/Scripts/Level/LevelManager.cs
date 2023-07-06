@@ -93,30 +93,22 @@ public class LevelManager : Core
     {
         GameManager.controlState = ControlState.None;
         Cursor.lockState = CursorLockMode.Locked;
+
         GameManager.Instance.UI.CombatTransitionOverlay(duration);
+
         yield return new WaitForSeconds(duration * 0.5f);
+
+        camWorld.enabled = true;
+        camCombat.enabled = true;
         if (entering)
-        {
-            camCombat.enabled = true;
             camWorld.enabled = false;
-            GameManager.Instance.UI.HUD.ShowHUD(ControlState.Combat);
-        }
         else
-        {
-            camWorld.enabled = true;
-            camCombat.enabled = true;
-            GameManager.Instance.UI.HUD.ShowHUD(ControlState.World);
-        }
+            camCombat.enabled = false;
+        GameManager.Instance.UI.HUD.ShowHUD(entering ? ControlState.Combat : ControlState.World);
+
         yield return new WaitForSeconds(duration * 0.5f);
-        if (entering)
-        {
-            Cursor.lockState = CursorLockMode.None;
-            GameManager.controlState = ControlState.Combat;
-        }
-        else
-        {
-            GameManager.controlState = ControlState.World;
-        }
+
+        GameManager.controlState = entering ? ControlState.Combat : ControlState.World;
     }
 
     public void INDEV_ExitCombat()

@@ -165,22 +165,30 @@ public class WorldEntityCore : Core
         }
         else
         {
+            if (modelObj != null)
+                modelObj.tag = "EntityModel";
+            List<GameObject> modelObjs = pivot.gameObject.GetChildrenWithTag("EntityModel");
+            if (modelObjs.Contains(model.gameObject))
+                modelObjs.Remove(model.gameObject);
             if (replaceModel)
             {
                 Vector3 pos = Vector3.zero;
                 Quaternion rot = Quaternion.identity;
-                if (modelObj != null || (model == null && modelObj != null))
+                if (modelObjs.Count > 0)
                 {
-                    pos = modelObj.transform.localPosition;
-                    rot = modelObj.transform.localRotation;
-                    if (Application.isPlaying)
-                        Destroy(modelObj);
+                    pos = modelObjs[0].transform.localPosition;
+                    rot = modelObjs[0].transform.localRotation;
+                    for (int i = modelObjs.Count - 1; i >= 0; i--)
+                    {
+                        if (Application.isPlaying)
+                            Destroy(modelObjs[i]);
 #if UNITY_EDITOR
-                    else if (EditorApplication.isPlaying)
-                        Destroy(modelObj);
+                        else if (EditorApplication.isPlaying)
+                            Destroy(modelObjs[i]);
 #endif
-                    else
-                        DestroyImmediate(modelObj);
+                        else
+                            DestroyImmediate(modelObjs[i]);
+                    }
                 }
                 if (model != null)
                 {
@@ -204,6 +212,21 @@ public class WorldEntityCore : Core
                 }
                 else
                 {
+                    if (modelObjs.Count > 1)
+                    {
+                        modelObjs.RemoveAt(modelObjs.IndexOf(modelObj));
+                        for (int i = modelObjs.Count - 1; i >= 0; i--)
+                        {
+                            if (Application.isPlaying)
+                                Destroy(modelObjs[i]);
+#if UNITY_EDITOR
+                            else if (EditorApplication.isPlaying)
+                                Destroy(modelObjs[i]);
+#endif
+                            else
+                                DestroyImmediate(modelObjs[i]);
+                        }
+                    }
                     modelObj.transform.SetParent(pivot);
                 }
             }

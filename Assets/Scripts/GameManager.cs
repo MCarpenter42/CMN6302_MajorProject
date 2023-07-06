@@ -87,7 +87,34 @@ public class GameManager : Core
 
     public static bool gamePaused = false;
     public static bool allowPauseToggle = true;
-    public static ControlState controlState = ControlState.World;
+    private static ControlState _controlState = ControlState.World;
+    public static ControlState controlState
+    {
+        get
+        {
+            return _controlState;
+        }
+        set
+        {
+            switch (value)
+            {
+                default:
+                case ControlState.None:
+                    Cursor.lockState = CursorLockMode.None;
+                    break;
+                case ControlState.Menu:
+                    Cursor.lockState = CursorLockMode.None;
+                    break;
+                case ControlState.World:
+                    Cursor.lockState = CursorLockMode.Locked;
+                    break;
+                case ControlState.Combat:
+                    Cursor.lockState = CursorLockMode.None;
+                    break;
+            }
+            _controlState = value;
+        }
+    }
 
     public static Vector2 windowCentre { get { return new Vector2(Screen.width, Screen.height) / 2.0f; } }
 
@@ -224,6 +251,8 @@ public class GameManager : Core
 
         if (Level == null)
             controlState = ControlState.Menu;
+        else
+            controlState = ControlState.World;
 
         if (controlState == ControlState.Menu)
         {
@@ -231,7 +260,6 @@ public class GameManager : Core
         }
         else if (controlState == ControlState.World)
         {
-            Cursor.lockState = CursorLockMode.Locked;
             playerW = FindObjectOfType<WorldPlayer>();
             cameraW = FindObjectOfType<PlayerCam>();
 
