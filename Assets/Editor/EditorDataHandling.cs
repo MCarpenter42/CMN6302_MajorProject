@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEditor;
 
 using NeoCambion.Collections;
-using NeoCambion.Unity.IO;
+using NeoCambion.IO.Unity;
 
 public class EditorDataHandling
 {

@@ -1,33 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.Events;
-using UnityEngine.EventSystems;
-using UnityEngine.SceneManagement;
-using UnityEngine.InputSystem;
-using UnityEditor;
-using TMPro;
 
 using NeoCambion;
 using NeoCambion.Collections;
-using NeoCambion.Collections.Unity;
-using NeoCambion.Encryption;
-using NeoCambion.Heightmaps;
-using NeoCambion.Interpolation;
 using NeoCambion.Maths;
-using NeoCambion.Maths.Matrices;
-using NeoCambion.Random;
-using NeoCambion.Sorting;
-using NeoCambion.TaggedData;
-using NeoCambion.TaggedData.Unity;
-using NeoCambion.Unity;
-using NeoCambion.Unity.Editor;
-using NeoCambion.Unity.Events;
-using NeoCambion.Unity.IO;
-using Unity.VisualScripting;
 using NeoCambion.Random.Unity;
-using Palmmedia.ReportGenerator.Core.Parser.Analysis;
+using NeoCambion.Unity;
 
 public class InDevRoomGen : Core
 {
@@ -70,6 +49,7 @@ public class InDevRoomGen : Core
     [Range(0.0f, 100.0f)]
     [SerializeField] float mergeRooms = 25.0f;
     [SerializeField] ushort maxCorridorLength = 5;
+    [SerializeField] float wallHeight = 1.0f;
 
     private Vector2Int boundsMin = Vector2Int.zero;
     private Vector2Int boundsMax = Vector2Int.zero;
@@ -400,6 +380,13 @@ public class InDevRoomGen : Core
                     components.Add(component);
                 }
             }
+        }
+        Vector3 scale;
+        foreach (GameObject component in components)
+        {
+            scale = component.transform.localScale;
+            scale.y *= wallHeight;
+            component.transform.localScale = scale;
         }
         Mesh meshOut = new Mesh();
         meshOut.MergeFrom(components, true);

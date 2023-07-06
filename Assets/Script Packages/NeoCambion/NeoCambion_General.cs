@@ -323,6 +323,18 @@ namespace NeoCambion
 
     public static class Ext_String
     {
+        public static string ToSingleString(this string[] strArr, string delimiter = null)
+        {
+            string str = strArr.Length > 0 ? strArr[0] : "";
+            if (delimiter == null)
+                delimiter = "";
+            for (int i = 1; i < strArr.Length; i++)
+            {
+                str += delimiter + strArr[i];
+            }
+            return str;
+        }
+
         public static byte[] ToBytes(this string str)
         {
             char[] chars = str.ToCharArray();
@@ -493,8 +505,6 @@ namespace NeoCambion
     {
         using UnityEngine;
         using UnityEditor;
-        using System.Collections;
-        using NeoCambion.Maths;
 
         public static class UnityExt_Float
         {

@@ -14,17 +14,20 @@ using NeoCambion.Collections;
 using NeoCambion.Collections.Unity;
 using NeoCambion.Encryption;
 using NeoCambion.Heightmaps;
-using NeoCambion.Interpolation;
+using NeoCambion.IO;
+using NeoCambion.IO.Unity;
 using NeoCambion.Maths;
 using NeoCambion.Maths.Matrices;
 using NeoCambion.Random;
+using NeoCambion.Random.Unity;
 using NeoCambion.Sorting;
 using NeoCambion.TaggedData;
 using NeoCambion.TaggedData.Unity;
 using NeoCambion.Unity;
 using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
-using NeoCambion.Unity.IO;
+using NeoCambion.Unity.Geometry;
+using NeoCambion.Unity.Interpolation;
 
 #region [ ENUM TYPES ]
 

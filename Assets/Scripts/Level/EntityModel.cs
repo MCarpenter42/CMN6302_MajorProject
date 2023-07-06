@@ -2,17 +2,55 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class EntityModel : MonoBehaviour
+using NeoCambion;
+
+public class EntityModel : Core
 {
-    // Start is called before the first frame update
-    void Start()
+    #region [ OBJECTS / COMPONENTS ]
+
+
+
+    #endregion
+
+    #region [ PROPERTIES ]
+
+
+
+    #endregion
+
+    #region [ COROUTINES ]
+
+
+
+    #endregion
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    #region [ BUILT-IN UNITY FUNCTIONS ]
+
+    void Awake()
     {
-        
+
     }
 
-    // Update is called once per frame
+    void Start()
+    {
+
+    }
+
     void Update()
     {
-        
+
     }
+
+    void FixedUpdate()
+    {
+
+    }
+
+    #endregion
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 }
