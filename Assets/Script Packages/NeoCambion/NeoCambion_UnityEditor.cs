@@ -201,7 +201,8 @@ namespace NeoCambion.Unity.Editor
                 {
                     _labelCentred = new GUIStyle(GUI.skin.label)
                     {
-                        alignment = TextAnchor.MiddleCenter
+                        alignment = TextAnchor.MiddleCenter,
+                        padding = new RectOffset(1, 1, 0, 0)
                     };
                 }
                 return _labelCentred;
@@ -217,7 +218,8 @@ namespace NeoCambion.Unity.Editor
                 {
                     _labelCentredLeft = new GUIStyle(GUI.skin.label)
                     {
-                        alignment = TextAnchor.MiddleLeft
+                        alignment = TextAnchor.MiddleLeft,
+                        padding = new RectOffset(1, 1, 0, 0)
                     };
                 }
                 return _labelCentredLeft;
@@ -233,7 +235,8 @@ namespace NeoCambion.Unity.Editor
                 {
                     _labelCentredRight = new GUIStyle(GUI.skin.label)
                     {
-                        alignment = TextAnchor.MiddleRight
+                        alignment = TextAnchor.MiddleRight,
+                        padding = new RectOffset(1, 1, 0, 0)
                     };
                 }
                 return _labelCentredRight;
@@ -578,6 +581,46 @@ namespace NeoCambion.Unity.Editor
                 GUI.skin.horizontalSlider.Draw(posRect, GUIContent.none, controlID);
             }
         }*/
+
+        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+        
+        public static string ReadonlyField(Rect position, string text)
+        {
+            EditorGUI.SelectableLabel(position, text, EditorStyles.textField);
+            return text;
+        }
+        
+        public static string ReadonlyField(Rect position, string label, string text)
+        {
+            position = EditorGUI.PrefixLabel(position, new GUIContent(label));
+            EditorGUI.SelectableLabel(position, text, EditorStyles.textField);
+            return text;
+        }
+        
+        public static string ReadonlyField(Rect position, GUIContent label, string text)
+        {
+            position = EditorGUI.PrefixLabel(position, label);
+            EditorGUI.SelectableLabel(position, text, EditorStyles.textField);
+            return text;
+        }
+
+        public static float PercentField(Rect position, float value, bool zeroToOne = true)
+        {
+            float valClamp = Mathf.Clamp(value * (zeroToOne ? 100.0f : 1.0f), 0.0f, 100.0f);
+            string percStr = valClamp.ToString() + "%";
+            string newStr = EditorGUI.DelayedTextField(position, percStr);
+            if (newStr != percStr && newStr.Length > 0)
+            {
+                if (newStr[newStr.Length - 1] == '%')
+                    newStr = newStr.Substring(0, newStr.Length - 1);
+                if (newStr.ValidateString(Ext_Char.SubDecimal))
+                {
+                    float f = float.Parse(newStr);
+                    return zeroToOne ? f / 100.0f : f;
+                }
+            }
+            return value;
+        }
 
         /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 

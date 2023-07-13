@@ -304,7 +304,7 @@ public class GameManager : Core
     public void UpdateElementData()
     {
         //EditorUtility.SetDirty(Instance.gameObject);
-        Instance.ElementDataStorage.Enemies = ElementDataStorage.LoadCache<EnemyData>();
+        Instance.ElementDataStorage.Enemies = ElementDataStorage.LoadCache<CombatantData>();
         PrefabUtility.ApplyObjectOverride(Instance, prefabPath, InteractionMode.AutomatedAction);
         //PrefabUtility.SavePrefabAsset((GameObject)Resources.Load("Prefabs/GameManager"));
         AssetDatabase.SaveAssets();

@@ -32,7 +32,7 @@ public class WorldEnemy : WorldEntityCore
     [Header("Combat Options")]
     [Range(1, 30)]
     public int level = 1;
-    public EnemyType[] enemyTypes;
+    public CombatantType[] enemyTypes;
 
     #endregion
 

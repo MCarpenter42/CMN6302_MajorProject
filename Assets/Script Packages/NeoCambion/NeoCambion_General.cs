@@ -97,7 +97,7 @@ namespace NeoCambion
         {
             byte hex0 = (byte)(byteVal % 0x10);
             byte hex1 = (byte)((byteVal - (byteVal % 0x10)) / 0x10);
-            return new char[] { Ext_Char.Hexidecimal[hex1], Ext_Char.Hexidecimal[hex0] };
+            return new char[] { Ext_Char.Hexadecimal[hex1], Ext_Char.Hexadecimal[hex0] };
         }
 
         public static char[] ParseToHexChars(this byte[] bytes)
@@ -133,7 +133,20 @@ namespace NeoCambion
 
     public static class Ext_Char
     {
-        public static char[] Hexidecimal = new char[]
+        public static char[] Decimal = new char[]
+        {
+            '0', '1', '2', '3', '4',
+            '5', '6', '7', '8', '9',
+        };
+        
+        public static char[] SubDecimal = new char[]
+        {
+            '0', '1', '2', '3', '4',
+            '5', '6', '7', '8', '9',
+            '.',
+        };
+        
+        public static char[] Hexadecimal = new char[]
         {
             '0', '1', '2', '3',
             '4', '5', '6', '7',
@@ -236,19 +249,19 @@ namespace NeoCambion
             return (allowSpace && charVal == ' ') || (allowDashOrUnderscore ? AlphaNumUnderscore.Contains(charVal) : AlphaNumeric.Contains(charVal));
         }
 
-        public static bool IsHexidecimal(this char charVal)
+        public static bool IsHexadecimal(this char charVal)
         {
-            return Hexidecimal.Contains(charVal.ToUpper());
+            return Hexadecimal.Contains(charVal.ToUpper());
         }
 
         public static byte ParseHexToByte(char hex1, char hex0)
         {
             int i1 = 0, i0 = 0;
-            for (int i = 0; i < Hexidecimal.Length; i++)
+            for (int i = 0; i < Hexadecimal.Length; i++)
             {
-                if (hex1 == Hexidecimal[i])
+                if (hex1 == Hexadecimal[i])
                     i1 = i;
-                if (hex0 == Hexidecimal[i])
+                if (hex0 == Hexadecimal[i])
                     i0 = i;
             }
             return (byte)(i1 * 0x10 + i0);
@@ -258,11 +271,11 @@ namespace NeoCambion
         {
             values = new char[] { values.Length > 0 ? values[0] : '0', values.Length >= 1 ? values[1] : '0' };
             int i1 = 0, i0 = 0;
-            for (int i = 0; i < Hexidecimal.Length; i++)
+            for (int i = 0; i < Hexadecimal.Length; i++)
             {
-                if (values[0] == Hexidecimal[i])
+                if (values[0] == Hexadecimal[i])
                     i1 = i;
-                if (values[1] == Hexidecimal[i])
+                if (values[1] == Hexadecimal[i])
                     i0 = i;
             }
             return (byte)(i1 * 0x10 + i0);
@@ -284,6 +297,18 @@ namespace NeoCambion
                 return true;
             }
             return false;
+        }
+
+        public static float Round(this float f, ushort decimalPlaces)
+        {
+            uint d2 = decimalPlaces + 1u;
+            float rem = f % (float)Math.Pow(10.0f, -decimalPlaces);
+            f -= rem;
+            if (rem >= 5 * (float)Math.Pow(10.0f, -d2))
+            {
+                f += (float)Math.Pow(10.0f, -decimalPlaces);
+            }
+            return f;
         }
     }
 
@@ -386,13 +411,13 @@ namespace NeoCambion
             return true;
         }
 
-        public static bool IsHexidecimal(this string text)
+        public static bool IsHexadecimal(this string text)
         {
             if (text.IsEmptyOrNullOrWhiteSpace())
                 return false;
             foreach (char charVal in text)
             {
-                if (!charVal.IsHexidecimal())
+                if (!charVal.IsHexadecimal())
                     return false;
             }
             return true;

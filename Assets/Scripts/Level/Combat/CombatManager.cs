@@ -53,7 +53,7 @@ public class CombatManager : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public void StartCombat(EnemyData[] enemyList)
+    public void StartCombat(CombatantData[] enemyList)
     {
         if (enemies.Count > 0)
         {
@@ -79,14 +79,14 @@ public class CombatManager : Core
         Destroy(temp);
     }
 
-    public void StartCombatDelayed(EnemyData[] enemyList, float delay)
+    public void StartCombatDelayed(CombatantData[] enemyList, float delay)
     {
         if (c_StartCombatDelayed != null)
             StopCoroutine(c_StartCombatDelayed);
         c_StartCombatDelayed = StartCoroutine(IStartCombatDelayed(enemyList, delay));
     }
 
-    private IEnumerator IStartCombatDelayed(EnemyData[] enemyList, float delay)
+    private IEnumerator IStartCombatDelayed(CombatantData[] enemyList, float delay)
     {
         yield return new WaitForSeconds(delay);
         StartCombat(enemyList);

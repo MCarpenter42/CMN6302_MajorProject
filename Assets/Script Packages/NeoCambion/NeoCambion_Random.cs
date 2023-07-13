@@ -22,7 +22,7 @@ namespace NeoCambion
                     l0 = vals[0];
                     l1 = vals[1];
                     initSeed = null;
-                    hexInitSeed = seed.IsHexidecimal();
+                    hexInitSeed = seed.IsHexadecimal();
                 }
             
                 public State(string seed, bool hexInitSeed)
@@ -40,7 +40,7 @@ namespace NeoCambion
                     l0 = vals[0];
                     l1 = vals[1];
                     initSeed = seed;
-                    hexInitSeed = seed == null ? false : seed.IsHexidecimal();
+                    hexInitSeed = seed == null ? false : seed.IsHexadecimal();
                 }
             
                 public State(string state, string seed, bool hexInitSeed)
@@ -57,7 +57,7 @@ namespace NeoCambion
                     l0 = state[0];
                     l1 = state[1];
                     initSeed = seed;
-                    hexInitSeed = seed == null ? false : seed.IsHexidecimal();
+                    hexInitSeed = seed == null ? false : seed.IsHexadecimal();
                 }
                 
                 public State(ulong[] state, string seed, bool hexInitSeed)
@@ -71,7 +71,7 @@ namespace NeoCambion
                 public static ulong[] FromSeed(string seed, bool forceHexSeed = false)
                 {
                     ulong[] vals = new ulong[2];
-                    if (forceHexSeed || (seed.Length == 32 && seed.IsHexidecimal()))
+                    if (forceHexSeed || (seed.Length == 32 && seed.IsHexadecimal()))
                     {
                         if (seed.Length > 32)
                             seed = seed.Substring(0, 32);

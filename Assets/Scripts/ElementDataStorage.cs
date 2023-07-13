@@ -37,8 +37,8 @@ public class ElementDataStorage
 {
     [HideInInspector] public bool loaded = false;
 
-    public ElementList<EnemyData> enemyList = new ElementList<EnemyData>(null, "Enemies:");
-    public List<EnemyData> Enemies { get { return enemyList.Data; } set { enemyList = new ElementList<EnemyData>(value, "Enemies:"); } }
+    public ElementList<CombatantData> enemyList = new ElementList<CombatantData>(null, "Enemies:");
+    public List<CombatantData> Enemies { get { return enemyList.Data; } set { enemyList = new ElementList<CombatantData>(value, "Enemies:"); } }
 
     public ElementList<ItemData> itemList = new ElementList<ItemData>(null, "Items:");
     public List<ItemData> Items { get { return itemList.Data; } set { itemList = new ElementList<ItemData>(value, "Items:"); } }
@@ -79,7 +79,7 @@ public class ElementDataStorage
         }
     }
 
-    public static void SaveCache(List<EnemyData> list, bool overwriteIfEmpty = false)
+    public static void SaveCache(List<CombatantData> list, bool overwriteIfEmpty = false)
     {
         if (!GameManager.applicationPlaying)
         {
@@ -125,7 +125,7 @@ public class ElementDataStorage
     public static List<T> LoadCache<T>()
     {
         ElementDataStorage data = LoadCache();
-        if (typeof(T) == typeof(EnemyData))
+        if (typeof(T) == typeof(CombatantData))
         {
             return data.Enemies as List<T>;
         }
@@ -141,7 +141,7 @@ public class ElementDataStorage
 
     // private static string cachePath_Enemies { get { return Application.dataPath + "/Editor/Data/CACHE_EnemyData.json"; } }
 
-    public static void SaveEnemyCache(List<EnemyData> list, bool overwriteIfEmpty = false)
+    public static void SaveEnemyCache(List<CombatantData> list, bool overwriteIfEmpty = false)
     {
         /*string jsonString = JsonUtility.ToJson(new EnemyList(list));
         File.WriteAllText(cachePath_Enemies, jsonString);*/
@@ -152,7 +152,7 @@ public class ElementDataStorage
         }
     }
 
-    public static List<EnemyData> LoadEnemyCache()
+    public static List<CombatantData> LoadEnemyCache()
     {
         /*List<EnemyData> list = null;
         if (File.Exists(cachePath_Enemies))
@@ -175,9 +175,9 @@ public class ElementDataStorage
 
 public static class ElementDataExtensions
 {
-    public static EnemyData[] AsData(this EnemyType[] enemies)
+    public static CombatantData[] AsData(this CombatantType[] enemies)
     {
-        EnemyData[] output = new EnemyData[enemies.Length];
+        CombatantData[] output = new CombatantData[enemies.Length];
         for (int i = 0; i < enemies.Length; i++)
         {
             output[i] = enemies[i].data;
@@ -223,15 +223,16 @@ public class ElementData
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 [System.Serializable]
-public class EnemyData : ElementData
+public class CombatantData : ElementData
 {
     public EntityModel model;
+    public int baseHealth = 50;
+    public float healthScaling = 2.0f;
     // Behaviour
-    // Health
     // Damage reduction
     // Speed
 
-    public EnemyData(string displayName)
+    public CombatantData(string displayName)
     {
         this.displayName = displayName;
     }
@@ -242,11 +243,25 @@ public class EnemyData : ElementData
     }
 }
 
+/*[System.Serializable]
+public class EnemyData : CombatantData
+{
+    public EnemyData(string displayName)
+    {
+        this.displayName = displayName;
+    }
+
+    public override string ToString()
+    {
+        return $"Enemy Type \"{displayName}\"";
+    }
+}*/
+
 [System.Serializable]
-public class EnemyType
+public class CombatantType
 {
     public int typeInd;
-    public EnemyData data
+    public CombatantData data
     {
         get
         {
@@ -258,13 +273,13 @@ public class EnemyType
 #endif
             if (!GameManager.Instance.ElementDataStorage.Enemies.InBounds(typeInd))
                 Debug.Log("No enemy data loaded! | " + typeInd + "/" + GameManager.Instance.ElementDataStorage.Enemies.Count);
-            List<EnemyData> enemies = GameManager.Instance.ElementDataStorage.Enemies;
+            List<CombatantData> enemies = GameManager.Instance.ElementDataStorage.Enemies;
             return enemies.InBounds(typeInd) ? enemies[typeInd] : null;
         }
     }
     public string displayName { get { return data.displayName; } }
 
-    public EnemyType(int typeInd = -1)
+    public CombatantType(int typeInd = -1)
     {
         this.typeInd = typeInd;
     }
@@ -275,12 +290,12 @@ public class EnemyType
     }
 }
 
-[CustomPropertyDrawer(typeof(EnemyType))]
-public class EnemyTypeDrawer : PropertyDrawer
+[CustomPropertyDrawer(typeof(CombatantType))]
+public class CombatantTypeDrawer : PropertyDrawer
 {
     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
     {
-        List<EnemyData> data = ElementDataStorage.LoadCache<EnemyData>();
+        List<CombatantData> data = ElementDataStorage.LoadCache<CombatantData>();
         string[] options = new string[data.Count];
         int[] optInds = new int[data.Count].IncrementalPopulate();
         int selected = property.FindPropertyRelative("typeInd").intValue;

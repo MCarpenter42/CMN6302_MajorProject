@@ -4,11 +4,11 @@ using UnityEngine;
 
 using NeoCambion;
 
-public class CombatEnemy : Core
+public class CombatEnemy : CombatantCore
 {
     #region [ OBJECTS / COMPONENTS ]
 
-    public EnemyData baseData;
+    public CombatantData baseData;
     public EntityModel modelObj;
 
     #endregion
@@ -53,7 +53,7 @@ public class CombatEnemy : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public void GetData(EnemyData data)
+    public void GetData(CombatantData data)
     {
         baseData = data;
         //Debug.Log((data == null) + (data == null ? "" : "" + (data.model == null)));
