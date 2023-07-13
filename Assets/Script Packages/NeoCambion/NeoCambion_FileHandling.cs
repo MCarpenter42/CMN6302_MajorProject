@@ -1,14 +1,27 @@
 namespace NeoCambion.IO
 {
+    using System;
     using System.Collections.Generic;
     using System.IO;
     using System.Runtime.Serialization.Json;
     using NeoCambion;
 
+    public static class Ext_Stream
+    {
+        public static string ReadToString(this Stream stream)
+        {
+            byte[] bytes = new byte[0];
+            if (stream != null)
+                bytes = new byte[stream.Length];
+            if (bytes.Length > 0)
+                return bytes.ParseToString();
+            else
+                return null;
+        }
+    }
+
     public static class FileHandler
     {
-        public enum FileFormat { Binary, String, MultiLine }
-
         #region [ JSON SETTINGS DATA ]
 
         public static DataContractJsonSerializerSettings jsonSettings = new DataContractJsonSerializerSettings()
@@ -16,92 +29,126 @@ namespace NeoCambion.IO
             DateTimeFormat = new System.Runtime.Serialization.DateTimeFormat("hh:mm:ss dd/MM/yyyy") { DateTimeStyles = System.Globalization.DateTimeStyles.AssumeLocal },
             EmitTypeInformation = System.Runtime.Serialization.EmitTypeInformation.AsNeeded,
             IgnoreExtensionDataObject = false,
-
+            SerializeReadOnlyTypes = false
         };
         
         #endregion
 
-        public static string ToJson(this object obj)
-        {
-            string jsonString = "";
-            return jsonString;
-        }
-        
-        public static string[] ToJsonMultiline(this object obj)
-        {
-            List<string> lines = new List<string>() { "{" };
-
-            lines.Add("}");
-            return lines.ToArray();
-        }
-        
-        public static T ToObject<T>(this string jsonString)
-        {
-
-            return default;
-        }
-
-        public static void Write(string[] data, string filePathFull, FileFormat format = FileFormat.Binary, string delimiter = "")
+        public static void Write(byte[] data, string filePathFull, bool overwrite = true)
         {
             if (!File.Exists(filePathFull))
                 File.Create(filePathFull);
 
-            switch (format)
+            if (overwrite)
             {
-                default:
-                case FileFormat.Binary:
-                    File.WriteAllBytes(filePathFull, data.ToSingleString(delimiter).ToBytes());
-                    break;
-
-                case FileFormat.String:
-                    File.WriteAllText(filePathFull, data.ToSingleString(delimiter));
-                    break;
-
-                case FileFormat.MultiLine:
-                    File.WriteAllLines(filePathFull, data);
-                    break;
-            }
-        }
-        
-        public static void Write(string data, string filePathFull, FileFormat format = FileFormat.Binary)
-        {
-            Write(new string[] { data }, filePathFull, format == FileFormat.MultiLine ? FileFormat.String : format);
-        }
-
-        public static void Write(object data, string filePathFull, FileFormat format = FileFormat.Binary)
-        {
-            Write(data.ToJson(), filePathFull, format);
-        }
-        
-        public static string[] Read(string filePathFull, FileFormat format = FileFormat.Binary, string delimiter = "")
-        {
-            if (File.Exists(filePathFull))
-            {
-                switch (format)
-                {
-                    default:
-                    case FileFormat.Binary:
-                        return new string[] { File.ReadAllBytes(filePathFull).ToString() };
-
-                    case FileFormat.String:
-                        if (delimiter.Length > 0)
-                            return File.ReadAllText(filePathFull).Split(delimiter);
-                        else
-                            return new string[] { File.ReadAllText(filePathFull) };
-
-                    case FileFormat.MultiLine:
-                        return File.ReadAllLines(filePathFull);
-                }
+                File.WriteAllBytes(filePathFull, data);
             }
             else
             {
-                return new string[0];
+                byte[] existingData = File.ReadAllBytes(filePathFull);
+                byte[] mergedData = new byte[existingData.Length + data.Length];
+                int i, l = existingData.Length;
+                for (i = 0; i < data.Length; i++)
+                {
+                    mergedData[l + i] = data[i];
+                }
+                File.WriteAllBytes(filePathFull, mergedData);
             }
         }
         
-        public static T ReadAs<T>(string filePathFull, FileFormat format = FileFormat.Binary)
+        public static void Write(string data, string filePathFull, bool overwrite = true)
         {
-            return Read(filePathFull, format).ToSingleString().ToObject<T>();
+            if (!File.Exists(filePathFull))
+                File.Create(filePathFull);
+
+            if (overwrite)
+            {
+                File.WriteAllText(filePathFull, data);
+            }
+            else
+            {
+                string existingData = File.ReadAllText(filePathFull);
+                File.WriteAllText(filePathFull, existingData + data);
+            }
+        }
+        
+        public static void Write(string[] data, string filePathFull, bool overwrite = true)
+        {
+            if (!File.Exists(filePathFull))
+                File.Create(filePathFull);
+
+            if (overwrite)
+            {
+                File.WriteAllLines(filePathFull, data);
+            }
+            else
+            {
+                string[] existingData = File.ReadAllLines(filePathFull);
+                string[] mergedData = new string[existingData.Length + data.Length];
+                int i, l = existingData.Length;
+                for (i = 0; i < data.Length; i++)
+                {
+                    mergedData[l + i] = data[i];
+                }
+                File.WriteAllLines(filePathFull, mergedData);
+            }
+        }
+
+        public static void Write(object data, string filePathFull)
+        {
+            DataContractJsonSerializer serializer = new DataContractJsonSerializer(data.GetType());
+            using (FileStream stream = File.Create(filePathFull))
+            {
+                serializer.WriteObject(stream, data);
+                stream.Close();
+            }
+        }
+        
+        public static byte[] Read(string filePathFull, out byte[] target)
+        {
+            if (File.Exists(filePathFull))
+                target = File.ReadAllBytes(filePathFull);
+            else
+                target = new byte[0];
+            return target;
+        }
+        
+        public static string ReadString(string filePathFull, out string target)
+        {
+            if (File.Exists(filePathFull))
+                target = File.ReadAllText(filePathFull);
+            else
+                target = null;
+            return target;
+        }
+        
+        public static string[] Read(string filePathFull, out string[] target)
+        {
+            if (File.Exists(filePathFull))
+                target = File.ReadAllLines(filePathFull);
+            else
+                target = new string[0];
+            return target;
+        }
+        
+        public static T ReadAs<T>(string filePathFull)
+        {
+            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(T));
+            T output;
+            using (FileStream stream = File.OpenRead(filePathFull))
+            {
+                object obj = serializer.ReadObject(stream);
+                try
+                {
+                    output = (T)obj;
+                }
+                catch
+                {
+                    throw new Exception("Error reading file to object: requested output type of \"" + typeof(T).ToString() + "\" is not compatible with the file contents.");
+                }
+                stream.Close();
+            }
+            return output;
         }
     }
 
