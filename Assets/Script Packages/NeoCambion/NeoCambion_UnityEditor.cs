@@ -604,10 +604,10 @@ namespace NeoCambion.Unity.Editor
             return text;
         }
 
-        public static float PercentField(Rect position, float value, bool zeroToOne = true)
+        public static float PercentField(Rect position, float value, string numStringFormat = "0.00", bool zeroToOne = true)
         {
             float valClamp = Mathf.Clamp(value * (zeroToOne ? 100.0f : 1.0f), 0.0f, 100.0f);
-            string percStr = valClamp.ToString() + "%";
+            string percStr = valClamp.ToString(numStringFormat) + "%";
             string newStr = EditorGUI.DelayedTextField(position, percStr);
             if (newStr != percStr && newStr.Length > 0)
             {
@@ -620,6 +620,16 @@ namespace NeoCambion.Unity.Editor
                 }
             }
             return value;
+        }
+        
+        public static float PercentField(Rect position, float value, bool zeroToOne = true)
+        {
+            return PercentField(position, value, "0.00", zeroToOne);
+        }
+
+        public static float IntPercentField(Rect position, float value, bool zeroToOne = true)
+        {
+            return PercentField(position, value, "0", zeroToOne);
         }
 
         /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */

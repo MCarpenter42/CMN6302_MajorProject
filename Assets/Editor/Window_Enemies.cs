@@ -8,6 +8,8 @@ using NeoCambion.Collections;
 using NeoCambion.IO.Unity;
 using NeoCambion.Unity;
 using NeoCambion.Unity.Editor;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 public class Window_Enemies : EditorWindow
 {
@@ -35,6 +37,8 @@ public class Window_Enemies : EditorWindow
     #endregion
 
     #region [ PROPERTIES ]
+
+    private bool focussed;
 
     private Vector2 scrollPosMain = new Vector2();
     private Vector2 scrollPosList = new Vector2();
@@ -64,8 +68,6 @@ public class Window_Enemies : EditorWindow
 
     #endregion
 
-    float fTest = 0.5f;
-
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     #region [ BUILT-IN UNITY FUNCTIONS ]
@@ -77,8 +79,6 @@ public class Window_Enemies : EditorWindow
 
     void OnGUI()
     {
-        bool updateGameManager = false;
-
         GUI.enabled = true;
 
         float slHeight = EditorGUIUtility.singleLineHeight;
@@ -104,6 +104,7 @@ public class Window_Enemies : EditorWindow
             padding = new RectOffset(4, 4, 4, 4),
         };
 
+        bool changesMade = false;
         EditorGUILayout.BeginHorizontal(EditorStyles.inspectorFullWidthMargins);
         {
             float avWidth = EditorGUILayout.BeginVertical(EditorStylesExtras.noMarginsNoPadding).width;
@@ -197,7 +198,7 @@ public class Window_Enemies : EditorWindow
                                     enemyList.RemoveAt(i);
                                     selectedEnemy = 0;
                                     showPickList = true;
-                                    updateGameManager = true;
+                                    changesMade = true;
                                 }
                             }
 
@@ -211,8 +212,9 @@ public class Window_Enemies : EditorWindow
                             {
                                 enemyList.Add(new CombatantData("New Enemy"));
                                 selectedEnemy = enemyList.Count - 1;
+                                enemyList[selectedEnemy].isFriendly = false;
                                 showPickList = false;
-                                updateGameManager = true;
+                                changesMade = true;
                             }
                         }
                         else
@@ -227,7 +229,7 @@ public class Window_Enemies : EditorWindow
                                 enemyList.Add(new CombatantData("New Enemy"));
                                 selectedEnemy = 0;
                                 showPickList = false;
-                                updateGameManager = true;
+                                changesMade = true;
                             }
 
                             /*EditorGUILayout.Space(12.0f);
@@ -255,9 +257,11 @@ public class Window_Enemies : EditorWindow
 
                             elementRect = EditorGUILayout.GetControlRect(true, slHeight);
                             dispName = EditorGUI.DelayedTextField(elementRect, label, dispName);
-                            /*if (dispName != enemyList[selectedEnemy].displayName)
-                                dataModified = true;*/
-                            enemyList[selectedEnemy].displayName = dispName;
+                            if (dispName != enemyList[selectedEnemy].displayName)
+                            {
+                                changesMade = true;
+                                enemyList[selectedEnemy].displayName = dispName;
+                            }
 
                             EntityModel mdl = enemyList[selectedEnemy].model;
 
@@ -266,9 +270,11 @@ public class Window_Enemies : EditorWindow
 
                             elementRect = EditorGUILayout.GetControlRect(true, slHeight);
                             mdl = (EntityModel)EditorGUI.ObjectField(elementRect, label, mdl, typeof(EntityModel), false);
-                            /*if (mdl != enemyList[selectedEnemy].model)
-                                dataModified = true;*/
-                            enemyList[selectedEnemy].model = mdl;
+                            if (mdl != enemyList[selectedEnemy].model)
+                            {
+                                changesMade = true;
+                                enemyList[selectedEnemy].model = mdl;
+                            }
 
                             EditorGUILayout.Space(2.0f);
 
@@ -292,24 +298,29 @@ public class Window_Enemies : EditorWindow
 
                                     int baseHealth = enemyList[selectedEnemy].baseHealth;
                                     baseHealth = EditorGUILayout.DelayedIntField(label, baseHealth);
-                                    if (baseHealth < 1)
-                                        baseHealth = 1;
-                                    enemyList[selectedEnemy].baseHealth = baseHealth;
+                                    if (baseHealth != enemyList[selectedEnemy].baseHealth)
+                                    {
+                                        changesMade = true;
+                                        if (baseHealth < 1)
+                                            baseHealth = 1;
+                                        enemyList[selectedEnemy].baseHealth = baseHealth;
+                                    }
 
                                     label.text = "Scaling Factor";
                                     label.tooltip = null;
 
                                     elementRect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), label);
                                     elementRect.width -= 44;
-                                    float healthScaling = enemyList[selectedEnemy].healthScaling;
-                                    healthScaling = GUI.HorizontalSlider(elementRect, healthScaling, 0.0f, 1.0f);
+                                    int healthScaling = enemyList[selectedEnemy].healthScaling;
+                                    healthScaling = (int)GUI.HorizontalSlider(elementRect, healthScaling, 0.0f, 100.0f).Round(0);
                                     elementRect.x += elementRect.width + 4;
                                     elementRect.width = 40;
-                                    int[] hsInt = new int[] { Mathf.RoundToInt(healthScaling * 100), -1 };
-                                    hsInt[1] = EditorGUI.IntField(elementRect, hsInt[0]);
-                                    if (hsInt[1] != hsInt[0])
-                                        healthScaling = hsInt[1] / 100.0f;
-                                    enemyList[selectedEnemy].healthScaling = healthScaling;
+                                    healthScaling = (int)EditorElements.IntPercentField(elementRect, healthScaling, false);
+                                    if (healthScaling != enemyList[selectedEnemy].healthScaling)
+                                    {
+                                        changesMade = true;
+                                        enemyList[selectedEnemy].healthScaling = healthScaling;
+                                    }
 
                                     EditorGUILayout.Space(2.0f);
 
@@ -317,18 +328,14 @@ public class Window_Enemies : EditorWindow
                                     label.tooltip = null;
 
                                     elementRect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), label);
-                                    int scaledHealth = CombatantCore.HealthValues.ScaledValue(baseHealth, previewLevel, healthScaling);
+                                    int scaledHealth = CombatValue.ScaledInt(baseHealth, previewLevel, healthScaling / 100.0f);
                                     EditorElements.ReadonlyField(elementRect, scaledHealth.ToString());
                                 }
                                 EditorElements.EndSubSection();
                             }
-
-                            label.text = "Test %";
-                            label.tooltip = null;
-
-                            elementRect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), label);
-                            fTest = EditorElements.PercentField(elementRect, fTest);
                         }
+                        else
+                            showPickList = true;
                     }
                 }
                 EditorGUILayout.EndScrollView();
@@ -348,15 +355,28 @@ public class Window_Enemies : EditorWindow
         }
         EditorGUILayout.EndHorizontal();
 
-        ElementDataStorage.SaveCache(enemyList);
-
-        if (updateGameManager)
-            GameManager.Instance.UpdateElementData();
+        if (changesMade)
+            ElementDataStorage.SaveCache(enemyList);
     }
 
     void OnValidate()
     {
-        enemyList = ElementDataStorage.LoadCache<CombatantData>();
+        if (focussed)
+        {
+            enemyList = ElementDataStorage.LoadCache<CombatantData>();
+            GameManager.Instance.UpdateElementData();
+        }
+    }
+    
+    void OnFocus()
+    {
+        //Debug.Log("OnFocus executed at " + System.DateTime.Now.ToString("T", CultureInfo.GetCultureInfo("en-GB")));
+        focussed = true;
+    }
+
+    void OnLostFocus()
+    {
+        focussed = false;
     }
 
     [MenuItem("Window/Game Elements/Enemy Maker")]

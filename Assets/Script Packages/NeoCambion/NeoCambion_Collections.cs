@@ -681,6 +681,52 @@ namespace NeoCambion.Collections
 
         #endregion
 
+        /// <summary>
+        /// Checks if the target dictionary already contains the key, and removes the key-value pair if it does.
+        /// </summary>
+        /// <typeparam name="Tkey"></typeparam>
+        /// <typeparam name="Tvalue"></typeparam>
+        /// <param name="dict"></param>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <returns>
+        /// <para><b>true</b> - The dictionary already contained the key, and the key-value pair was removed.</para>
+        /// <para><b>false</b> - The dictionary did not already contain the key, and the key-value pair <u>was</u> added.</para>
+        /// </returns>
+        public static bool ContainsKey_Add<Tkey, Tvalue>(this Dictionary<Tkey, Tvalue> dict, Tkey key, Tvalue value)
+        {
+            if (!dict.ContainsKey(key))
+            {
+                dict.Add(key, value);
+                return false;
+            }
+            else
+                return true;
+        }
+
+        /// <summary>
+        /// Checks if the target dictionary contains the key, and removes the corresponding key-value pair if it does.
+        /// </summary>
+        /// <typeparam name="Tkey"></typeparam>
+        /// <typeparam name="Tvalue"></typeparam>
+        /// <param name="dict"></param>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <returns>
+        /// <para><b>true</b> - The dictionary contained the key, and the corresponding key-value pair was removed.</para>
+        /// <para><b>false</b> - The dictionary did not contain the key.</para>
+        /// </returns>
+        public static bool ContainsKey_Remove<Tkey, Tvalue>(this Dictionary<Tkey, Tvalue> dict, Tkey key)
+        {
+            if (dict.ContainsKey(key))
+            {
+                dict.Remove(key);
+                return true;
+            }
+            else
+                return false;
+        }
+
         public static void Transfer<T>(this List<T> source, int sourceIndex, List<T> destination, int destinationIndex = -1)
         {
             if (destinationIndex < 0)

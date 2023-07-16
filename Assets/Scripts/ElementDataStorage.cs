@@ -226,8 +226,13 @@ public class ElementData
 public class CombatantData : ElementData
 {
     public EntityModel model;
+    public bool isFriendly;
     public int baseHealth = 50;
-    public float healthScaling = 2.0f;
+    public int healthScaling;
+    public int baseAttack;
+    public int attackScaling;
+    public int baseDefence;
+    public int defenceScaling;
     // Behaviour
     // Damage reduction
     // Speed
@@ -239,7 +244,7 @@ public class CombatantData : ElementData
 
     public override string ToString()
     {
-        return $"Enemy Type \"{displayName}\"";
+        return $"Combatant Type \"{displayName}\"";
     }
 }
 
@@ -413,33 +418,33 @@ public class ItemTypeDrawer : PropertyDrawer
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 [System.Serializable]
-public struct DropTableList
+public struct LootTableList
 {
-    public List<DropTable> Tables;
-    public DropTableList(List<DropTable> tables = null)
+    public List<LootTable> Tables;
+    public LootTableList(List<LootTable> tables = null)
     {
-        Tables = tables == null ? new List<DropTable>() : tables;
+        Tables = tables == null ? new List<LootTable>() : tables;
     }
 }
 
 [System.Serializable]
-public class DropTable
+public class LootTable
 {
     public bool fillPercentage = true;
-    public List<DropTableItem> items;
+    public List<LootTableItem> items;
 
     public void Recalculate()
     {
         if (items.Count > 0)
         {
             float total = 0.0f;
-            foreach (DropTableItem item in items)
+            foreach (LootTableItem item in items)
             {
                 total += item.rollChance;
             }
             if (total > 1.0f)
             {
-                foreach (DropTableItem item in items)
+                foreach (LootTableItem item in items)
                 {
                     item.rollChance /= total;
                 }
@@ -447,13 +452,13 @@ public class DropTable
         }
     }
 
-    public DropTableItem GetItem()
+    public LootTableItem GetItem()
     {
         float ranPercent = Random.Range(0.0f, 1.0f);
         return GetItem(ranPercent);
     }
 
-    public DropTableItem GetItem(float ranPercent)
+    public LootTableItem GetItem(float ranPercent)
     {
         float threshold = 0.0f;
         for (int i = 0; i < items.Count; i++)
@@ -467,7 +472,7 @@ public class DropTable
 }
 
 [System.Serializable]
-public class DropTableItem
+public class LootTableItem
 {
     public ItemType item = null;
     public ushort count = 1;

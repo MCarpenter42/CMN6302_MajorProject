@@ -28,51 +28,10 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
+using System.Runtime.CompilerServices;
 
 public class CombatantCore : Core
 {
-    public struct HealthValues
-    {
-        public int baseValue;
-        public int max;
-        public int current;
-        public float scalingPercent;
-
-        public HealthValues(int baseValue, float scalingPercent = 0.2f)
-        {
-            this.baseValue = baseValue;
-            max = baseValue;
-            current = baseValue;
-            this.scalingPercent = scalingPercent;
-        }
-
-        private static float ScaledFloat(int baseValue, ushort level, float scalingPercent)
-        {
-            float scaling = Mathf.Clamp(scalingPercent, 0.0f, 1.0f) * 0.06f;
-            level -= (ushort)(level > 0 ? 1 : 0);
-            return (float)baseValue * Mathf.Exp(0.01f * scaling * (float)level);
-        }
-        
-        public static int ScaledValue(int baseValue, ushort level, float scalingPercent)
-        {
-            level -= (ushort)(level > 0 ? 1 : 0);
-            return Mathf.RoundToInt(ScaledFloat(baseValue, level, scalingPercent));
-        }
-
-        public int RecalculateMax(ushort level, ItemCore[] equipment = null)
-        {
-            level -= (ushort)(level > 0 ? 1 : 0);
-            float multiply = 1.0f;
-            int add = 0;
-            if (equipment != null && equipment.Length > 0)
-            {
-                
-            }
-            max = Mathf.RoundToInt(ScaledFloat(baseValue, level, scalingPercent) * multiply) + add;
-            return max;
-        }
-    }
-
     #region [ OBJECTS / COMPONENTS ]
 
 
@@ -81,7 +40,37 @@ public class CombatantCore : Core
 
     #region [ PROPERTIES ]
 
-    public HealthValues health;
+    public ushort level;
+    private CombatValue[] values = new CombatValue[3];
+    public CombatValue health
+    {
+        get
+        {
+            if (values[0] == null)
+                values[0] = new CombatValue(this);
+            return values[0];
+        }
+    }
+    public CombatValue attack
+    {
+        get
+        {
+            if (values[1] == null)
+                values[1] = new CombatValue(this);
+            return values[1];
+        }
+    }
+    public CombatValue defence
+    {
+        get
+        {
+            if (values[1] == null)
+                values[1] = new CombatValue(this);
+            return values[1];
+        }
+    }
+
+    public CombatEquipment equipment;
 
     #endregion
 
@@ -119,5 +108,89 @@ public class CombatantCore : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+
+}
+
+public class CombatValue
+{
+    public static float ScaledFloat(int baseValue, ushort level, float scalingPercent)
+    {
+        float scaling = Mathf.Clamp(scalingPercent, 0.0f, 1.0f) * 0.06f;
+        level -= (ushort)(level > 0 ? 1 : 0);
+        return (float)baseValue * Mathf.Exp(scaling * (float)level);
+    }
+
+    public static int ScaledInt(int baseValue, ushort level, float scalingPercent)
+    {
+        level -= (ushort)(level > 0 ? 1 : 0);
+        return Mathf.RoundToInt(ScaledFloat(baseValue, level, scalingPercent));
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public CombatantCore combatant;
+    private int _level;
+    public int level
+    {
+        get { return combatant == null ? _level : combatant.level; }
+        set { _level = value; }
+    }
+
+    private int[] values = new int[3] { -1, -1, -1 };
+    public int valueBase
+    {
+        get
+        {
+            return values[0];
+        }
+        set
+        {
+            values[0] = value;
+            values[1] = modifiers.Modify(valueBase);
+        }
+    }
+    public int valueScaled
+    {
+        get
+        {
+            if (modifiers.newChanges)
+            {
+                values[1] = modifiers.Modify(valueBase);
+            }
+            return values[1];
+        }
+    }
+    public int valueCurrent
+    {
+        get { return values[2]; }
+        set { values[2] = value; }
+    }
+    public int scaling;
+
+    public ModifiersInt modifiers = new ModifiersInt();
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public CombatValue(CombatantCore combatant)
+    {
+        this.combatant = combatant;
+        level = 1;
+    }
+    
+    public CombatValue(int level)
+    {
+        combatant = null;
+        this.level = level;
+    }
+}
+
+public class CombatEquipment
+{
+
+}
+
+[System.Serializable]
+public class CombatantBrain
+{
 
 }
