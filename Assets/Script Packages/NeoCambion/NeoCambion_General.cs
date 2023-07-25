@@ -280,6 +280,24 @@ namespace NeoCambion
             }
             return (byte)(i1 * 0x10 + i0);
         }
+
+        public static byte[] ParseHexToBytes(this char[] values)
+        {
+            if (new string(values).IsHexadecimal())
+            {
+                int l = values.Length;
+                byte[] bytes = new byte[(l - (l % 2)) / 2];
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    bytes[i] = Ext_Char.ParseHexToByte(values[2 * i], values[2 * i + 1]);
+                }
+                return bytes;
+            }
+            else
+            {
+                return null;
+            }
+        }
     }
 
     public static class Ext_Float
@@ -317,6 +335,19 @@ namespace NeoCambion
         public static byte[] ToBytes(this int intVal)
         {
             return BitConverter.GetBytes(intVal);
+        }
+
+        public static string ParseToHexString(this int intVal)
+        {
+            string str = "";
+            int x;
+            for (int i = 3; i >= 0; i--)
+            {
+                x = intVal;
+                x = (x >> (8 * i)) & byte.MaxValue;
+                str += ((byte)x).ParseToHexString();
+            }
+            return str;
         }
     }
     
@@ -487,6 +518,103 @@ namespace NeoCambion
                 return null;
             }
         }
+
+        public static int HexStringToInt(this string hexString, bool adjustFromLeft = true)
+        {
+            if (hexString.IsHexadecimal())
+            {
+                int l = hexString.Length;
+                int valOut = 0;
+                byte[] bytes = new byte[4];
+                if (adjustFromLeft)
+                {
+                    if (l > 8)
+                    {
+                        hexString = hexString.Substring(l - 9);
+                    }
+                    else if (l < 8)
+                    {
+                        hexString = hexString.PadLeft(8, '0');
+                    }
+                }
+                else
+                {
+                    if (l > 8)
+                    {
+                        hexString = hexString.Substring(0, 8);
+                    }
+                    else if (l < 8)
+                    {
+                        hexString = hexString.PadRight(8, '0');
+                    }
+                }
+                bytes = Ext_Char.ParseHexToBytes(hexString.ToCharArray());
+                for (int i = 0; i < 4; i++)
+                {
+                    valOut += bytes[i] << (8 * (3 - i));
+                }
+                return valOut;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+
+        public static uint HexStringToUInt(this string hexString, bool adjustFromLeft = true)
+        {
+            if (hexString.IsHexadecimal())
+            {
+                int l = hexString.Length;
+                uint valOut = 0;
+                byte[] bytes = new byte[4];
+                if (adjustFromLeft)
+                {
+                    if (l > 8)
+                    {
+                        hexString = hexString.Substring(l - 9);
+                    }
+                    else if (l < 8)
+                    {
+                        hexString = hexString.PadLeft(8, '0');
+                    }
+                }
+                else
+                {
+                    if (l > 8)
+                    {
+                        hexString = hexString.Substring(0, 8);
+                    }
+                    else if (l < 8)
+                    {
+                        hexString = hexString.PadRight(8, '0');
+                    }
+                }
+                bytes = Ext_Char.ParseHexToBytes(hexString.ToCharArray());
+                for (int i = 0; i < 4; i++)
+                {
+                    valOut += (uint)bytes[i] << (8 * (3 - i));
+                }
+                return valOut;
+            }
+            else
+            {
+                return uint.MinValue;
+            }
+        }
+
+        public static string TrimFileExtension(this string filepath)
+        {
+            int ind = filepath.LastIndexOf('.');
+            if (filepath.Length > 3 && ind > 0)
+            {
+                return filepath.Substring(0, ind);
+            }
+            else
+            {
+                return filepath;
+            }
+        }
     }
 
     public static class Ext_Short
@@ -502,6 +630,19 @@ namespace NeoCambion
         public static byte[] ToBytes(this uint uintVal)
         {
             return BitConverter.GetBytes(uintVal);
+        }
+
+        public static string ParseToHexString(this uint uintVal)
+        {
+            string str = "";
+            uint x;
+            for (int i = 3; i >= 0; i--)
+            {
+                x = uintVal;
+                x = (x >> (8 * i)) & byte.MaxValue;
+                str += ((byte)x).ParseToHexString();
+            }
+            return str;
         }
     }
 

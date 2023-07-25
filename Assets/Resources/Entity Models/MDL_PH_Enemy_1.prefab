@@ -92,7 +92,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8065508944823705824}
-  - component: {fileID: 6565933023328135375}
+  - component: {fileID: 3336949885710560194}
+  - component: {fileID: 3569172055984607490}
   m_Layer: 0
   m_Name: MDL_PH_Enemy_1
   m_TagString: EntityModel
@@ -117,7 +118,20 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &6565933023328135375
+--- !u!114 &3336949885710560194
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1074736340438341455}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02f2f10215bb5d4448313cc3aa73a650, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  UID: 0
+--- !u!114 &3569172055984607490
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

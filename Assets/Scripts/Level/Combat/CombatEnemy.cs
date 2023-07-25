@@ -8,8 +8,7 @@ public class CombatEnemy : CombatantCore
 {
     #region [ OBJECTS / COMPONENTS ]
 
-    public CombatantData baseData;
-    public EntityModel modelObj;
+
 
     #endregion
 
@@ -53,10 +52,8 @@ public class CombatEnemy : CombatantCore
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public void GetData(CombatantData data)
+    public override void GetData(CombatantData data)
     {
-        baseData = data;
-        //Debug.Log((data == null) + (data == null ? "" : "" + (data.model == null)));
-        modelObj = Instantiate(baseData.model, transform);
+        base.GetData(data);
     }
 }

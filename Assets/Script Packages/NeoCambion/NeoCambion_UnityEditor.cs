@@ -294,6 +294,21 @@ namespace NeoCambion.Unity.Editor
                 }
             };
         }
+
+        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+        public static GUIStyleState emptyStyleState
+        {
+            get
+            {
+                return new GUIStyleState()
+                {
+                    background = null,
+                    scaledBackgrounds = null,
+                    textColor = new Color(0, 0, 0, 0)
+                };
+            }
+        }
     }
 
     public static class EditorElements
@@ -423,12 +438,12 @@ namespace NeoCambion.Unity.Editor
                 EditorGUILayout.BeginHorizontal(tempStyle, GUILayout.MinHeight(minHeight), GUILayout.MaxHeight(maxHeight));
             GreyRect(barWidth, 0, false, true);
             EditorGUILayout.BeginVertical(tempStyle);
-            EditorGUILayout.Space(4.0f);
+            EditorGUILayout.Space(8.0f);
         }
 
         public static void EndSubSection()
         {
-            EditorGUILayout.Space(4.0f);
+            EditorGUILayout.Space(2.0f);
             EditorGUILayout.EndVertical();
             EditorGUILayout.EndHorizontal();
         }

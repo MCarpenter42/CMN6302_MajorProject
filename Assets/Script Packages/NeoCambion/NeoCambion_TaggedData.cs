@@ -100,6 +100,7 @@ namespace NeoCambion
             #endregion
         }
 
+        [Serializable]
         public struct Data_LongTag<T>
         {
             public long tag;
@@ -112,7 +113,8 @@ namespace NeoCambion
                 this.value = value;
             }
         }
-        
+
+        [Serializable]
         public struct Data_IntTag<T>
         {
             public int tag;
@@ -126,6 +128,7 @@ namespace NeoCambion
             }
         }
 
+        [Serializable]
         public struct Data_StringTag<T>
         {
             private Data_LongTag<T> data;
@@ -193,6 +196,7 @@ namespace NeoCambion
                 #endregion
             }
 
+            [Serializable]
             public struct Data_Vector2Tag<T>
             {
                 public Vector2 tag;
@@ -205,7 +209,8 @@ namespace NeoCambion
                     this.value = value;
                 }
             }
-            
+
+            [Serializable]
             public struct Data_Vector3Tag<T>
             {
                 public Vector3 tag;

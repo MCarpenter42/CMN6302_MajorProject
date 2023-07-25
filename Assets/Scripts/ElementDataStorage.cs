@@ -225,7 +225,7 @@ public class ElementData
 [System.Serializable]
 public class CombatantData : ElementData
 {
-    public EntityModel model;
+    public string modelHexUID;
     public bool isFriendly;
     public int baseHealth = 50;
     public int healthScaling;

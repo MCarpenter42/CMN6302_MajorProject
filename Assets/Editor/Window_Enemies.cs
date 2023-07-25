@@ -10,6 +10,9 @@ using NeoCambion.Unity;
 using NeoCambion.Unity.Editor;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using NeoCambion.Unity.PersistentUID;
+using Unity.VisualScripting;
+using System;
 
 public class Window_Enemies : EditorWindow
 {
@@ -43,12 +46,9 @@ public class Window_Enemies : EditorWindow
     private Vector2 scrollPosMain = new Vector2();
     private Vector2 scrollPosList = new Vector2();
 
-    #region < REGION TOGGLES >
-
-    private bool showPickList = false;
-    private bool showHealth = false;
-
-    #endregion
+    private enum RegionToggle { EnemyList, Health, Attack, Defence }
+    private bool[] regionToggles = new bool[4];
+    private int toggleCount { get { return Enum.GetNames(typeof(RegionToggle)).Length; } }
 
     private int selectedEnemy = -1;
 
@@ -75,6 +75,13 @@ public class Window_Enemies : EditorWindow
     void Awake()
     {
         enemyList = ElementDataStorage.LoadCache<CombatantData>();
+        if (regionToggles.Length != toggleCount)
+            regionToggles = new bool[toggleCount];
+        regionToggles[0] = true;
+        for (int i = 1; i < regionToggles.Length; i++)
+        {
+            regionToggles[i] = false;
+        }
     }
 
     void OnGUI()
@@ -141,7 +148,7 @@ public class Window_Enemies : EditorWindow
                 bSize = Vector2.one * (elementRect.height + 4);
                 elementRect.width -= bSize.x + 4;
 
-                bool _showPickList = (enemyList.Count > 0 && enemyList.InBounds(selectedEnemy)) ? showPickList : true;
+                bool _showPickList = (enemyList.Count > 0 && enemyList.InBounds(selectedEnemy)) ? regionToggles[0] : true;
 
                 label.text = _showPickList ? "Select Enemy to Edit" : "Editing: \"" + enemyList[selectedEnemy].displayName + "\"";
                 label.tooltip = null;
@@ -158,7 +165,7 @@ public class Window_Enemies : EditorWindow
                 {
                     if (GUI.Button(btnRect, label, boldButton))
                     {
-                        showPickList = enemyList.Count > 0 ? !showPickList : true;
+                        regionToggles[0] = enemyList.Count > 0 ? !regionToggles[0] : true;
                     }
                 }
 
@@ -185,7 +192,7 @@ public class Window_Enemies : EditorWindow
                                 if (GUI.Button(elementRect, enemyList[i].displayName, i == selectedEnemy ? EditorStylesExtras.ColouredTextButton(DynamicTextColour.lightBlue, FontStyle.Normal) : GUI.skin.button))
                                 {
                                     selectedEnemy = i;
-                                    showPickList = false;
+                                    regionToggles[0] = false;
                                 }
 
                                 label.text = "X";
@@ -197,7 +204,7 @@ public class Window_Enemies : EditorWindow
                                 {
                                     enemyList.RemoveAt(i);
                                     selectedEnemy = 0;
-                                    showPickList = true;
+                                    regionToggles[0] = true;
                                     changesMade = true;
                                 }
                             }
@@ -213,7 +220,7 @@ public class Window_Enemies : EditorWindow
                                 enemyList.Add(new CombatantData("New Enemy"));
                                 selectedEnemy = enemyList.Count - 1;
                                 enemyList[selectedEnemy].isFriendly = false;
-                                showPickList = false;
+                                regionToggles[0] = false;
                                 changesMade = true;
                             }
                         }
@@ -228,20 +235,9 @@ public class Window_Enemies : EditorWindow
                             {
                                 enemyList.Add(new CombatantData("New Enemy"));
                                 selectedEnemy = 0;
-                                showPickList = false;
+                                regionToggles[0] = false;
                                 changesMade = true;
                             }
-
-                            /*EditorGUILayout.Space(12.0f);
-                            EditorGUILayout.LabelField("Alternatively, retrieve existing data:", centreWrapLabel);
-
-                            elementRect = EditorGUILayout.GetControlRect(true, slHeight + 10);
-                            elementRect.x += 40;
-                            elementRect.width -= 80;
-                            if (GUI.Button(elementRect, "Retrieve Enemy Data"))
-                            {
-                                enemyList = ElementDataStorage.LoadCache<EnemyData>();
-                            }*/
                         }
                     }
                     else
@@ -250,10 +246,10 @@ public class Window_Enemies : EditorWindow
                         {
                             EditorGUILayout.Space(4.0f);
 
-                            string dispName = enemyList[selectedEnemy].displayName;
-
                             label.text = "Display Name";
                             label.tooltip = null;
+
+                            string dispName = enemyList[selectedEnemy].displayName;
 
                             elementRect = EditorGUILayout.GetControlRect(true, slHeight);
                             dispName = EditorGUI.DelayedTextField(elementRect, label, dispName);
@@ -263,18 +259,37 @@ public class Window_Enemies : EditorWindow
                                 enemyList[selectedEnemy].displayName = dispName;
                             }
 
-                            EntityModel mdl = enemyList[selectedEnemy].model;
-
                             label.text = "Model";
                             label.tooltip = null;
 
+                            string modelPath = EntityModel.GetModelPathFromUID(enemyList[selectedEnemy].modelHexUID);
+                            GameObject modelObj = Resources.Load<GameObject>(modelPath);
+                            //Debug.Log(enemyList[selectedEnemy].modelHexUID + " | " + modelPath + " | " + (modelObj == null ? "null" : modelObj.name));
+                            
                             elementRect = EditorGUILayout.GetControlRect(true, slHeight);
-                            mdl = (EntityModel)EditorGUI.ObjectField(elementRect, label, mdl, typeof(EntityModel), false);
-                            if (mdl != enemyList[selectedEnemy].model)
+                            EntityModel model = EditorGUI.ObjectField(elementRect, label, (modelObj == null ? null : modelObj.GetComponent<EntityModel>()), typeof(EntityModel), false) as EntityModel;
+                            string[] hexUIDs = new string[] { (modelObj == null ? "00000000" : enemyList[selectedEnemy].modelHexUID), (model == null ? "00000000" : model.gameObject.GetComponent<PrefabUID>().hexUID) };
+                            if (hexUIDs[1] == "00000000")
+                            {
+                                if (hexUIDs[0] != "00000000")
+                                    changesMade = true;
+                                enemyList[selectedEnemy].modelHexUID = hexUIDs[1];
+                            }
+                            else if (hexUIDs[0] == "00000000")
                             {
                                 changesMade = true;
-                                enemyList[selectedEnemy].model = mdl;
+                                enemyList[selectedEnemy].modelHexUID = model.gameObject.GetComponent<PrefabUID>().hexUID;
                             }
+                            else
+                            {
+                                string hexUID = model.gameObject.GetComponent<PrefabUID>().hexUID;
+                                if (hexUID != enemyList[selectedEnemy].modelHexUID)
+                                {
+                                    changesMade = true;
+                                    enemyList[selectedEnemy].modelHexUID = hexUID;
+                                }
+                            }
+                            //Debug.Log("modelObj: " + (modelObj == null ? "null" : hexUIDs[0]) + " | model: " + (model == null ? "null" : hexUIDs[1]));
 
                             EditorGUILayout.Space(2.0f);
 
@@ -286,56 +301,38 @@ public class Window_Enemies : EditorWindow
 
                             EditorGUILayout.Space(2.0f);
 
-                            label.text = "Health";
-                            label.tooltip = null;
-
-                            if (showHealth = EditorGUILayout.Foldout(showHealth, label, true, EditorStylesExtras.foldoutLabel))
+                            ReturnScalingData healthData = ScalingStatFoldoutRegion(RegionToggle.Health, "Health", enemyList[selectedEnemy].baseHealth, enemyList[selectedEnemy].healthScaling);
+                            if (healthData.value != enemyList[selectedEnemy].baseHealth || healthData.scaling != enemyList[selectedEnemy].healthScaling)
                             {
-                                EditorElements.BeginSubSection(10.0f, 0);
-                                {
-                                    label.text = "Base Value";
-                                    label.tooltip = null;
-
-                                    int baseHealth = enemyList[selectedEnemy].baseHealth;
-                                    baseHealth = EditorGUILayout.DelayedIntField(label, baseHealth);
-                                    if (baseHealth != enemyList[selectedEnemy].baseHealth)
-                                    {
-                                        changesMade = true;
-                                        if (baseHealth < 1)
-                                            baseHealth = 1;
-                                        enemyList[selectedEnemy].baseHealth = baseHealth;
-                                    }
-
-                                    label.text = "Scaling Factor";
-                                    label.tooltip = null;
-
-                                    elementRect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), label);
-                                    elementRect.width -= 44;
-                                    int healthScaling = enemyList[selectedEnemy].healthScaling;
-                                    healthScaling = (int)GUI.HorizontalSlider(elementRect, healthScaling, 0.0f, 100.0f).Round(0);
-                                    elementRect.x += elementRect.width + 4;
-                                    elementRect.width = 40;
-                                    healthScaling = (int)EditorElements.IntPercentField(elementRect, healthScaling, false);
-                                    if (healthScaling != enemyList[selectedEnemy].healthScaling)
-                                    {
-                                        changesMade = true;
-                                        enemyList[selectedEnemy].healthScaling = healthScaling;
-                                    }
-
-                                    EditorGUILayout.Space(2.0f);
-
-                                    label.text = "Scaled to Level " + previewLevel;
-                                    label.tooltip = null;
-
-                                    elementRect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), label);
-                                    int scaledHealth = CombatValue.ScaledInt(baseHealth, previewLevel, healthScaling / 100.0f);
-                                    EditorElements.ReadonlyField(elementRect, scaledHealth.ToString());
-                                }
-                                EditorElements.EndSubSection();
+                                changesMade = true;
+                                enemyList[selectedEnemy].baseHealth = healthData.value;
+                                enemyList[selectedEnemy].healthScaling = healthData.scaling;
                             }
+
+                            //EditorGUILayout.Space(2.0f);
+
+                            ReturnScalingData attackData = ScalingStatFoldoutRegion(RegionToggle.Attack, "Attack", enemyList[selectedEnemy].baseAttack, enemyList[selectedEnemy].attackScaling);
+                            if (attackData.value != enemyList[selectedEnemy].baseAttack || attackData.scaling != enemyList[selectedEnemy].attackScaling)
+                            {
+                                changesMade = true;
+                                enemyList[selectedEnemy].baseAttack = attackData.value;
+                                enemyList[selectedEnemy].attackScaling = attackData.scaling;
+                            }
+
+                            //EditorGUILayout.Space(2.0f);
+
+                            ReturnScalingData defenceData = ScalingStatFoldoutRegion(RegionToggle.Defence, "Defence", enemyList[selectedEnemy].baseDefence, enemyList[selectedEnemy].defenceScaling);
+                            if (defenceData.value != enemyList[selectedEnemy].baseDefence || defenceData.scaling != enemyList[selectedEnemy].defenceScaling)
+                            {
+                                changesMade = true;
+                                enemyList[selectedEnemy].baseDefence = defenceData.value;
+                                enemyList[selectedEnemy].defenceScaling = defenceData.scaling;
+                            }
+
+                            //EditorGUILayout.Space(2.0f);
                         }
                         else
-                            showPickList = true;
+                            regionToggles[0] = true;
                     }
                 }
                 EditorGUILayout.EndScrollView();
@@ -390,4 +387,62 @@ public class Window_Enemies : EditorWindow
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    private struct ReturnScalingData
+    {
+        public int value;
+        public int scaling;
+
+        public ReturnScalingData(int value, int scaling)
+        {
+            this.value = value;
+            this.scaling = scaling;
+        }
+    }
+
+    private ReturnScalingData ScalingStatFoldoutRegion(RegionToggle region, string headerText, int baseValue, int valueScaling)
+    {
+        label.text = headerText;
+        label.tooltip = null;
+
+        ReturnScalingData returnData = new ReturnScalingData(baseValue, valueScaling);
+        int r = (int)region;
+        if (regionToggles.InBounds(r))
+        {
+            if (regionToggles[r] = EditorGUILayout.Foldout(regionToggles[r], label, true, EditorStylesExtras.foldoutLabel))
+            {
+                EditorElements.BeginSubSection(10.0f, 0);
+                {
+                    label.text = "Base Value";
+                    label.tooltip = null;
+
+                    returnData.value = EditorGUILayout.DelayedIntField(label, baseValue);
+                    if (returnData.value < 1)
+                        returnData.value = 1;
+
+                    label.text = "Scaling Factor";
+                    label.tooltip = null;
+
+                    elementRect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), label);
+                    elementRect.width -= 44;
+                    returnData.scaling = (int)GUI.HorizontalSlider(elementRect, valueScaling, 0.0f, 100.0f).Round(0);
+                    elementRect.x += elementRect.width + 4;
+                    elementRect.width = 40;
+                    returnData.scaling = (int)EditorElements.IntPercentField(elementRect, valueScaling, false);
+
+                    EditorGUILayout.Space(2.0f);
+
+                    label.text = "Scaled to Level " + previewLevel;
+                    label.tooltip = null;
+
+                    elementRect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), label);
+                    int scaledValue = CombatValue.ScaledInt(returnData.value, previewLevel, returnData.scaling / 100.0f);
+                    EditorElements.ReadonlyField(elementRect, scaledValue.ToString());
+                }
+                EditorElements.EndSubSection();
+            }
+            EditorGUILayout.Space(8.0f);
+        }
+
+        return returnData;
+    }
 }

@@ -8,23 +8,19 @@ using UnityEditor;
 using NeoCambion;
 using NeoCambion.Maths;
 using NeoCambion.Unity;
+using NeoCambion.Unity.Editor;
+using NeoCambion.Unity.PersistentUID;
 
 [CustomEditor(typeof(WorldEntityCore), true)]
 [CanEditMultipleObjects]
 public class WorldEntityCoreEditor : Editor
 {
-    SerializedProperty pivot;
-    SerializedProperty model;
-    SerializedProperty maxSpeed;
+    WorldEntityCore targ { get { return target as WorldEntityCore; } }
 
     string[] propertiesInBaseClass;
 
     void OnEnable()
     {
-        pivot = serializedObject.FindProperty("pivot");
-        model = serializedObject.FindProperty("model");
-        maxSpeed = serializedObject.FindProperty("maxSpeed");
-
         FieldInfo[] fields = typeof(WorldEntityCore).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         propertiesInBaseClass = new string[fields.Length];
         for (int i = 0; i < fields.Length; i++)
@@ -36,23 +32,23 @@ public class WorldEntityCoreEditor : Editor
     public override void OnInspectorGUI()
     {
         serializedObject.Update();
-        SerializedProperty _pivot = pivot;
-        EditorGUILayout.PropertyField(_pivot, new GUIContent("Pivot"));
-        if (_pivot != pivot)
+        EditorGUILayout.LabelField("World Entity Core");
+        Transform pivot = EditorGUILayout.ObjectField("Pivot", targ.pivot, typeof(Transform), true) as Transform;
+        if (pivot != targ.pivot)
         {
-            pivot = _pivot;
-            ((WorldEntityCore)target).UpdateModelObject(false);
+            targ.pivot = pivot;
+            targ.UpdateModelObject(false);
         }
-        SerializedProperty _model = model;
-        EditorGUILayout.PropertyField(_model, new GUIContent("Model"));
+        EntityModel model = EditorGUILayout.ObjectField("Model", targ.model, typeof(EntityModel), true) as EntityModel;
+        if (model != targ.model)
         {
-            model = _model;
-            ((WorldEntityCore)target).UpdateModelObject(true);
+            targ.model = model;
+            targ.UpdateModelObject(true);
         }
-        EditorGUILayout.PropertyField(maxSpeed, new GUIContent("Maximum Speed"));
-        DrawPropertiesExcluding(serializedObject, propertiesInBaseClass);
+        targ.maxSpeed = EditorGUILayout.FloatField("Maximum Speed", targ.maxSpeed);
         //Debug.Log(propertiesInBaseClass[0]);
         serializedObject.ApplyModifiedProperties();
+        DrawPropertiesExcluding(serializedObject, propertiesInBaseClass);
     }
 }
 
@@ -61,8 +57,8 @@ public class WorldEntityCore : Core
     #region [ OBJECTS / COMPONENTS ]
 
     [Header("Entity Core")]
-    [SerializeField] protected Transform pivot;
-    [SerializeField] protected EntityModel model;
+    public Transform pivot;
+    public EntityModel model;
     protected GameObject modelObj;
     protected Rigidbody _rb;
     public Rigidbody rb
@@ -148,7 +144,7 @@ public class WorldEntityCore : Core
             if (modelObj != null)
                 modelObj.tag = "EntityModel";
             List<GameObject> modelObjs = pivot.gameObject.GetChildrenWithTag("EntityModel");
-            if (modelObjs.Contains(model.gameObject))
+            if (modelObj != null && modelObjs.Contains(model.gameObject))
                 modelObjs.Remove(model.gameObject);
             if (replaceModel)
             {

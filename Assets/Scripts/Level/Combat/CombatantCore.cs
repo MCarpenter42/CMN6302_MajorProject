@@ -34,7 +34,8 @@ public class CombatantCore : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 
-
+    public CombatantData baseData;
+    public EntityModel modelObj;
 
     #endregion
 
@@ -108,7 +109,23 @@ public class CombatantCore : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    public virtual void GetData(CombatantData data)
+    {
+        if (data != null)
+        {
+            baseData = data;
 
+            GameObject modelTemplate = Resources.Load<GameObject>(EntityModel.GetModelPathFromUID(data.modelHexUID));
+            modelObj = Instantiate(modelTemplate, transform).GetComponent<EntityModel>();
+
+            health.valueBase = baseData.baseHealth;
+            health.scaling = baseData.healthScaling;
+            attack.valueBase = baseData.baseAttack;
+            attack.scaling = baseData.attackScaling;
+            defence.valueBase = baseData.baseDefence;
+            defence.scaling = baseData.defenceScaling;
+        }
+    }
 }
 
 public class CombatValue
