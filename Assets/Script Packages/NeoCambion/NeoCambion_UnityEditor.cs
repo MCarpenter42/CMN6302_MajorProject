@@ -6,6 +6,7 @@ namespace NeoCambion.Unity.Editor
 
     using NeoCambion.Collections;
     using NeoCambion.Collections.Unity;
+    using UnityEditor.Experimental.GraphView;
 
     public delegate void MenuReturn<T>(T returnVal);
 
@@ -137,6 +138,34 @@ namespace NeoCambion.Unity.Editor
         }
     }
 
+    public struct FontSettings
+    {
+        public Font font;
+        public int fontSize;
+        public FontStyle fontStyle;
+
+        public FontSettings(FontStyle fontStyle)
+        {
+            font = GUI.skin.label.font;
+            fontSize = GUI.skin.label.fontSize;
+            this.fontStyle = fontStyle;
+        }
+
+        public FontSettings(Font font, int fontSize, FontStyle fontStyle)
+        {
+            this.font = font;
+            this.fontSize = fontSize;
+            this.fontStyle = fontStyle;
+        }
+
+        public FontSettings(GUIStyle template)
+        {
+            font = template.font;
+            fontSize = template.fontSize;
+            fontStyle = template.fontStyle;
+        }
+    }
+
     public class EditorStylesExtras
     {
         private static bool darkTheme { get { return GUI.skin.label.normal.textColor.ApproximatelyEquals(new Color(0.824f, 0.824f, 0.824f, 1.000f), 0.005f); } }
@@ -241,6 +270,45 @@ namespace NeoCambion.Unity.Editor
                 }
                 return _labelCentredRight;
             }
+        }
+
+        public static GUIStyle LabelStyle(TextAnchor textAlignment, FontSettings textStyle)
+        {
+            return new GUIStyle()
+            {
+                alignment = textAlignment,
+                font = textStyle.font,
+                fontSize = textStyle.fontSize,
+                fontStyle = textStyle.fontStyle
+            };
+        }
+        
+        public static GUIStyle LabelStyle(TextAnchor textAlignment, FontSettings textStyle, DynamicTextColour textColour)
+        {
+            GUIStyleState hover = new GUIStyleState()
+            {
+                textColor = textColour[true, !darkTheme]
+            };
+            GUIStyleState normal = new GUIStyleState()
+            {
+                textColor = textColour[false, !darkTheme]
+            };
+
+            return new GUIStyle()
+            {
+                alignment = textAlignment,
+                font = textStyle.font,
+                fontSize = textStyle.fontSize,
+                fontStyle = textStyle.fontStyle,
+                active = normal,
+                onActive = normal,
+                focused = hover,
+                onFocused = hover,
+                hover = hover,
+                onHover = hover,
+                normal = normal,
+                onNormal = normal
+            };
         }
 
         public static GUIStyle textButtonRed { get { return ColouredTextButton(DynamicTextColour.red); } }

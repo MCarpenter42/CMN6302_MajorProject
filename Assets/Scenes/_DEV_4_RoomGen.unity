@@ -2164,6 +2164,7 @@ MonoBehaviour:
   Combat: {fileID: 0}
   camWorld: {fileID: 673289710}
   camCombat: {fileID: 811166722}
+  levelScene: 1
 --- !u!1 &1807720269
 GameObject:
   m_ObjectHideFlags: 0

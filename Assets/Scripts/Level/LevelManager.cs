@@ -9,14 +9,14 @@ public class LevelManager : Core
     #region [ OBJECTS / COMPONENTS ]
 
     [HideInInspector] public CombatManager Combat = null;
-    [SerializeField] Camera camWorld;
-    [SerializeField] Camera camCombat;
+    public Camera camWorld;
+    public Camera camCombat;
 
     #endregion
 
     #region [ PROPERTIES ]
 
-    
+    public bool levelScene = true;
 
     #endregion
 

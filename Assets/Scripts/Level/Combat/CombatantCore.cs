@@ -70,6 +70,7 @@ public class CombatantCore : Core
             return values[1];
         }
     }
+    public CombatSpeed speed = new CombatSpeed();
 
     public CombatEquipment equipment;
 
@@ -198,6 +199,179 @@ public class CombatValue
     {
         combatant = null;
         this.level = level;
+    }
+}
+
+public class SpeedAtLevel
+{
+    public ushort levelThreshold;
+    public int value;
+
+    public SpeedAtLevel(ushort levelThreshold, int value)
+    {
+        this.levelThreshold = levelThreshold;
+        this.value = value;
+    }
+
+    public static SpeedAtLevel Default { get { return new SpeedAtLevel(0, 1); } }
+}
+
+public class CombatSpeed
+{
+    private List<SpeedAtLevel> speeds = new List<SpeedAtLevel>();
+
+    public CombatSpeed()
+    {
+        speeds.Add(SpeedAtLevel.Default);
+    }
+    
+    public int Overwrite(SpeedAtLevel[] newSpeeds)
+    {
+        int i;
+        speeds.Clear();
+        speeds.Add(SpeedAtLevel.Default);
+        if (newSpeeds != null && newSpeeds.Length > 0)
+        {
+            foreach (SpeedAtLevel speed in newSpeeds)
+            {
+                if (speeds.Count > 0)
+                {
+                    for (i = 0; i < speeds.Count; i++)
+                    {
+                        if (speed.levelThreshold < speeds[i].levelThreshold)
+                        {
+                            speeds.Insert(i, speed);
+                            break;
+                        }
+                        else if (speed.levelThreshold == speeds[i].levelThreshold)
+                        {
+                            if (speed.value > speeds[i].value)
+                                speeds[i] = speed;
+                            break;
+                        }
+                        else if (i == speeds.Count - 1)
+                        {
+                            speeds.Add(speed);
+                        }
+                    }
+                }
+                else
+                {
+                    speeds.Add(speed);
+                }
+            }
+        }
+        return speeds.Count;
+    }
+    
+    public int Overwrite(List<SpeedAtLevel> newSpeeds)
+    {
+        int i;
+        speeds.Clear();
+        speeds.Add(SpeedAtLevel.Default);
+        if (newSpeeds != null && newSpeeds.Count > 0)
+        {
+            foreach (SpeedAtLevel speed in newSpeeds)
+            {
+                if (speeds.Count > 0)
+                {
+                    for (i = 0; i < speeds.Count; i++)
+                    {
+                        if (speed.levelThreshold < speeds[i].levelThreshold)
+                        {
+                            speeds.Insert(i, speed);
+                            break;
+                        }
+                        else if (speed.levelThreshold == speeds[i].levelThreshold)
+                        {
+                            if (speed.value > speeds[i].value)
+                                speeds[i] = speed;
+                            break;
+                        }
+                        else if (i == speeds.Count - 1)
+                        {
+                            speeds.Add(speed);
+                        }
+                    }
+                }
+                else
+                {
+                    speeds.Add(speed);
+                }
+            }
+        }
+        return speeds.Count;
+    }
+
+    public CombatSpeed(SpeedAtLevel[] speeds)
+    {
+        Overwrite(speeds);
+    }
+    
+    public CombatSpeed(List<SpeedAtLevel> speeds)
+    {
+        Overwrite(speeds);
+    }
+
+    public bool Add(SpeedAtLevel newSpeed)
+    {
+        for (int i = 0; i < speeds.Count; i++)
+        {
+            if (newSpeed.levelThreshold < speeds[i].levelThreshold)
+            {
+                speeds.Insert(i, newSpeed);
+                return false;
+            }
+            else if (newSpeed.levelThreshold == speeds[i].levelThreshold)
+            {
+                if (newSpeed.value > speeds[i].value)
+                {
+                    speeds[i] = newSpeed;
+                    return true;
+                }
+                break;
+            }
+            else if (i == speeds.Count - 1)
+            {
+                speeds.Add(newSpeed);
+                return false;
+            }
+        }
+        return false;
+    }
+
+    public bool Remove(ushort levelThreshold)
+    {
+        for (int i = speeds.Count - 1; i > 0; i--)
+        {
+            if (levelThreshold == speeds[i].levelThreshold)
+            {
+                speeds.RemoveAt(i);
+                return true;
+            }
+            else if (levelThreshold < speeds[i].levelThreshold)
+            {
+                break;
+            }
+        }
+        return false;
+    }
+
+    public int GetValue(ushort level)
+    {
+        for (int i = 0; i < speeds.Count; i++)
+        {
+            if (level >= speeds[i].levelThreshold)
+            {
+                return speeds[i].value;
+            }
+        }
+        return 1;
+    }
+
+    public SpeedAtLevel[] GetList()
+    {
+        return speeds.ToArray();
     }
 }
 

@@ -227,12 +227,17 @@ public class CombatantData : ElementData
 {
     public string modelHexUID;
     public bool isFriendly;
+
     public int baseHealth = 50;
     public int healthScaling;
+
     public int baseAttack;
     public int attackScaling;
+
     public int baseDefence;
     public int defenceScaling;
+
+    public SpeedAtLevel[] speeds;
     // Behaviour
     // Damage reduction
     // Speed

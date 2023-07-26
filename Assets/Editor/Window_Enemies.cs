@@ -46,8 +46,8 @@ public class Window_Enemies : EditorWindow
     private Vector2 scrollPosMain = new Vector2();
     private Vector2 scrollPosList = new Vector2();
 
-    private enum RegionToggle { EnemyList, Health, Attack, Defence }
-    private bool[] regionToggles = new bool[4];
+    private enum RegionToggle { EnemyList, Health, Attack, Defence, Speed }
+    private List<bool> regionToggles = new List<bool>();
     private int toggleCount { get { return Enum.GetNames(typeof(RegionToggle)).Length; } }
 
     private int selectedEnemy = -1;
@@ -57,9 +57,12 @@ public class Window_Enemies : EditorWindow
     private GUIContent label = new GUIContent();
     private Rect elementRect;
 
-    List<CombatantData> enemyList;
+    private List<CombatantData> enemyList;
 
     private ushort previewLevel = 1;
+
+    private CombatSpeed speedData = new CombatSpeed();
+    private SpeedAtLevel pendingSpeedAddition = null;
 
     #endregion
 
@@ -75,13 +78,14 @@ public class Window_Enemies : EditorWindow
     void Awake()
     {
         enemyList = ElementDataStorage.LoadCache<CombatantData>();
-        if (regionToggles.Length != toggleCount)
-            regionToggles = new bool[toggleCount];
-        regionToggles[0] = true;
-        for (int i = 1; i < regionToggles.Length; i++)
+        if (regionToggles.Count < toggleCount)
         {
-            regionToggles[i] = false;
+            for (int i = 0; i < toggleCount - regionToggles.Count; i++)
+            {
+                regionToggles.Add(false);
+            }
         }
+        regionToggles[0] = true;
     }
 
     void OnGUI()
@@ -309,8 +313,6 @@ public class Window_Enemies : EditorWindow
                                 enemyList[selectedEnemy].healthScaling = healthData.scaling;
                             }
 
-                            //EditorGUILayout.Space(2.0f);
-
                             ReturnScalingData attackData = ScalingStatFoldoutRegion(RegionToggle.Attack, "Attack", enemyList[selectedEnemy].baseAttack, enemyList[selectedEnemy].attackScaling);
                             if (attackData.value != enemyList[selectedEnemy].baseAttack || attackData.scaling != enemyList[selectedEnemy].attackScaling)
                             {
@@ -318,8 +320,6 @@ public class Window_Enemies : EditorWindow
                                 enemyList[selectedEnemy].baseAttack = attackData.value;
                                 enemyList[selectedEnemy].attackScaling = attackData.scaling;
                             }
-
-                            //EditorGUILayout.Space(2.0f);
 
                             ReturnScalingData defenceData = ScalingStatFoldoutRegion(RegionToggle.Defence, "Defence", enemyList[selectedEnemy].baseDefence, enemyList[selectedEnemy].defenceScaling);
                             if (defenceData.value != enemyList[selectedEnemy].baseDefence || defenceData.scaling != enemyList[selectedEnemy].defenceScaling)
@@ -329,7 +329,9 @@ public class Window_Enemies : EditorWindow
                                 enemyList[selectedEnemy].defenceScaling = defenceData.scaling;
                             }
 
-                            //EditorGUILayout.Space(2.0f);
+                            EditorGUILayout.Space(2.0f);
+
+
                         }
                         else
                             regionToggles[0] = true;
@@ -444,5 +446,39 @@ public class Window_Enemies : EditorWindow
         }
 
         return returnData;
+    }
+
+    private SpeedAtLevel[] SpeedListFoldoutRegion(SpeedAtLevel[] speeds)
+    {
+        speedData.Overwrite(speeds);
+
+        label.text = "Speed";
+        label.tooltip = null;
+
+        if (regionToggles[(int)RegionToggle.Speed] = EditorGUILayout.Foldout(regionToggles[(int)RegionToggle.Speed], label, true, EditorStylesExtras.foldoutLabel))
+        {
+            EditorElements.BeginSubSection(10.0f, 0);
+            {
+                // Column headers: "Level Threshold" / "Speed"
+                // Scroll rect: Speed data list
+                    // See "DrawSpeedAtLevel" function
+                // Input fields: [Level Threshold] / [Speed Value]
+                // Function buttons: <Add new data to list from input fields> / <Clear input fields>
+                    // Add: Creates new "SpeedAtLevel" object from input field values & adds to list
+                    // Clear: Removes any values from input fields
+            }
+            EditorElements.EndSubSection();
+        }
+
+        return speedData.GetList();
+    }
+
+    private void DrawSpeedAtLevel(int ind)
+    {
+        // Get data from "speedData" at index
+        // Display fields: [Level Threshold] / [Speed Value]
+        // Function buttons: <Edit> / <Delete>
+            // Edit: Writes entry values into input fields
+            // Delete: Removes entry
     }
 }
