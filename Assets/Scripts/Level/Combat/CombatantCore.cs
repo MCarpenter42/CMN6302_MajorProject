@@ -356,8 +356,20 @@ public class CombatSpeed
         }
         return false;
     }
+    
+    public bool RemoveAt(int index)
+    {
+        if (speeds.InBounds(index))
+        {
+            speeds.RemoveAt(index);
+            return true;
+        }
+        return false;
+    }
 
-    public int GetValue(ushort level)
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public int GetAtLevel(ushort level)
     {
         for (int i = 0; i < speeds.Count; i++)
         {
@@ -369,9 +381,29 @@ public class CombatSpeed
         return 1;
     }
 
+    public SpeedAtLevel this[int index]
+    {
+        get
+        {
+            if (speeds.InBounds(index))
+                return speeds[index];
+            else
+                return null;
+        }
+    }
+
     public SpeedAtLevel[] GetList()
     {
         return speeds.ToArray();
+    }
+
+    public int valueCount { get { return speeds.Count; } }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public bool IndexInBounds(int ind)
+    {
+        return speeds.InBounds(ind);
     }
 }
 

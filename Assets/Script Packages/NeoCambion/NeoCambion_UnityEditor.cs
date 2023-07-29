@@ -6,7 +6,9 @@ namespace NeoCambion.Unity.Editor
 
     using NeoCambion.Collections;
     using NeoCambion.Collections.Unity;
-    using UnityEditor.Experimental.GraphView;
+    using UnityEngine.UIElements;
+    using global::Unity.VisualScripting;
+    using System.Collections;
 
     public delegate void MenuReturn<T>(T returnVal);
 
@@ -168,7 +170,9 @@ namespace NeoCambion.Unity.Editor
 
     public class EditorStylesExtras
     {
-        private static bool darkTheme { get { return GUI.skin.label.normal.textColor.ApproximatelyEquals(new Color(0.824f, 0.824f, 0.824f, 1.000f), 0.005f); } }
+        public static bool darkTheme { get { return GUI.skin.label.normal.textColor.ApproximatelyEquals(new Color(0.824f, 0.824f, 0.824f, 1.000f), 0.005f); } }
+
+        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
         private static GUIStyle _noMarginsNoPadding = null;
         public static GUIStyle noMarginsNoPadding
@@ -221,6 +225,8 @@ namespace NeoCambion.Unity.Editor
             }
         }
 
+        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
         private static GUIStyle _labelCentred = null;
         public static GUIStyle labelCentred
         {
@@ -272,6 +278,18 @@ namespace NeoCambion.Unity.Editor
             }
         }
 
+        public static GUIStyle LabelStyle(TextAnchor textAlignment, FontStyle fontStyle = FontStyle.Normal)
+        {
+            return new GUIStyle()
+            {
+                alignment = textAlignment,
+                font = GUI.skin.label.font,
+                fontSize = GUI.skin.label.fontSize,
+                fontStyle = fontStyle,
+                normal = GUI.skin.label.normal
+            };
+        }
+        
         public static GUIStyle LabelStyle(TextAnchor textAlignment, FontSettings textStyle)
         {
             return new GUIStyle()
@@ -279,7 +297,8 @@ namespace NeoCambion.Unity.Editor
                 alignment = textAlignment,
                 font = textStyle.font,
                 fontSize = textStyle.fontSize,
-                fontStyle = textStyle.fontStyle
+                fontStyle = textStyle.fontStyle,
+                normal = GUI.skin.label.normal
             };
         }
         
@@ -310,6 +329,8 @@ namespace NeoCambion.Unity.Editor
                 onNormal = normal
             };
         }
+
+        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
         public static GUIStyle textButtonRed { get { return ColouredTextButton(DynamicTextColour.red); } }
 
@@ -491,6 +512,7 @@ namespace NeoCambion.Unity.Editor
 
         public static void BeginSubSection(float minHeight, float maxHeight, int barWidth = 3)
         {
+            EditorGUILayout.Space(1.0f);
             if (barWidth < 1)
                 barWidth = 1;
             int lPad = barWidth >= 12 ? 0 : 6 - (barWidth - (barWidth % 2)) / 2;
@@ -506,7 +528,7 @@ namespace NeoCambion.Unity.Editor
                 EditorGUILayout.BeginHorizontal(tempStyle, GUILayout.MinHeight(minHeight), GUILayout.MaxHeight(maxHeight));
             GreyRect(barWidth, 0, false, true);
             EditorGUILayout.BeginVertical(tempStyle);
-            EditorGUILayout.Space(8.0f);
+            EditorGUILayout.Space(1.0f);
         }
 
         public static void EndSubSection()
@@ -514,6 +536,38 @@ namespace NeoCambion.Unity.Editor
             EditorGUILayout.Space(2.0f);
             EditorGUILayout.EndVertical();
             EditorGUILayout.EndHorizontal();
+        }
+
+        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+        public static GUIContent ButtonIcon(Texture tx_DarkTheme, Texture tx_LightTheme, string tooltip = null)
+        {
+            GUIContent content = new GUIContent()
+            {
+                image = EditorStylesExtras.darkTheme ? tx_DarkTheme : tx_LightTheme,
+                tooltip = tooltip
+            };
+            return content;
+        }
+        
+        public static GUIContent ButtonIcon(string iconName, string tooltip = null)
+        {
+            if (EditorStylesExtras.darkTheme && iconName.Substring(0, 2) != "d_")
+                iconName = "d_" + iconName;
+            GUIContent content = EditorGUIUtility.IconContent(iconName);
+            content.tooltip = tooltip;
+            return content;
+        }
+
+        public static void UndockButton(Rect position, EditorWindow targetWindow)
+        {
+            if (targetWindow.docked)
+            {
+                if (GUI.Button(position, ButtonIcon("winbtn_win_restore@2x", "Undock Window"), new GUIStyle(GUI.skin.button) { padding = new RectOffset(2, 2, 2, 2) }))
+                {
+                    targetWindow.position = targetWindow.position;
+                }
+            }
         }
 
         /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -627,32 +681,150 @@ namespace NeoCambion.Unity.Editor
             EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
         }
 
-        public static void GreyRect(float width, float height, bool expandWidth = false, bool expandHeight = false)
+        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+        private static bool setToDark = true;
+        private static Color grey_DarkTheme = new Color(0.369f, 0.369f, 0.369f, 1.000f);
+        private static Color grey_LightTheme = new Color(0.561f, 0.561f, 0.561f, 1.000f);
+        private static Texture2D[] _greyRectTextures = null;
+        public static Texture2D[] greyRectTextures
         {
-            GUIStyle greyRectStyle = new GUIStyle(GUI.skin.horizontalSlider)
+            get
+            {
+                if (_greyRectTextures == null || (setToDark != EditorStylesExtras.darkTheme))
+                {
+                    setToDark = EditorStylesExtras.darkTheme;
+                    _greyRectTextures = GetGreyRectTextures(setToDark);
+                }
+                return _greyRectTextures;
+            }
+        }
+        private static Texture2D[] GetGreyRectTextures(bool darkTheme)
+        {
+            Texture2D[] baseTextures = GUI.skin.box.normal.scaledBackgrounds;
+            Texture2D[] textures = new Texture2D[baseTextures.Length];
+            int w, h;
+            Color[] clrs;
+            for (int i = 0; i < baseTextures.Length; i++)
+            {
+                w = baseTextures[i].width;
+                h = baseTextures[i].height;
+                clrs = new Color[w * h];
+                /*for (int x = 0; x < w; x++)
+                {
+                    for (int y = 0; i < h; y++)
+                    {
+                        clrs[x, y] = darkTheme ? grey_DarkTheme : grey_LightTheme;
+                    }
+                }*/
+                for (int j = 0; j < clrs.Length; j++)
+                {
+                    clrs[j] = darkTheme ? grey_DarkTheme : grey_LightTheme;
+                }
+                textures[i] = new Texture2D(w, h/*, baseTextures[0].format, false*/);
+                textures[i].SetPixels(clrs);
+                textures[i].Apply();
+            }
+            return textures;
+        }
+
+        /*private static Texture2D SingleClrTex(int width, int height, Color clr)
+        {
+            Texture2D texOut = new Texture2D(width, height);
+            Color[,] clrs = new Color[width, height];
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    clrs[x, y] = clr;
+                }
+            }
+            return texOut;
+        }*/
+
+        /*private static Texture2D[] GreyRectBackgrounds(Texture2D[] bgsIn)
+        {
+            int w = bgsIn[0].width, h = bgsIn[0].height;
+            Texture2D copy = new Texture2D(w, h, bgsIn[0].format, false);
+            Graphics.CopyTexture(bgsIn[0], copy);
+            Color clr2 = copy.GetPixel(w - 10, h - 10);
+            Texture2D[] bgsOut = new Texture2D[bgsIn.Length];
+            for (int i = 0; i < bgsIn.Length; i++)
+            {
+                bgsOut[i] = SingleClrTex(bgsIn[i].width, bgsIn[i].height, clr2);
+            }
+            return bgsOut;
+        }*/
+        
+        /*private static Texture2D[] GreyRectBackgrounds(Texture2D[] bgsIn)
+        {
+            int w = bgsIn[0].width, h = bgsIn[0].height;
+            Texture2D copy = new Texture2D(w, h, bgsIn[0].format, false);
+            Graphics.CopyTexture(bgsIn[0], copy);
+            Color clr2 = copy.GetPixel(w - 10, h - 10);
+            Texture2D[] bgsOut = new Texture2D[bgsIn.Length];
+            for (int i = 0; i < bgsIn.Length; i++)
+            {
+                bgsOut[i] = SingleClrTex(bgsIn[i].width, bgsIn[i].height, clr2);
+            }
+            return bgsOut;
+        }*/
+
+        private static GUIStyleState GreyRectStyleState()
+        {
+            return new GUIStyleState() { background = greyRectTextures[0], scaledBackgrounds = greyRectTextures };
+        }
+        
+        /*private static GUIStyleState GreyRectStyleState(int ind)
+        {
+            switch (ind)
+            {
+                default:
+                case 0:
+                    return new GUIStyleState() { scaledBackgrounds = GUI.skin.horizontalSlider.active.scaledBackgrounds };
+                case 1:
+                    return new GUIStyleState() { scaledBackgrounds = GUI.skin.horizontalSlider.focused.scaledBackgrounds };
+                case 2:
+                    return new GUIStyleState() { scaledBackgrounds = GUI.skin.horizontalSlider.hover.scaledBackgrounds };
+                case 3:
+                    return new GUIStyleState() { scaledBackgrounds = GUI.skin.horizontalSlider.normal.scaledBackgrounds };
+            }
+        }*/
+
+        private static GUIStyle GreyRectStyle()
+        {
+            GUIStyle styleOut = new GUIStyle(GUI.skin.box)
             {
                 fixedWidth = 0,
                 fixedHeight = 0,
                 margin = new RectOffset(0, 0, 0, 0),
                 padding = new RectOffset(0, 0, 0, 0),
                 border = new RectOffset(0, 0, 0, 0),
-                stretchHeight = true
+                active = GreyRectStyleState(),
+                onActive = GreyRectStyleState(),
+                focused = GreyRectStyleState(),
+                onFocused = GreyRectStyleState(),
+                hover = GreyRectStyleState(),
+                onHover = GreyRectStyleState(),
+                normal = GreyRectStyleState(),
+                onNormal = GreyRectStyleState(),
             };
-            GUILayout.Label("", greyRectStyle, GUILayout.Width(width), GUILayout.Height(height), GUILayout.ExpandWidth(expandWidth), GUILayout.ExpandHeight(expandHeight || height <= 0.0f));
+            return styleOut;
+        }
+
+        public static void GreyRect(Rect position)
+        {
+            GUI.Label(position, "", GreyRectStyle());
+        }
+        
+        public static void GreyRect(float width, float height, bool expandWidth = false, bool expandHeight = false)
+        {
+            GUILayout.Label("", GreyRectStyle(), GUILayout.Width(width), GUILayout.Height(height), GUILayout.ExpandWidth(expandWidth), GUILayout.ExpandHeight(expandHeight || height <= 0.0f));
         }
         
         public static void GreyRect(float minWidth, float maxWidth, float minHeight, float maxHeight)
         {
-            GUIStyle greyRectStyle = new GUIStyle(GUI.skin.horizontalSlider)
-            {
-                fixedWidth = 0,
-                fixedHeight = 0,
-                margin = new RectOffset(0, 0, 0, 0),
-                padding = new RectOffset(0, 0, 0, 0),
-                border = new RectOffset(0, 0, 0, 0),
-                stretchHeight = true
-            };
-            GUILayout.Label("", greyRectStyle, GUILayout.MinWidth(minWidth), GUILayout.MaxWidth(maxWidth), GUILayout.MinHeight(minHeight), GUILayout.MaxHeight(maxHeight));
+            GUILayout.Label("", GreyRectStyle(), GUILayout.MinWidth(minWidth), GUILayout.MaxWidth(maxWidth), GUILayout.MinHeight(minHeight), GUILayout.MaxHeight(maxHeight));
         }
 
         /*public static void GreyRect(Rect posRect)

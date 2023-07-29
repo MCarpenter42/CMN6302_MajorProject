@@ -45,6 +45,7 @@ public class Window_Enemies : EditorWindow
 
     private Vector2 scrollPosMain = new Vector2();
     private Vector2 scrollPosList = new Vector2();
+    private Vector2 scrollPosSpeeds = new Vector2();
 
     private enum RegionToggle { EnemyList, Health, Attack, Defence, Speed }
     private List<bool> regionToggles = new List<bool>();
@@ -62,7 +63,10 @@ public class Window_Enemies : EditorWindow
     private ushort previewLevel = 1;
 
     private CombatSpeed speedData = new CombatSpeed();
-    private SpeedAtLevel pendingSpeedAddition = null;
+    private int editingSpeedEntry = -1;
+    private int pendingSpeedValue = -1;
+    private ushort newSpeedLevel = 1;
+    private int newSpeedValue = 1;
 
     #endregion
 
@@ -78,19 +82,21 @@ public class Window_Enemies : EditorWindow
     void Awake()
     {
         enemyList = ElementDataStorage.LoadCache<CombatantData>();
-        if (regionToggles.Count < toggleCount)
-        {
-            for (int i = 0; i < toggleCount - regionToggles.Count; i++)
-            {
-                regionToggles.Add(false);
-            }
-        }
         regionToggles[0] = true;
     }
 
     void OnGUI()
     {
         GUI.enabled = true;
+        if (regionToggles.Count < toggleCount)
+        {
+            regionToggles.PadList(toggleCount);
+            int c = toggleCount - regionToggles.Count;
+            for (int i = 0; i < c; i++)
+            {
+                regionToggles.Add(false);
+            }
+        }
 
         float slHeight = EditorGUIUtility.singleLineHeight;
         bool darkTheme = GUI.skin.label.normal.textColor.ApproximatelyEquals(new Color(0.824f, 0.824f, 0.824f, 1.000f), 0.005f);
@@ -132,19 +138,10 @@ public class Window_Enemies : EditorWindow
                 elementRect = EditorGUILayout.GetControlRect(true, slHeight);
                 EditorElements.Header(elementRect, label, 18);
 
-                Vector2 bSize;
-                Rect btnRect;
-
-                if (Window.docked)
-                {
-                    btnRect = new Rect(elementRect);
-                    btnRect.size = new Vector2(56, 20);
-                    btnRect.y += (elementRect.height - btnRect.height) / 2;
-                    if (GUI.Button(btnRect, "Undock", GUI.skin.button))
-                    {
-                        Window.position = Window.position;
-                    }
-                }
+                Vector2 bSize = new Vector2(24, 24);
+                Rect btnRect = new Rect(elementRect) { size = bSize };
+                btnRect.y += (elementRect.height - btnRect.height) / 2;
+                EditorElements.UndockButton(btnRect, Window);
 
                 EditorElements.SeparatorBar();
 
@@ -331,7 +328,7 @@ public class Window_Enemies : EditorWindow
 
                             EditorGUILayout.Space(2.0f);
 
-
+                            SpeedAtLevel[] spdData = SpeedListFoldoutRegion(speedData.GetList());
                         }
                         else
                             regionToggles[0] = true;
@@ -425,11 +422,18 @@ public class Window_Enemies : EditorWindow
                     label.tooltip = null;
 
                     elementRect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), label);
-                    elementRect.width -= 44;
-                    returnData.scaling = (int)GUI.HorizontalSlider(elementRect, valueScaling, 0.0f, 100.0f).Round(0);
-                    elementRect.x += elementRect.width + 4;
-                    elementRect.width = 40;
-                    returnData.scaling = (int)EditorElements.IntPercentField(elementRect, valueScaling, false);
+                    Rect rSlider = new Rect(elementRect);
+                    rSlider.width -= 44;
+                    Rect rBox = new Rect(rSlider);
+                    rBox.x += rSlider.width + 4;
+                    rBox.width = 40;
+                    int[] returnScaling = new int[2];
+                    returnScaling[0] = (int)GUI.HorizontalSlider(rSlider, valueScaling, 0.0f, 100.0f).Round(0);
+                    returnScaling[1] = (int)EditorElements.IntPercentField(rBox, valueScaling, false);
+                    if (returnScaling[0] == valueScaling)
+                        returnData.scaling = returnScaling[1];
+                    else
+                        returnData.scaling = returnScaling[0];
 
                     EditorGUILayout.Space(2.0f);
 
@@ -442,7 +446,7 @@ public class Window_Enemies : EditorWindow
                 }
                 EditorElements.EndSubSection();
             }
-            EditorGUILayout.Space(8.0f);
+            EditorGUILayout.Space(4.0f);
         }
 
         return returnData;
@@ -466,19 +470,167 @@ public class Window_Enemies : EditorWindow
                 // Function buttons: <Add new data to list from input fields> / <Clear input fields>
                     // Add: Creates new "SpeedAtLevel" object from input field values & adds to list
                     // Clear: Removes any values from input fields
+
+                elementRect = EditorGUILayout.GetControlRect();
+                elementRect.x += 23;
+                elementRect.width -= 56;
+                Rect[] columHeaderRects = SpeedAtLevelRects(elementRect, 104);
+
+                label.text = "Level Threshold";
+                EditorGUI.LabelField(columHeaderRects[0], label, EditorStylesExtras.LabelStyle(TextAnchor.MiddleCenter, FontStyle.Bold));
+                EditorElements.GreyRect(columHeaderRects[1]);
+                label.text = "Speed Value";
+                EditorGUI.LabelField(columHeaderRects[2], label, EditorStylesExtras.LabelStyle(TextAnchor.MiddleCenter, FontStyle.Bold));
+
+                float itemHeight = EditorGUIUtility.singleLineHeight + 16, scrollHeight = itemHeight * (speedData.valueCount > 8 ? 8 : speedData.valueCount) + 10;
+                //GUIStyle listBox = new GUIStyle(GUI.skin.box) { margin = new RectOffset(0, 0, 0, 0), padding = new RectOffset(0, 0, 0, 0) };
+                scrollPosSpeeds = EditorGUILayout.BeginScrollView(scrollPosSpeeds, false, true, GUILayout.Height(scrollHeight), GUILayout.MaxHeight(scrollHeight));
+                {
+                    for (int i = 0; i < speedData.valueCount; i++)
+                    {
+                        elementRect = EditorGUILayout.GetControlRect(false, itemHeight);
+                        elementRect.x += 20;
+                        elementRect.width -= 40;
+                        DrawSpeedAtLevel(elementRect, i);
+                    }
+                    EditorGUILayout.Space(7);
+                }
+                EditorGUILayout.EndScrollView();
+
+                EditorGUILayout.Space();
+
+                elementRect = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight + 8);
+                elementRect.x += 32;
+                elementRect.width = (elementRect.width - 100) / 2;
+                elementRect.y += 4;
+                elementRect.height = EditorGUIUtility.singleLineHeight;
+                int nsl = EditorGUI.DelayedIntField(elementRect, newSpeedLevel);
+                if (nsl != newSpeedLevel && nsl > 0)
+                    newSpeedLevel = (ushort)nsl;
+
+                elementRect.x += elementRect.width + 4;
+                int nsv = EditorGUI.DelayedIntField(elementRect, newSpeedValue);
+                if (nsv != newSpeedValue && nsv > 0)
+                    newSpeedValue = nsv;
+
+                elementRect.x += elementRect.width + 4;
+                elementRect.width = 24;
+                elementRect.y += (elementRect.height - 24) / 2;
+                elementRect.height = 24;
+                GUIStyle btnStyle = GUI.skin.button;
+                btnStyle.padding = new RectOffset(2, 2, 2, 2);
+                if (GUI.Button(elementRect, EditorElements.ButtonIcon("Toolbar Plus", "Add Entry"), btnStyle))
+                {
+                    speedData.Add(new SpeedAtLevel(newSpeedLevel, newSpeedValue));
+                    newSpeedLevel = 1;
+                    newSpeedValue = 1;
+                }
             }
             EditorElements.EndSubSection();
+        }
+        else
+        {
+            editingSpeedEntry = -1;
+            pendingSpeedValue = -1;
+            newSpeedLevel = 1;
+            newSpeedValue = 1;
         }
 
         return speedData.GetList();
     }
 
-    private void DrawSpeedAtLevel(int ind)
+    private Rect[] DrawSpeedAtLevel(Rect position, int ind)
     {
         // Get data from "speedData" at index
         // Display fields: [Level Threshold] / [Speed Value]
         // Function buttons: <Edit> / <Delete>
             // Edit: Writes entry values into input fields
             // Delete: Removes entry
+        if (speedData.IndexInBounds(ind))
+        {
+            position.height -= 4;
+            position.y += 2;
+            EditorGUI.LabelField(position, "", GUI.skin.box);
+            position.size -= Vector2.one * 8;
+            position.position += Vector2.one * 4;
+
+            SpeedAtLevel spd = speedData[ind];
+            Rect[] rects = SpeedAtLevelRects(position);
+            GUIStyle infoLabel = EditorStylesExtras.LabelStyle(TextAnchor.MiddleCenter, FontStyle.Normal);
+            GUIContent label = new GUIContent() { tooltip = null };
+
+            GUIStyle btnStyle = GUI.skin.button;
+            btnStyle.padding = new RectOffset(2, 2, 2, 2);
+
+            label.text = spd.levelThreshold.ToString() + " +";
+            EditorGUI.LabelField(rects[0], label, infoLabel);
+
+            EditorElements.GreyRect(rects[1]);
+
+            if (editingSpeedEntry != ind)
+            {
+                label.text = spd.value.ToString();
+                EditorGUI.LabelField(rects[2], label, infoLabel);
+
+                if (GUI.Button(rects[3], EditorElements.ButtonIcon("CustomTool", "Edit Entry"), btnStyle))
+                {
+                    editingSpeedEntry = ind;
+                }
+
+                if (ind > 0 && spd.levelThreshold > 0)
+                {
+                    if (GUI.Button(rects[4], EditorElements.ButtonIcon("TreeEditor.Trash", "Delete Entry"), btnStyle))
+                    {
+                        speedData.RemoveAt(ind);
+                    }
+                }
+            }
+            else
+            {
+                if (pendingSpeedValue == -1)
+                    pendingSpeedValue = spd.value;
+
+                Rect rEditBox = rects[2];
+                rEditBox.x += 4;
+                rEditBox.width -= 8;
+                pendingSpeedValue = EditorGUI.IntField(rEditBox, pendingSpeedValue);
+
+                if (GUI.Button(rects[3], EditorElements.ButtonIcon("SaveAs", "Save Changes"), btnStyle))
+                {
+                    if (pendingSpeedValue > 0)
+                        speedData[ind].value = pendingSpeedValue;
+                    editingSpeedEntry = -1;
+                }
+
+                if (GUI.Button(rects[4], EditorElements.ButtonIcon("winbtn_win_close", "Discard Changes"), btnStyle))
+                {
+                    editingSpeedEntry = -1;
+                }
+            }
+
+            return rects;
+        }
+        return null;
+    }
+
+    private Rect[] SpeedAtLevelRects(Rect position, float minDisplayWidth = 100)
+    {
+        Rect[] rects = new Rect[5];
+
+        float w1 = position.width > (2 * minDisplayWidth + 76) ? ((position.width - 76) / 2.0f) : minDisplayWidth, w2 = 4, w3 = 24;
+        float x = position.x, y = position.y, h = position.height;
+        rects[0] = new Rect() { x = x, y = y, width = w1, height = h };
+        x += w1;
+        rects[1] = new Rect() { x = x + 1, y = y, width = 2, height = h };
+        x += w2;
+        rects[2] = new Rect() { x = x, y = y, width = w1, height = h };
+        x += w1 + w2;
+        y += (h - w3) / 2;
+        h = w3;
+        rects[3] = new Rect() { x = x, y = y, width = w3, height = h };
+        x += w3 + w2;
+        rects[4] = new Rect() { x = x, y = y, width = w3, height = h };
+
+        return rects;
     }
 }
