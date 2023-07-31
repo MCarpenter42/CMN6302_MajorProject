@@ -48,6 +48,16 @@ namespace NeoCambion
         }
     }
 
+    public delegate void Callback();
+    public static class Ext_Callback
+    {
+        public static void InvokeIfValid(Callback callback)
+        {
+            if (callback != null)
+                callback.Invoke();
+        }
+    }
+
     public static class Ext_Byte
     {
         public static int ToInt(this byte[] bytes)

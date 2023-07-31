@@ -9,6 +9,23 @@ using NeoCambion.Collections;
 using NeoCambion.IO;
 using NeoCambion.Unity.PersistentUID;
 using JetBrains.Annotations;
+using System.Reflection;
+
+[CustomEditor(typeof(EntityModel), true)]
+[CanEditMultipleObjects]
+public class EntityModelEditor : Editor
+{
+    EntityModel targ { get { return target as EntityModel; } }
+    Rect rect;
+    int rangeMin = 1;
+    int rangeMax = 4;
+
+    public override void OnInspectorGUI()
+    {
+        targ.size = EditorGUILayout.IntSlider("Size", (targ.size <= rangeMax ? (targ.size >= rangeMin ? targ.size : rangeMin) : rangeMax), rangeMin, rangeMax);
+        PersistentUID_Utility.AssignPrefabUIDs(EntityModel.modelFolder);
+    }
+}
 
 [RequireComponent(typeof(PrefabUID))]
 public class EntityModel : Core
@@ -23,6 +40,7 @@ public class EntityModel : Core
 
     public static string modelFolder = "Entity Models";
     public static string modelFolderPath { get { return Application.dataPath + "/Resources/" + modelFolder; } }
+    public int size = 1;
 
     #endregion
 
@@ -140,19 +158,6 @@ public class ModelList
             strings.Add(new string[] { mdlRef.hexUID, mdlRef.resourcesPath });
         }
         return strings;
-    }
-}
-
-[CustomEditor(typeof(EntityModel))]
-public class EntityModelEditor : Editor
-{
-    EntityModel targ { get { return target as EntityModel; } }
-    Rect rect;
-
-    public override void OnInspectorGUI()
-    {
-        DrawDefaultInspector();
-        PersistentUID_Utility.AssignPrefabUIDs(EntityModel.modelFolder);
     }
 }
 

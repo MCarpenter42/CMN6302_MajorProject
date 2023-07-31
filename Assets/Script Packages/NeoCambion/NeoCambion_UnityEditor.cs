@@ -554,16 +554,30 @@ namespace NeoCambion.Unity.Editor
         {
             if (EditorStylesExtras.darkTheme && iconName.Substring(0, 2) != "d_")
                 iconName = "d_" + iconName;
-            GUIContent content = EditorGUIUtility.IconContent(iconName);
+            GUIContent content = (iconName != null && iconName.Length > 0 ? EditorGUIUtility.IconContent(iconName) : null);
             content.tooltip = tooltip;
             return content;
+        }
+
+        public static bool IconButton(Rect position, Texture tx_DarkTheme, Texture tx_LightTheme, string tooltip = null)
+        {
+            GUIStyle btnStyle = GUI.skin.button;
+            btnStyle.padding = new RectOffset(2, 2, 2, 2);
+            return GUI.Button(position, ButtonIcon(tx_DarkTheme, tx_LightTheme, tooltip), btnStyle);
+        }
+        
+        public static bool IconButton(Rect position, string iconName, string tooltip = null)
+        {
+            GUIStyle btnStyle = GUI.skin.button;
+            btnStyle.padding = new RectOffset(2, 2, 2, 2);
+            return GUI.Button(position, ButtonIcon(iconName, tooltip), btnStyle);
         }
 
         public static void UndockButton(Rect position, EditorWindow targetWindow)
         {
             if (targetWindow.docked)
             {
-                if (GUI.Button(position, ButtonIcon("winbtn_win_restore@2x", "Undock Window"), new GUIStyle(GUI.skin.button) { padding = new RectOffset(2, 2, 2, 2) }))
+                if (IconButton(position, "winbtn_win_restore@2x"))
                 {
                     targetWindow.position = targetWindow.position;
                 }

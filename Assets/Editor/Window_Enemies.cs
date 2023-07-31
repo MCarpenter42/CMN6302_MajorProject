@@ -62,7 +62,7 @@ public class Window_Enemies : EditorWindow
 
     private ushort previewLevel = 1;
 
-    private CombatSpeed speedData = new CombatSpeed();
+    private CombatSpeed speedData = new CombatSpeed(0);
     private int editingSpeedEntry = -1;
     private int pendingSpeedValue = -1;
     private ushort newSpeedLevel = 1;
@@ -82,6 +82,15 @@ public class Window_Enemies : EditorWindow
     void Awake()
     {
         enemyList = ElementDataStorage.LoadCache<CombatantData>();
+        if (regionToggles.Count < toggleCount)
+        {
+            regionToggles.PadList(toggleCount);
+            int c = toggleCount - regionToggles.Count;
+            for (int i = 0; i < c; i++)
+            {
+                regionToggles.Add(false);
+            }
+        }
         regionToggles[0] = true;
     }
 
@@ -112,6 +121,8 @@ public class Window_Enemies : EditorWindow
         {
             fixedHeight = 0,
             fixedWidth = 0,
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 14,
             fontStyle = FontStyle.Bold
         };
 
@@ -162,9 +173,11 @@ public class Window_Enemies : EditorWindow
                 btnRect = new Rect(elementRect);
                 btnRect.size = bSize;
                 btnRect.x += elementRect.width + 4;
+                string btnIcon = _showPickList ? "CustomTool" : "UnityEditor.SceneHierarchyWindow";
+                string btnTooltip = _showPickList ? "Edit selected\nenemy" : "Show list of\ncreated enemies";
                 if (selectedEnemy > -1)
                 {
-                    if (GUI.Button(btnRect, label, boldButton))
+                    if (EditorElements.IconButton(btnRect, btnIcon, btnTooltip))
                     {
                         regionToggles[0] = enemyList.Count > 0 ? !regionToggles[0] : true;
                     }
@@ -339,7 +352,6 @@ public class Window_Enemies : EditorWindow
                 {
                     EditorGUILayout.EndHorizontal();
                     scrollPosList = scrollPos;
-
                 }
                 else
                 {
@@ -572,14 +584,14 @@ public class Window_Enemies : EditorWindow
                 label.text = spd.value.ToString();
                 EditorGUI.LabelField(rects[2], label, infoLabel);
 
-                if (GUI.Button(rects[3], EditorElements.ButtonIcon("CustomTool", "Edit Entry"), btnStyle))
+                if (EditorElements.IconButton(rects[3], "CustomTool", "Edit Entry"))
                 {
                     editingSpeedEntry = ind;
                 }
 
                 if (ind > 0 && spd.levelThreshold > 0)
                 {
-                    if (GUI.Button(rects[4], EditorElements.ButtonIcon("TreeEditor.Trash", "Delete Entry"), btnStyle))
+                    if (EditorElements.IconButton(rects[4], "TreeEditor.Trash", "Delete Entry"))
                     {
                         speedData.RemoveAt(ind);
                     }
@@ -595,14 +607,14 @@ public class Window_Enemies : EditorWindow
                 rEditBox.width -= 8;
                 pendingSpeedValue = EditorGUI.IntField(rEditBox, pendingSpeedValue);
 
-                if (GUI.Button(rects[3], EditorElements.ButtonIcon("SaveAs", "Save Changes"), btnStyle))
+                if (EditorElements.IconButton(rects[3], "SaveAs", "Save Changes"))
                 {
                     if (pendingSpeedValue > 0)
                         speedData[ind].value = pendingSpeedValue;
                     editingSpeedEntry = -1;
                 }
 
-                if (GUI.Button(rects[4], EditorElements.ButtonIcon("winbtn_win_close", "Discard Changes"), btnStyle))
+                if (EditorElements.IconButton(rects[4], "winbtn_win_close", "Discard Changes"))
                 {
                     editingSpeedEntry = -1;
                 }

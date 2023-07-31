@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
@@ -93,18 +94,61 @@ public struct MeshData
 	}
 }
 
-public abstract class Modifiers<T>
+// GENERIC NON-ABSTRACT DEPRECATED
+// For the generic version to be non-abstract, the "dynamic" data type must be used.
+// Unfortunately, due to platform support issues, "dynamic" is not supported in Unity.
+/// <summary>
+/// A collection of modifiers that can be applied to a numerical value.
+/// </summary>
+/// <typeparam name="T">
+/// Requires a numerical type that implements the same interfaces as all numerical types in System.
+/// </typeparam>
+public abstract class Modifiers<T> where T : System.IComparable, System.IComparable<T>, System.IConvertible, System.IEquatable<T>, System.IFormattable
 {
+    private static System.Type[] integralTypes = new System.Type[]
+    {
+        typeof(byte),
+        typeof(int),
+        typeof(nint),
+        typeof(nuint),
+        typeof(long),
+        typeof(short),
+        typeof(sbyte),
+        typeof(uint),
+        typeof(ulong),
+        typeof(ushort),
+    };
+
 	public static byte DictBit = 1 << 7;
 	private static bool InMultiply(byte key)
 	{
 		return (key & DictBit) == 0;
 	}
 
-    public Dictionary<byte, float> multiply = new Dictionary<byte, float>();
+	public Dictionary<byte, float> multiply = new Dictionary<byte, float>();
 	public Dictionary<byte, T> add = new Dictionary<byte, T>();
 
 	public bool newChanges = false;
+
+	public Callback onChanges = null;
+	public Callback onAdd = null;
+	public Callback onRemove = null;
+
+	/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+	public Modifiers(Callback onAdd, Callback onRemove)
+	{
+		this.onChanges = null;
+		this.onAdd = onAdd;
+		this.onRemove = onRemove;
+	}
+	
+	public Modifiers(Callback onChanges = null, Callback onAdd = null, Callback onRemove = null)
+	{
+		this.onChanges = onChanges;
+		this.onAdd = onAdd;
+		this.onRemove = onRemove;
+	}
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -128,7 +172,7 @@ public abstract class Modifiers<T>
 			return (byte)(Random.Range(1, 127) | DictBit);
 	}
 
-	public byte AddToMultiply(byte key, float value)
+	public byte AddToMultiply(byte key, float value, bool suppressCallback = false)
 	{
 		if (key > 0 && !multiply.ContainsKey_Add(key,value))
 		{
@@ -136,10 +180,15 @@ public abstract class Modifiers<T>
             newChanges = true;
             return key;
         }
-		return 0;
+        if (!suppressCallback)
+        {
+            Ext_Callback.InvokeIfValid(onChanges);
+            Ext_Callback.InvokeIfValid(onAdd);
+        }
+        return 0;
     }
 	
-	public byte AddToMultiply(float value)
+	public byte AddToMultiply(float value, bool suppressCallback = false)
 	{
 		if (multiply.Count < 127)
 		{
@@ -155,10 +204,15 @@ public abstract class Modifiers<T>
                 }
             }
         }
-		return byte.MinValue;
+        if (!suppressCallback)
+        {
+            Ext_Callback.InvokeIfValid(onChanges);
+            Ext_Callback.InvokeIfValid(onAdd);
+        }
+        return byte.MinValue;
 	}
 
-    public byte AddToAdd(byte key, T value)
+    public byte AddToAdd(byte key, T value, bool suppressCallback = false)
     {
         if (key > 0 && !add.ContainsKey_Add(key, value))
         {
@@ -166,10 +220,15 @@ public abstract class Modifiers<T>
             newChanges = true;
             return key;
         }
+        if (!suppressCallback)
+        {
+            Ext_Callback.InvokeIfValid(onChanges);
+            Ext_Callback.InvokeIfValid(onAdd);
+        }
         return 0;
     }
 
-    public byte AddToAdd(T value)
+    public byte AddToAdd(T value, bool suppressCallback = false)
     {
         if (add.Count < 127)
         {
@@ -185,10 +244,15 @@ public abstract class Modifiers<T>
                 }
             }
         }
+        if (!suppressCallback)
+        {
+            Ext_Callback.InvokeIfValid(onChanges);
+            Ext_Callback.InvokeIfValid(onAdd);
+        }
         return byte.MinValue;
     }
 
-	public bool Remove(byte key)
+	public bool Remove(byte key, bool suppressCallback = false)
 	{
 		if (InMultiply(key))
 		{
@@ -200,19 +264,73 @@ public abstract class Modifiers<T>
             if (add.ContainsKey_Remove(key))
                 return newChanges = true;
         }
-		return false;
+        if (!suppressCallback)
+        {
+            Ext_Callback.InvokeIfValid(onChanges);
+            Ext_Callback.InvokeIfValid(onRemove);
+        }
+        return false;
 	}
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public virtual T Modify(T baseValue)
-	{
-		return baseValue;
-	}
+    {
+        return baseValue;
+    }
+
+    /*public virtual T Modify(T baseValue)
+    {
+        float mTotal = 1.0f;
+        T aTotal = default;
+        if (multiply.Count > 0)
+        {
+            foreach (KeyValuePair<byte, float> kvp in multiply)
+            {
+                mTotal += kvp.Value;
+            }
+        }
+        if (add.Count > 0)
+        {
+            foreach (KeyValuePair<byte, T> kvp in add)
+            {
+                try
+                {
+                    dynamic dA = aTotal;
+                    dynamic dB = kvp.Value;
+                    aTotal = dA + dB;
+                }
+                catch
+                { }
+            }
+        }
+        newChanges = false;
+        dynamic dynBase = baseValue;
+        if (integralTypes.Contains(typeof(T)))
+            return (T)(Mathf.RoundToInt(dynBase * mTotal) + aTotal);
+        else
+            return (T)(dynBase * mTotal + aTotal);
+    }*/
 }
 
 public class ModifiersInt : Modifiers<int>
 {
+    public ModifiersInt(Callback onAdd, Callback onRemove)
+    {
+        this.onChanges = null;
+        this.onAdd = onAdd;
+        this.onRemove = onRemove;
+    }
+
+    public ModifiersInt(Callback onChanges = null, Callback onAdd = null, Callback onRemove = null)
+    {
+        this.onChanges = onChanges;
+        this.onAdd = onAdd;
+        this.onRemove = onRemove;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
     public override int Modify(int baseValue)
     {
 		float mTotal = 1.0f;
@@ -238,7 +356,23 @@ public class ModifiersInt : Modifiers<int>
 
 public class ModifiersFloat : Modifiers<float>
 {
-	public override float Modify(float baseValue)
+    public ModifiersFloat(Callback onAdd, Callback onRemove)
+    {
+        this.onChanges = null;
+        this.onAdd = onAdd;
+        this.onRemove = onRemove;
+    }
+
+    public ModifiersFloat(Callback onChanges = null, Callback onAdd = null, Callback onRemove = null)
+    {
+        this.onChanges = onChanges;
+        this.onAdd = onAdd;
+        this.onRemove = onRemove;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public override float Modify(float baseValue)
 	{
         float mTotal = 1.0f;
         float aTotal = 0;

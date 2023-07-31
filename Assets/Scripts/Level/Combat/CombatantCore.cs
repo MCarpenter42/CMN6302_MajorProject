@@ -29,6 +29,7 @@ using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
 using System.Runtime.CompilerServices;
+using UnityEngine.UIElements;
 
 public class CombatantCore : Core
 {
@@ -41,38 +42,36 @@ public class CombatantCore : Core
 
     #region [ PROPERTIES ]
 
+    public bool gotData;
+    public bool isFriendly;
+
+    public int size { get { return modelObj == null ? 0 : modelObj.size; } }
+
     public ushort level;
-    private CombatValue[] values = new CombatValue[3];
-    public CombatValue health
-    {
-        get
-        {
-            if (values[0] == null)
-                values[0] = new CombatValue(this);
-            return values[0];
-        }
-    }
-    public CombatValue attack
-    {
-        get
-        {
-            if (values[1] == null)
-                values[1] = new CombatValue(this);
-            return values[1];
-        }
-    }
-    public CombatValue defence
-    {
-        get
-        {
-            if (values[1] == null)
-                values[1] = new CombatValue(this);
-            return values[1];
-        }
-    }
-    public CombatSpeed speed = new CombatSpeed();
+    public CombatValue health = null;
+    public CombatValue attack = null;
+    public CombatValue defence = null;
+    public CombatSpeed speed = null;
 
     public CombatEquipment equipment;
+
+    public bool alive = true;
+
+    public float lastActionTime = 0.0f;
+    public float actionInterval
+    {
+        get
+        {
+            return speed == null ? float.MaxValue : CombatManager.TimeFactor / speed.Current;
+        }
+    }
+    public float nextActionTime
+    {
+        get
+        {
+            return speed == null ? float.MaxValue : lastActionTime + actionInterval;
+        }
+    }
 
     #endregion
 
@@ -112,19 +111,24 @@ public class CombatantCore : Core
 
     public virtual void GetData(CombatantData data)
     {
-        if (data != null)
+        gotData = data != null;
+        if (gotData)
         {
             baseData = data;
 
-            GameObject modelTemplate = Resources.Load<GameObject>(EntityModel.GetModelPathFromUID(data.modelHexUID));
-            modelObj = Instantiate(modelTemplate, transform).GetComponent<EntityModel>();
+            string modelPath = EntityModel.GetModelPathFromUID(data.modelHexUID);
+            if (modelPath != null)
+            {
+                GameObject modelTemplate = Resources.Load<GameObject>(modelPath);
+                modelObj = modelTemplate == null ? null : Instantiate(modelTemplate, transform).GetComponent<EntityModel>();
+            }
 
-            health.valueBase = baseData.baseHealth;
-            health.scaling = baseData.healthScaling;
-            attack.valueBase = baseData.baseAttack;
-            attack.scaling = baseData.attackScaling;
-            defence.valueBase = baseData.baseDefence;
-            defence.scaling = baseData.defenceScaling;
+            isFriendly = baseData.isFriendly;
+
+            health = new CombatValue(this, baseData.baseHealth, baseData.healthScaling);
+            attack = new CombatValue(this, baseData.baseAttack, baseData.attackScaling);
+            defence = new CombatValue(this, baseData.baseDefence, baseData.defenceScaling);
+            speed = new CombatSpeed(this, baseData.speeds);
         }
     }
 }
@@ -147,58 +151,96 @@ public class CombatValue
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public CombatantCore combatant;
-    private int _level;
-    public int level
+    private ushort _level;
+    public ushort level
     {
         get { return combatant == null ? _level : combatant.level; }
         set { _level = value; }
     }
 
-    private int[] values = new int[3] { -1, -1, -1 };
-    public int valueBase
+    private int _base = -1;
+    public int Base
     {
         get
         {
-            return values[0];
+            if (_base < 0)
+                _base = 0;
+            return _base;
         }
         set
         {
-            values[0] = value;
-            values[1] = modifiers.Modify(valueBase);
+            _base = value;
         }
     }
-    public int valueScaled
+    private float _scaled = -1;
+    public float ScaledAsFloat
     {
         get
         {
-            if (modifiers.newChanges)
-            {
-                values[1] = modifiers.Modify(valueBase);
-            }
-            return values[1];
+            if (_scaled < 0)
+                _scaled = modifiers.Modify(ScaledFloat(Base, level, (float)Scaling / 100.0f));
+            return _scaled;
         }
     }
-    public int valueCurrent
+    public int Scaled
     {
-        get { return values[2]; }
-        set { values[2] = value; }
+        get
+        {
+            return Mathf.RoundToInt(ScaledAsFloat);
+        }
     }
-    public int scaling;
-
-    public ModifiersInt modifiers = new ModifiersInt();
+    private int _current = -1;
+    public int Current
+    {
+        get
+        {
+            if (_current < 0)
+                _current = 0;
+            return _current;
+        }
+        set { _current = value < 0 ? 0 : value; }
+    }
+    public int _scaling;
+    public int Scaling
+    {
+        get => _scaling;
+        set { _scaling = value < 0 ? 0 : (value > 100 ? 100 : value); }
+    }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public CombatValue(CombatantCore combatant)
+    public CombatValue(CombatantCore combatant, int Base = 1, int Scaling = 0)
     {
         this.combatant = combatant;
+        this.Base = Base;
+        this.Scaling = Scaling;
         level = 1;
     }
     
-    public CombatValue(int level)
+    public CombatValue(ushort level, int Base = 1, int Scaling = 0)
     {
         combatant = null;
+        this.Base = Base;
+        this.Scaling = Scaling;
         this.level = level;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    private ModifiersFloat _modifiers = null;
+    public ModifiersFloat modifiers
+    {
+        get
+        {
+            if (_modifiers == null)
+                _modifiers = new ModifiersFloat(ModifierChanged);
+            return _modifiers;
+        }
+    }
+
+    public void ModifierChanged()
+    {
+        _scaled = modifiers.Modify(ScaledFloat(Base, level, (float)Scaling / 100.0f));
     }
 }
 
@@ -218,13 +260,65 @@ public class SpeedAtLevel
 
 public class CombatSpeed
 {
+    public CombatantCore combatant = null;
+    private ushort _level;
+    public ushort level
+    {
+        get { return combatant == null ? _level : combatant.level; }
+        set { _level = value; }
+    }
+
     private List<SpeedAtLevel> speeds = new List<SpeedAtLevel>();
 
-    public CombatSpeed()
+    public CombatSpeed(CombatantCore combatant)
     {
+        this.combatant = combatant;
+        level = 1;
         speeds.Add(SpeedAtLevel.Default);
     }
     
+    public CombatSpeed(CombatantCore combatant, SpeedAtLevel[] speeds)
+    {
+        this.combatant = combatant;
+        level = 1;
+        Overwrite(speeds);
+    }
+    
+    public CombatSpeed(CombatantCore combatant, List<SpeedAtLevel> speeds)
+    {
+        this.combatant = combatant;
+        level = 1;
+        Overwrite(speeds);
+    }
+    
+    public CombatSpeed(ushort level)
+    {
+        combatant = null;
+        this.level = level;
+        speeds.Add(SpeedAtLevel.Default);
+    }
+    
+    public CombatSpeed(ushort level, SpeedAtLevel[] speeds)
+    {
+        combatant = null;
+        this.level = level;
+        Overwrite(speeds);
+    }
+    
+    public CombatSpeed(ushort level, List<SpeedAtLevel> speeds)
+    {
+        combatant = null;
+        this.level = level;
+        Overwrite(speeds);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public bool IndexInBounds(int ind)
+    {
+        return speeds.InBounds(ind);
+    }
+
     public int Overwrite(SpeedAtLevel[] newSpeeds)
     {
         int i;
@@ -301,16 +395,6 @@ public class CombatSpeed
             }
         }
         return speeds.Count;
-    }
-
-    public CombatSpeed(SpeedAtLevel[] speeds)
-    {
-        Overwrite(speeds);
-    }
-    
-    public CombatSpeed(List<SpeedAtLevel> speeds)
-    {
-        Overwrite(speeds);
     }
 
     public bool Add(SpeedAtLevel newSpeed)
@@ -401,9 +485,35 @@ public class CombatSpeed
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public bool IndexInBounds(int ind)
+    private int _current = 0;
+    public int Current
     {
-        return speeds.InBounds(ind);
+        get
+        {
+            if (_current < 1)
+                _current = 1;
+            return _current;
+        }
+        set
+        {
+            _current = value < 1 ? 1 : value;
+        }
+    }
+
+    private ModifiersFloat _modifiers = null;
+    public ModifiersFloat modifiers
+    {
+        get
+        {
+            if (_modifiers == null)
+                _modifiers = new ModifiersFloat(ModifierChanged);
+            return _modifiers;
+        }
+    }
+
+    public void ModifierChanged()
+    {
+        Current = Mathf.RoundToInt(modifiers.Modify(GetAtLevel(level)));
     }
 }
 
