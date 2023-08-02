@@ -67,6 +67,7 @@ public class Window_Enemies : EditorWindow
     private int pendingSpeedValue = -1;
     private ushort newSpeedLevel = 1;
     private int newSpeedValue = 1;
+    private bool speedDataChanged = false;
 
     #endregion
 
@@ -206,6 +207,7 @@ public class Window_Enemies : EditorWindow
                                 if (GUI.Button(elementRect, enemyList[i].displayName, i == selectedEnemy ? EditorStylesExtras.ColouredTextButton(DynamicTextColour.lightBlue, FontStyle.Normal) : GUI.skin.button))
                                 {
                                     selectedEnemy = i;
+                                    speedData.Overwrite(enemyList[selectedEnemy].speeds);
                                     regionToggles[0] = false;
                                 }
 
@@ -234,6 +236,7 @@ public class Window_Enemies : EditorWindow
                                 enemyList.Add(new CombatantData("New Enemy"));
                                 selectedEnemy = enemyList.Count - 1;
                                 enemyList[selectedEnemy].isFriendly = false;
+                                enemyList[selectedEnemy].playerControlled = false;
                                 regionToggles[0] = false;
                                 changesMade = true;
                             }
@@ -341,7 +344,14 @@ public class Window_Enemies : EditorWindow
 
                             EditorGUILayout.Space(2.0f);
 
-                            SpeedAtLevel[] spdData = SpeedListFoldoutRegion(speedData.GetList());
+                            SpeedAtLevel[] spdData = SpeedListFoldoutRegion(enemyList[selectedEnemy].speeds);
+                            if (speedDataChanged)
+                            {
+                                changesMade = true;
+                                speedData.Overwrite(spdData);
+                                enemyList[selectedEnemy].speeds = spdData;
+                                speedDataChanged = false;
+                            }
                         }
                         else
                             regionToggles[0] = true;
@@ -364,7 +374,9 @@ public class Window_Enemies : EditorWindow
         EditorGUILayout.EndHorizontal();
 
         if (changesMade)
+        {
             ElementDataStorage.SaveCache(enemyList);
+        }
     }
 
     void OnValidate()
@@ -536,6 +548,7 @@ public class Window_Enemies : EditorWindow
                     speedData.Add(new SpeedAtLevel(newSpeedLevel, newSpeedValue));
                     newSpeedLevel = 1;
                     newSpeedValue = 1;
+                    speedDataChanged = true;
                 }
             }
             EditorElements.EndSubSection();
@@ -587,6 +600,7 @@ public class Window_Enemies : EditorWindow
                 if (EditorElements.IconButton(rects[3], "CustomTool", "Edit Entry"))
                 {
                     editingSpeedEntry = ind;
+                    pendingSpeedValue = spd.value;
                 }
 
                 if (ind > 0 && spd.levelThreshold > 0)
@@ -594,6 +608,7 @@ public class Window_Enemies : EditorWindow
                     if (EditorElements.IconButton(rects[4], "TreeEditor.Trash", "Delete Entry"))
                     {
                         speedData.RemoveAt(ind);
+                        speedDataChanged = true;
                     }
                 }
             }
@@ -610,7 +625,10 @@ public class Window_Enemies : EditorWindow
                 if (EditorElements.IconButton(rects[3], "SaveAs", "Save Changes"))
                 {
                     if (pendingSpeedValue > 0)
+                    {
                         speedData[ind].value = pendingSpeedValue;
+                        speedDataChanged = true;
+                    }
                     editingSpeedEntry = -1;
                 }
 

@@ -1,19 +1,61 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.Events;
+using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem;
+using UnityEditor;
+using TMPro;
 
 using NeoCambion;
 using NeoCambion.Collections;
+using NeoCambion.Collections.Unity;
+using NeoCambion.Encryption;
+using NeoCambion.Heightmaps;
+using NeoCambion.IO;
+using NeoCambion.IO.Unity;
+using NeoCambion.Maths;
+using NeoCambion.Maths.Matrices;
+using NeoCambion.Random;
+using NeoCambion.Random.Unity;
 using NeoCambion.Sorting;
 using NeoCambion.TaggedData;
+using NeoCambion.TaggedData.Unity;
+using NeoCambion.Unity;
+using NeoCambion.Unity.Editor;
+using NeoCambion.Unity.Events;
+using NeoCambion.Unity.Geometry;
+using NeoCambion.Unity.Interpolation;
 
 public class CombatManager : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 
     [SerializeField] Transform allyParent;
+    private Vector3 allyAnchor
+    {
+        get
+        {
+            if (allyParent == null)
+                return Vector3.forward * 6.0f;
+            else
+                return allyParent.position;
+        }
+    }
     [SerializeField] Transform enemyParent;
-    public List<CombatantCore> combatants = new List<CombatantCore>();
+    private Vector3 enemyAnchor
+    {
+        get
+        {
+            if (enemyParent == null)
+                return Vector3.forward * -6.0f;
+            else
+                return enemyParent.position;
+        }
+    }
+    [HideInInspector] public List<CombatantCore> combatants = new List<CombatantCore>();
     public int[] allies
     {
         get
@@ -40,6 +82,7 @@ public class CombatManager : Core
             return l.ToArray();
         }
     }
+    [SerializeField] GameObject turnIndicator;
 
     #endregion
 
@@ -48,14 +91,14 @@ public class CombatManager : Core
     public static float TimeFactor = 5000;
     public float combatTime { get; private set; }
 
-    public int turnOfInd = -1;
+    [HideInInspector] public int turnOfInd = -1;
     public CombatantCore turnOf { get { return combatants.InBounds(turnOfInd) ? combatants[turnOfInd] : null; } }
 
     #endregion
 
     #region [ COROUTINES ]
 
-    private Coroutine c_StartCombatDelayed = null;
+    private Coroutine c_EventDelay = null;
 
     #endregion
 
@@ -95,12 +138,12 @@ public class CombatManager : Core
         int i;
         if (enemyPos)
         {
-            anchor = enemyParent.position;
+            anchor = enemyAnchor;
             inds = enemies;
         }
         else
         {
-            anchor = allyParent.position;
+            anchor = allyAnchor;
             inds = allies;
         }
         float[] offsets = new float[inds.Length];
@@ -121,6 +164,84 @@ public class CombatManager : Core
         return positions;
     }
 
+    public bool SpawnCombatant(GameObject template, CombatantData data)
+    {
+        GameObject cmbObj = Instantiate(template);
+        CombatantCore combatant = cmbObj.GetOrAddComponent<CombatantCore>();
+        combatant.GetData(data);
+        if (combatant.gotData)
+        {
+            cmbObj.name = data.displayName;
+            combatants.Add(combatant);
+            return true;
+        }
+        else
+        {
+            Destroy(cmbObj);
+            return false;
+        }
+    }
+
+    public int[] GetActionOrder(ushort forecastMax)
+    {
+        List<Data_IntTag<float>> order = new List<Data_IntTag<float>>();
+        Data_IntTag<float> nxAct;
+        int x = Mathf.RoundToInt(forecastMax / combatants.Count) + 1, x2, x3;
+        int i, j;
+        for (i = 0; i < combatants.Count; i++)
+        {
+            x3 = x;
+            if (combatants[i] != null && combatants[i].alive)
+            {
+                if (order.Count > 0)
+                {
+                    x2 = order.Count;
+                    nxAct = new Data_IntTag<float>(i, combatants[i].nextActionTime);
+                    for (j = 0; j < x2 && x3 > 0; j++)
+                    {
+                        if (nxAct.value < order[j].value)
+                        {
+                            x2++;
+                            x3--;
+                            order.Insert(j, nxAct);
+                            nxAct = new Data_IntTag<float>(nxAct.tag, nxAct.value + combatants[i].actionInterval);
+                        }
+                    }
+                    for (j = 0; j < x3; j++)
+                    {
+                        nxAct = new Data_IntTag<float>(nxAct.tag, nxAct.value + combatants[i].actionInterval);
+                        order.Add(nxAct);
+                    }
+                }
+                else
+                {
+                    for (j = 0; j < x; j++)
+                    {
+                        nxAct = new Data_IntTag<float>(i, combatants[i].nextActionTime + j * combatants[i].actionInterval);
+                        order.Add(nxAct);
+                    }
+                }
+            }
+        }
+        int[] ordOut = new int[forecastMax];
+        for (i = 0; i < ordOut.Length; i++)
+        {
+            if (i < order.Count)
+                ordOut[i] = order[i].tag;
+            else
+                ordOut[i] = -1;
+        }
+        return ordOut;
+    }
+
+    public float TimeToAction(int combatantInd)
+    {
+        if (combatants.InBounds(combatantInd) && combatants[combatantInd].alive)
+            return combatants[combatantInd].nextActionTime - combatTime;
+        else
+            return float.MaxValue;
+    }
+
     public void StartCombat(CombatantData[] allyList, CombatantData[] enemyList)
     {
         if (combatants.Count > 0)
@@ -133,26 +254,46 @@ public class CombatManager : Core
         }
 
         GameObject temp = new GameObject();
-        for (int i = 0; i < enemyList.Length && i < 9; i++)
+        foreach (CombatantData ally in allyList)
         {
-            GameObject enemyObj = Instantiate(temp, enemyParent);
-            float xOff = 4.0f - (4.0f * (i % 3));
-            float zOff = 4.0f - (4.0f * ((i - i % 3) / 3));
-            enemyObj.transform.localPosition = new Vector3(xOff, 0.0f, zOff);
-            enemyObj.transform.localEulerAngles = Vector3.zero;
-            CombatEnemy enemy = enemyObj.AddComponent<CombatEnemy>();
-            enemy.GetData(enemyList[i]);
-            if (enemy.gotData)
-                combatants.Add(enemy);
+            SpawnCombatant(temp, ally);
+        }
+        foreach (CombatantData enemy in enemyList)
+        {
+            SpawnCombatant(temp, enemy);
         }
         Destroy(temp);
+        Vector3[] allyPos = CombatantPositions(false);
+        Vector3[] enemyPos = CombatantPositions(true);
+        for (int i = 0; i < allies.Length; i++)
+        {
+            combatants[allies[i]].pos = allyPos[i];
+        }
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            combatants[enemies[i]].pos = enemyPos[i];
+            combatants[enemies[i]].rot = Vector3.up * 180.0f;
+        }
+
+        int[] initActOrd = GetActionOrder(10);
+        for (int i = 0; i < 10; i++)
+        {
+            if (initActOrd[i] >= 0)
+            {
+                TurnOrderItem lItem = Instantiate(GameManager.Instance.UI.HUD.turnOrderItem, GameManager.Instance.UI.HUD.turnOrderAnchor.transform);
+                lItem.rTransform.anchoredPosition = Vector3.zero + Vector3.up * -80 * i;
+                lItem.SetName(combatants[initActOrd[i]].displayName);
+            }
+        }
+
+        OpeningEvents();
     }
 
     public void StartCombatDelayed(CombatantData[] allyList, CombatantData[] enemyList, float delay)
     {
-        if (c_StartCombatDelayed != null)
-            StopCoroutine(c_StartCombatDelayed);
-        c_StartCombatDelayed = StartCoroutine(IStartCombatDelayed(allyList, enemyList, delay));
+        if (c_EventDelay != null)
+            StopCoroutine(c_EventDelay);
+        c_EventDelay = StartCoroutine(IStartCombatDelayed(allyList, enemyList, delay));
     }
 
     private IEnumerator IStartCombatDelayed(CombatantData[] allyList, CombatantData[] enemyList, float delay)
@@ -161,39 +302,16 @@ public class CombatManager : Core
         StartCombat(allyList, enemyList);
     }
 
-    public int[] GetActionOrder(ushort forecastMax)
+    private void OpeningEvents()
     {
-        List<Data_IntTag<float>> order = new List<Data_IntTag<float>>();
-        float nxActTime;
-        int i, j;
-        for (i = 0; i < combatants.Count && order.Count < forecastMax; i++)
-        {
-            if (combatants[i] != null && combatants[i].alive)
-            {
-                nxActTime = combatants[i].nextActionTime;
-                if (order.Count > 0)
-                {
-                    for (j = 0; j < order.Count; j++)
-                    {
-                        if (nxActTime < order[j].value)
-                        {
-                            order.Insert(j, new Data_IntTag<float>(i, nxActTime));
-                        }
-                    }
-                    order.Add(new Data_IntTag<float>(i, nxActTime));
-                }
-                else
-                {
-                    order.Add(new Data_IntTag<float>(i, nxActTime));
-                }
-            }
-        }
-        int[] ordOut = new int[order.Count];
-        for (i = 0; i < order.Count; i++)
-        {
-            ordOut[i] = order[i].tag;
-        }
-        return ordOut;
+        if (c_EventDelay != null)
+            StopCoroutine(c_EventDelay);
+        c_EventDelay = StartCoroutine(IOpeningEvents());
+    }
+
+    private IEnumerator IOpeningEvents()
+    {
+        yield return null;
     }
 
     public int NextTurn()
@@ -210,14 +328,15 @@ public class CombatManager : Core
         }
         turnOfInd = cInd;
         combatTime = combatants[cInd].nextActionTime;
-        return cInd;
-    }
-
-    public float TimeToAction(int combatantInd)
-    {
-        if (combatants.InBounds(combatantInd) && combatants[combatantInd].alive)
-            return combatants[combatantInd].nextActionTime - combatTime;
+        turnIndicator.transform.position = combatants[cInd].pos;
+        if (combatants[cInd].playerControlled)
+        {
+            // ENABLE PLAYER CONTROL
+        }
         else
-            return float.MaxValue;
+        {
+            // PASS THROUGH TO AI
+        }
+        return cInd;
     }
 }

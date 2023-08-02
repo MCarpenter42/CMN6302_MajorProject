@@ -42,10 +42,16 @@ public class CombatantCore : Core
 
     #region [ PROPERTIES ]
 
+    public Vector3 pos { get { return gameObject.transform.position; } set { gameObject.transform.position = value; } }
+    public Vector3 rot { get { return gameObject.transform.eulerAngles; } set { gameObject.transform.eulerAngles = value; } }
+
     public bool gotData;
     public bool isFriendly;
+    public bool playerControlled = false;
 
     public int size { get { return modelObj == null ? 0 : modelObj.size; } }
+
+    public string displayName;
 
     public ushort level;
     public CombatValue health = null;
@@ -123,7 +129,10 @@ public class CombatantCore : Core
                 modelObj = modelTemplate == null ? null : Instantiate(modelTemplate, transform).GetComponent<EntityModel>();
             }
 
+            displayName = data.displayName;
+
             isFriendly = baseData.isFriendly;
+            playerControlled = baseData.playerControlled;
 
             health = new CombatValue(this, baseData.baseHealth, baseData.healthScaling);
             attack = new CombatValue(this, baseData.baseAttack, baseData.attackScaling);
@@ -244,6 +253,7 @@ public class CombatValue
     }
 }
 
+[System.Serializable]
 public class SpeedAtLevel
 {
     public ushort levelThreshold;
@@ -355,6 +365,7 @@ public class CombatSpeed
                 }
             }
         }
+        Current = Mathf.RoundToInt(modifiers.Modify(GetAtLevel(level)));
         return speeds.Count;
     }
     
@@ -394,6 +405,7 @@ public class CombatSpeed
                 }
             }
         }
+        Current = Mathf.RoundToInt(modifiers.Modify(GetAtLevel(level)));
         return speeds.Count;
     }
 
@@ -421,6 +433,7 @@ public class CombatSpeed
                 return false;
             }
         }
+        Current = Mathf.RoundToInt(modifiers.Modify(GetAtLevel(level)));
         return false;
     }
 
@@ -438,6 +451,7 @@ public class CombatSpeed
                 break;
             }
         }
+        Current = Mathf.RoundToInt(modifiers.Modify(GetAtLevel(level)));
         return false;
     }
     
@@ -448,6 +462,7 @@ public class CombatSpeed
             speeds.RemoveAt(index);
             return true;
         }
+        Current = Mathf.RoundToInt(modifiers.Modify(GetAtLevel(level)));
         return false;
     }
 
@@ -524,6 +539,25 @@ public class CombatEquipment
 
 [System.Serializable]
 public class CombatantBrain
+{
+    // - Bool to enable/disable
+
+    // - List of possible actions
+    // - Priority ranking
+    // - Associated conditions
+    // - Percentage chances
+}
+
+[System.Serializable]
+public class CombatAction
+{
+    // - Targeting
+    // - Effect
+    // - Hit chance
+}
+
+[System.Serializable]
+public class CombatCondition
 {
 
 }

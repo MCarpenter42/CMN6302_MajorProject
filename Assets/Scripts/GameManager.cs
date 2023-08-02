@@ -335,7 +335,7 @@ public class GameManager : Core
             enemy.PauseBehaviour(true);
         }
         Level.CombatTransition(true, 1.0f);
-        Level.Combat.StartCombatDelayed(null, triggerEnemy.enemyTypes.AsData(), 0.5f);
+        Level.Combat.StartCombatDelayed(playerW.playerCharacters, triggerEnemy.enemyTypes.AsData(), 0.5f);
     }
 
     public void OnCombatEnd()

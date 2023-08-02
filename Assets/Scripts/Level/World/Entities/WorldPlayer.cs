@@ -28,6 +28,8 @@ public class WorldPlayer : WorldEntityCore
     private List<int> inRangeInteracts = new List<int>();
     private int targetInteractInd = -1;
 
+    [HideInInspector] public CombatantData[] playerCharacters = null;
+
     #endregion
 
     #region [ COROUTINES ]
@@ -43,6 +45,7 @@ public class WorldPlayer : WorldEntityCore
     protected override void Awake()
     {
         base.Awake();
+        playerCharacters = INDEV_PlayerCharacters();
     }
 
     protected override void Start()
@@ -156,5 +159,64 @@ public class WorldPlayer : WorldEntityCore
             GameManager.Instance.UI.HUD.interactHLVisible = true;
         }
         targetInteractInd = index;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    private CombatantData[] INDEV_PlayerCharacters()
+    {
+        CombatantData[] data = new CombatantData[3]
+        {
+            new CombatantData("Player Character 1"),
+            new CombatantData("Player Character 2"),
+            new CombatantData("Player Character 3")
+        };
+
+        data[0].modelHexUID = "8663CC29";
+        data[1].modelHexUID = "8663CC29";
+        data[2].modelHexUID = "8663CC29";
+        
+        data[0].isFriendly = true;
+        data[1].isFriendly = true;
+        data[2].isFriendly = true;
+        data[0].playerControlled = true;
+        data[1].playerControlled = true;
+        data[2].playerControlled = true;
+
+        data[0].baseHealth = 80;
+        data[0].healthScaling = 40;
+        data[1].baseHealth = 80;
+        data[1].healthScaling = 40;
+        data[2].baseHealth = 80;
+        data[2].healthScaling = 40;
+
+        data[0].baseAttack = 30;
+        data[0].attackScaling = 40;
+        data[1].baseAttack = 30;
+        data[1].attackScaling = 40;
+        data[2].baseAttack = 30;
+        data[2].attackScaling = 40;
+
+        data[0].baseDefence = 40;
+        data[0].defenceScaling = 40;
+        data[1].baseDefence = 40;
+        data[1].defenceScaling = 40;
+        data[2].baseDefence = 40;
+        data[2].defenceScaling = 40;
+
+        data[0].speeds = new SpeedAtLevel[]
+        {
+            new SpeedAtLevel(0, 130)
+        };
+        data[1].speeds = new SpeedAtLevel[]
+        {
+            new SpeedAtLevel(0, 120)
+        };
+        data[2].speeds = new SpeedAtLevel[]
+        {
+            new SpeedAtLevel(0, 110)
+        };
+
+        return data;
     }
 }

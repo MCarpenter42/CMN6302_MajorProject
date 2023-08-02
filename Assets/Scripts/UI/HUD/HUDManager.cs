@@ -10,11 +10,17 @@ public class HUDManager : Core
     #region [ OBJECTS / COMPONENTS ]
 
     [Header("World")]
-    [SerializeField] UIObject hudWorld;
-    [SerializeField] UIObject interactHighlight;
+    public UIObject hudWorld;
+    public UIObject interactHighlight;
+
+    //[Header("World (InDev)")]
 
     [Header("Combat")]
-    [SerializeField] UIObject hudCombat;
+    public UIObject hudCombat;
+    public UIObject turnOrderAnchor;
+    public TurnOrderItem turnOrderItem;
+
+    //[Header("Combat (InDev)")]
 
     #endregion
 

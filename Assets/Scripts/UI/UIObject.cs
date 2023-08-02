@@ -28,6 +28,8 @@ public class UIObject : Core
     #region [ PROPERTIES ]
 
     public bool visible { get; private set; }
+    
+    // ADD TAGGING SYSTEM?
 
     #endregion
 

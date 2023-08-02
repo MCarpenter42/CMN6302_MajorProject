@@ -130,6 +130,10 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 3369024408070196085, guid: 8853285840402b5459b15547759f582a, type: 3}
+      propertyPath: m_RootOrder
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5281716106638694609, guid: 8853285840402b5459b15547759f582a, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -1403,6 +1407,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f517a8a44aa49aa43a79633dd1a66b01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  size: 1
 --- !u!114 &1215395417
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2277,7 +2282,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6602542fa19b1ae4ba85e1fb43f7526b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  allyParent: {fileID: 0}
   enemyParent: {fileID: 519055701}
+  combatants: []
+  turnOfInd: -1
 --- !u!4 &1883554107
 Transform:
   m_ObjectHideFlags: 0
@@ -2342,6 +2350,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f517a8a44aa49aa43a79633dd1a66b01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  size: 1
 --- !u!114 &1899185791
 MonoBehaviour:
   m_ObjectHideFlags: 0
