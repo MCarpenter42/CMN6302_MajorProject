@@ -31,6 +31,9 @@ using NeoCambion.Unity.Interpolation;
 using System.Runtime.CompilerServices;
 using UnityEngine.UIElements;
 
+// BASIC THREAT AND TAUNT SYSTEMS NEEDED
+// MEMORY (ATTACKED BY + ETC) NEEDED
+
 public class CombatantCore : Core
 {
     #region [ OBJECTS / COMPONENTS ]
@@ -537,7 +540,6 @@ public class CombatEquipment
 
 }
 
-[System.Serializable]
 public class CombatantBrain
 {
     // - Bool to enable/disable
@@ -546,18 +548,4 @@ public class CombatantBrain
     // - Priority ranking
     // - Associated conditions
     // - Percentage chances
-}
-
-[System.Serializable]
-public class CombatAction
-{
-    // - Targeting
-    // - Effect
-    // - Hit chance
-}
-
-[System.Serializable]
-public class CombatCondition
-{
-
 }
