@@ -782,6 +782,34 @@ namespace NeoCambion.Collections
             }
             return n;
         }
+
+        public static T[] Insert<T>(this T[] array, int index, T item)
+        {
+            if (array.InBounds(index))
+            {
+                for (int i = array.Length - 1; i >= index; i--)
+                {
+                    if (i > index)
+                        array[i] = array[i - 1];
+                    else
+                        array[i] = item;
+                }
+            }
+            return array;
+        }
+
+        public static List<T> InsertAndTrim<T>(this List<T> list, int index, T item, int maxCount)
+        {
+            if (maxCount > 0 && list.InBounds(index) && index < maxCount)
+            {
+                list.Insert(index, item);
+                if (list.Count > maxCount)
+                {
+                    list.RemoveRange(maxCount, list.Count - maxCount);
+                }
+            }
+            return list;
+        }
     }
 
     public static class Ext_FloatCollection

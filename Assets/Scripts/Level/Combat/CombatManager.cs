@@ -28,6 +28,7 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
+using UnityEngine.UIElements;
 
 public class CombatManager : Core
 {
@@ -55,31 +56,16 @@ public class CombatManager : Core
                 return enemyParent.position;
         }
     }
-    [HideInInspector] public List<CombatantCore> combatants = new List<CombatantCore>();
-    public int[] allies
+    [HideInInspector] public List<CombatantCore> playerTeam = new List<CombatantCore>();
+    [HideInInspector] public List<CombatantCore> enemyTeam = new List<CombatantCore>();
+    public List<CombatantCore> combatants
     {
         get
         {
-            List<int> l = new List<int>();
-            for (int i = 0; i < combatants.Count; i++)
-            {
-                if (combatants[i] != null && combatants[i].gotData && combatants[i].isFriendly)
-                    l.Add(i);
-            }
-            return l.ToArray();
-        }
-    }
-    public int[] enemies
-    {
-        get
-        {
-            List<int> l = new List<int>();
-            for (int i = 0; i < combatants.Count; i++)
-            {
-                if (combatants[i] != null && combatants[i].gotData && !combatants[i].isFriendly)
-                    l.Add(i);
-            }
-            return l.ToArray();
+            List<CombatantCore> combatants = new List<CombatantCore>();
+            combatants.AddRange(playerTeam);
+            combatants.AddRange(enemyTeam);
+            return combatants;
         }
     }
     [SerializeField] GameObject turnIndicator;
@@ -132,28 +118,30 @@ public class CombatManager : Core
 
     public Vector3[] CombatantPositions(bool enemyPos = true)
     {
-        Vector3 anchor;
+        Vector3 anchor = enemyPos ? enemyAnchor : allyAnchor;
         float spacing = 2.0f, totalWidth = 0.0f;
-        int[] inds;
         int i;
+        float[] offsets;
         if (enemyPos)
         {
-            anchor = enemyAnchor;
-            inds = enemies;
+            offsets = new float[enemyTeam.Count];
+            for (i = 1; i < offsets.Length; i++)
+            {
+                totalWidth += (enemyTeam[i - 1].size + enemyTeam[i].size) / 2.0f + spacing;
+                offsets[i] = totalWidth;
+            }
         }
         else
         {
-            anchor = allyAnchor;
-            inds = allies;
+            offsets = new float[playerTeam.Count];
+            for (i = 1; i < offsets.Length; i++)
+            {
+                totalWidth += (playerTeam[i - 1].size + playerTeam[i].size) / 2.0f + spacing;
+                offsets[i] = totalWidth;
+            }
         }
-        float[] offsets = new float[inds.Length];
-        for (i = 1; i < inds.Length; i++)
-        {
-            totalWidth += (combatants[inds[i - 1]].size + combatants[inds[i]].size) / 2.0f + spacing;
-            offsets[i] = totalWidth;
-        }
-        Vector3[] positions = new Vector3[inds.Length];
-        if (inds.Length > 0)
+        Vector3[] positions = new Vector3[offsets.Length];
+        if (offsets.Length > 0)
         {
             positions[0] = anchor - Vector3.right * (totalWidth / 2.0f);
         }
@@ -182,56 +170,89 @@ public class CombatManager : Core
         }
     }
 
-    public int[] GetActionOrder(ushort forecastMax)
+    private void ReassignIndices()
     {
-        List<Data_IntTag<float>> order = new List<Data_IntTag<float>>();
-        Data_IntTag<float> nxAct;
-        int x = Mathf.RoundToInt(forecastMax / combatants.Count) + 1, x2, x3;
-        int i, j;
-        for (i = 0; i < combatants.Count; i++)
+        int i;
+        for (i = 0; i < playerTeam.Count; i++)
         {
-            x3 = x;
-            if (combatants[i] != null && combatants[i].alive)
+            playerTeam[i].index = i;
+        }
+        for (i = 0; i < enemyTeam.Count; i++)
+        {
+            enemyTeam[i].index = i;
+        }
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public struct TurnOrderRef
+    {
+        public bool playerTeam;
+        public int index;
+        public float nextActionTime;
+
+        public TurnOrderRef(bool playerTeam, int index, float nextActionTime)
+        {
+            this.playerTeam = playerTeam;
+            this.index = index;
+            this.nextActionTime = nextActionTime;
+        }
+
+        public TurnOrderRef(TurnOrderRef template, float timeMod)
+        {
+            playerTeam = template.playerTeam;
+            index = template.index;
+            nextActionTime = template.nextActionTime + timeMod;
+        }
+
+        public static TurnOrderRef Empty
+        {
+            get
             {
-                if (order.Count > 0)
+                return new TurnOrderRef(true, -1, float.MaxValue);
+            }
+        }
+
+        public bool IsEmpty()
+        {
+            return index == -1 && nextActionTime == float.MaxValue;
+        }
+    }
+    public TurnOrderRef[] GetActionOrder(ushort forecastMax)
+    {
+        TurnOrderRef[] order = new TurnOrderRef[forecastMax];
+        TurnOrderRef nxAct;
+        int combatantCount = playerTeam.Count + enemyTeam.Count;
+        int i, j;
+        for (i = 0; i < order.Length; i++)
+        {
+            order[i] = new TurnOrderRef(true, 0, playerTeam[0].nextActionTime + playerTeam[0].actionInterval * i);
+        }
+        for (i = 1; i < playerTeam.Count; i++)
+        {
+            nxAct = new TurnOrderRef(true, i, playerTeam[i].nextActionTime);
+            for (j = 0; j < order.Length; j++)
+            {
+                if (nxAct.nextActionTime < order[j].nextActionTime)
                 {
-                    x2 = order.Count;
-                    nxAct = new Data_IntTag<float>(i, combatants[i].nextActionTime);
-                    for (j = 0; j < x2 && x3 > 0; j++)
-                    {
-                        if (nxAct.value < order[j].value)
-                        {
-                            x2++;
-                            x3--;
-                            order.Insert(j, nxAct);
-                            nxAct = new Data_IntTag<float>(nxAct.tag, nxAct.value + combatants[i].actionInterval);
-                        }
-                    }
-                    for (j = 0; j < x3; j++)
-                    {
-                        nxAct = new Data_IntTag<float>(nxAct.tag, nxAct.value + combatants[i].actionInterval);
-                        order.Add(nxAct);
-                    }
-                }
-                else
-                {
-                    for (j = 0; j < x; j++)
-                    {
-                        nxAct = new Data_IntTag<float>(i, combatants[i].nextActionTime + j * combatants[i].actionInterval);
-                        order.Add(nxAct);
-                    }
+                    order.Insert(i, nxAct);
+                    nxAct = new TurnOrderRef(nxAct, playerTeam[i].actionInterval);
                 }
             }
         }
-        int[] ordOut = new int[forecastMax];
-        for (i = 0; i < ordOut.Length; i++)
+        for (i = 0; i < enemyTeam.Count; i++)
         {
-            if (i < order.Count)
-                ordOut[i] = order[i].tag;
-            else
-                ordOut[i] = -1;
+            nxAct = new TurnOrderRef(true, i, enemyTeam[i].nextActionTime);
+            for (j = 0; j < order.Length; j++)
+            {
+                if (nxAct.nextActionTime < order[j].nextActionTime)
+                {
+                    order.Insert(i, nxAct);
+                    nxAct = new TurnOrderRef(nxAct, enemyTeam[i].actionInterval);
+                }
+            }
         }
-        return ordOut;
+        return order;
     }
 
     public float TimeToAction(int combatantInd)
@@ -241,6 +262,8 @@ public class CombatManager : Core
         else
             return float.MaxValue;
     }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public void StartCombat(CombatantData[] allyList, CombatantData[] enemyList)
     {
@@ -263,26 +286,29 @@ public class CombatManager : Core
             SpawnCombatant(temp, enemy);
         }
         Destroy(temp);
+        ReassignIndices();
         Vector3[] allyPos = CombatantPositions(false);
         Vector3[] enemyPos = CombatantPositions(true);
-        for (int i = 0; i < allies.Length; i++)
+        for (int i = 0; i < playerTeam.Count; i++)
         {
-            combatants[allies[i]].pos = allyPos[i];
+            playerTeam[i].pos = allyPos[i];
         }
-        for (int i = 0; i < enemies.Length; i++)
+        for (int i = 0; i < enemyTeam.Count; i++)
         {
-            combatants[enemies[i]].pos = enemyPos[i];
-            combatants[enemies[i]].rot = Vector3.up * 180.0f;
+            enemyTeam[i].pos = enemyPos[i];
+            enemyTeam[i].rot = Vector3.up * 180.0f;
         }
 
-        int[] initActOrd = GetActionOrder(10);
+        TurnOrderRef[] initActOrd = GetActionOrder(10);
+        int index;
         for (int i = 0; i < 10; i++)
         {
-            if (initActOrd[i] >= 0)
+            index = initActOrd[i].index;
+            if (index >= 0)
             {
                 TurnOrderItem lItem = Instantiate(GameManager.Instance.UI.HUD.turnOrderItem, GameManager.Instance.UI.HUD.turnOrderAnchor.transform);
                 lItem.rTransform.anchoredPosition = Vector3.zero + Vector3.up * -80 * i;
-                lItem.SetName(combatants[initActOrd[i]].displayName);
+                lItem.SetName(initActOrd[i].playerTeam ? playerTeam[index].displayName : enemyTeam[index].displayName);
             }
         }
 

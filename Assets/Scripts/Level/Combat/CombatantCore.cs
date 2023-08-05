@@ -51,6 +51,7 @@ public class CombatantCore : Core
     public bool gotData;
     public bool isFriendly;
     public bool playerControlled = false;
+    public int index = -1;
 
     public int size { get { return modelObj == null ? 0 : modelObj.size; } }
 
@@ -81,6 +82,11 @@ public class CombatantCore : Core
             return speed == null ? float.MaxValue : lastActionTime + actionInterval;
         }
     }
+
+    public int threat = 100;
+    public int tauntedBy = -1;
+
+    public ActiveEffects statusEffects = new ActiveEffects();
 
     #endregion
 
@@ -143,6 +149,262 @@ public class CombatantCore : Core
             speed = new CombatSpeed(this, baseData.speeds);
         }
     }
+}
+
+public static class CombatantUtility
+{
+    public static List<KeyValuePair<int, int>> SortedByThreat(this List<CombatantCore> combatants, bool descending = true, int includeThreshold = int.MinValue)
+    {
+        List<KeyValuePair<int, int>> lOut = new List<KeyValuePair<int, int>>();
+        int i, j, threat;
+        lOut.Add(new KeyValuePair<int, int>(0, combatants[0] == null ? 0 : combatants[0].threat));
+        if (descending)
+        {
+            for (i = 1; i < combatants.Count; i++)
+            {
+                threat = combatants[i] == null ? 0 : combatants[i].threat;
+                if (threat >= includeThreshold)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new KeyValuePair<int, int>(i, threat));
+                        else if (threat >= lOut[j].Value)
+                        {
+                            lOut.Insert(j, new KeyValuePair<int, int>(i, threat));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (includeThreshold == int.MinValue)
+                includeThreshold = int.MaxValue;
+            for (i = 1; i < combatants.Count; i++)
+            {
+                threat = combatants[1] == null ? 0 : combatants[1].threat;
+                if (threat <= includeThreshold)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new KeyValuePair<int, int>());
+                        else if (threat <= lOut[j].Value)
+                        {
+                            lOut.Insert(j, new KeyValuePair<int, int>(i, threat));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return lOut;
+    }
+    
+    public static List<KeyValuePair<int, int>> SortedByCurrentHealth(this List<CombatantCore> combatants, bool descending = true, int includeThreshold = int.MinValue)
+    {
+        List<KeyValuePair<int, int>> lOut = new List<KeyValuePair<int, int>>();
+        int i, j, health;
+        lOut.Add(new KeyValuePair<int, int>(0, combatants[0] == null ? 0 : combatants[0].health.Current));
+        if (descending)
+        {
+            for (i = 1; i < combatants.Count; i++)
+            {
+                health = combatants[i] == null ? 0 : combatants[i].health.Current;
+                if (health >= includeThreshold)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new KeyValuePair<int, int>(i, health));
+                        else if (health >= lOut[j].Value)
+                        {
+                            lOut.Insert(j, new KeyValuePair<int, int>(i, health));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (includeThreshold == int.MinValue)
+                includeThreshold = int.MaxValue;
+            for (i = 1; i < combatants.Count; i++)
+            {
+                health = combatants[1] == null ? 0 : combatants[1].health.Current;
+                if (health <= includeThreshold)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new KeyValuePair<int, int>());
+                        else if (health <= lOut[j].Value)
+                        {
+                            lOut.Insert(j, new KeyValuePair<int, int>(i, health));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return lOut;
+    }
+    
+    public static List<KeyValuePair<int, float>> SortedByPercentHealth(this List<CombatantCore> combatants, bool descending = true, float includeThreshold = float.MinValue)
+    {
+        List<KeyValuePair<int, float>> lOut = new List<KeyValuePair<int, float>>();
+        int i, j;
+        float health;
+        if (includeThreshold == float.MinValue && !descending)
+            includeThreshold = float.MaxValue;
+        includeThreshold = Mathf.Clamp(includeThreshold, 0.0f, 100.0f);
+        lOut.Add(new KeyValuePair<int, float>(0, combatants[0] == null ? 0 : (float)combatants[0].health.Current / combatants[0].health.ScaledAsFloat));
+        if (descending)
+        {
+            for (i = 1; i < combatants.Count; i++)
+            {
+                health = combatants[i] == null ? 0 : (float)combatants[i].health.Current / combatants[i].health.ScaledAsFloat;
+                if (health >= includeThreshold)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new KeyValuePair<int, float>(i, health));
+                        else if (health >= lOut[j].Value)
+                        {
+                            lOut.Insert(j, new KeyValuePair<int, float>(i, health));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (i = 1; i < combatants.Count; i++)
+            {
+                health = combatants[1] == null ? 0 : combatants[1].health.Current;
+                if (health <= includeThreshold)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new KeyValuePair<int, float>(i, health));
+                        else if (health <= lOut[j].Value)
+                        {
+                            lOut.Insert(j, new KeyValuePair<int, float>(i, health));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return lOut;
+    }
+
+    public static List<KeyValuePair<int, int>> SortedByMaxHealth(this List<CombatantCore> combatants, bool descending = true, int includeThreshold = int.MinValue)
+    {
+        List<KeyValuePair<int, int>> lOut = new List<KeyValuePair<int, int>>();
+        int i, j, health;
+        lOut.Add(new KeyValuePair<int, int>(0, combatants[0] == null ? 0 : combatants[0].health.Scaled));
+        if (descending)
+        {
+            for (i = 1; i < combatants.Count; i++)
+            {
+                health = combatants[i] == null ? 0 : combatants[i].health.Scaled;
+                if (health >= includeThreshold)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new KeyValuePair<int, int>(i, health));
+                        else if (health >= lOut[j].Value)
+                        {
+                            lOut.Insert(j, new KeyValuePair<int, int>(i, health));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (includeThreshold == int.MinValue)
+                includeThreshold = int.MaxValue;
+            for (i = 1; i < combatants.Count; i++)
+            {
+                health = combatants[1] == null ? 0 : combatants[1].health.Scaled;
+                if (health <= includeThreshold)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new KeyValuePair<int, int>());
+                        else if (health <= lOut[j].Value)
+                        {
+                            lOut.Insert(j, new KeyValuePair<int, int>(i, health));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return lOut;
+    }
+
+    public static List<KeyValuePair<int, int>> SortedByStacks(this List<CombatantCore> combatants, string effectName, bool descending = true, int includeThreshold = int.MinValue)
+    {
+        List<KeyValuePair<int, int>> lOut = new List<KeyValuePair<int, int>>();
+        int i, j, stacks;
+        lOut.Add(new KeyValuePair<int, int>(0, combatants[0] == null ? 0 : combatants[0].threat));
+        if (descending)
+        {
+            for (i = 1; i < combatants.Count; i++)
+            {
+                threat = combatants[i] == null ? 0 : combatants[i].threat;
+                if (threat >= includeThreshold)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new KeyValuePair<int, int>(i, threat));
+                        else if (threat >= lOut[j].Value)
+                        {
+                            lOut.Insert(j, new KeyValuePair<int, int>(i, threat));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (includeThreshold == int.MinValue)
+                includeThreshold = int.MaxValue;
+            for (i = 1; i < combatants.Count; i++)
+            {
+                threat = combatants[1] == null ? 0 : combatants[1].threat;
+                if (threat <= includeThreshold)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new KeyValuePair<int, int>());
+                        else if (threat <= lOut[j].Value)
+                        {
+                            lOut.Insert(j, new KeyValuePair<int, int>(i, threat));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return lOut;
+    }
+
 }
 
 public class CombatValue
