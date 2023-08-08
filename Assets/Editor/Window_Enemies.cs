@@ -235,7 +235,7 @@ public class Window_Enemies : EditorWindow
                             {
                                 enemyList.Add(new CombatantData("New Enemy"));
                                 selectedEnemy = enemyList.Count - 1;
-                                enemyList[selectedEnemy].isFriendly = false;
+                                enemyList[selectedEnemy].friendly = false;
                                 enemyList[selectedEnemy].playerControlled = false;
                                 regionToggles[0] = false;
                                 changesMade = true;

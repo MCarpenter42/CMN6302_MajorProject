@@ -28,10 +28,11 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
-using System;
 
 public class ActiveEffects
 {
+    private CombatantCore combatant;
+
     public enum RemovalTarget { First, Last, All }
 
     private List<StatusEffect> Special = new List<StatusEffect>();
@@ -55,12 +56,15 @@ public class ActiveEffects
         241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255
     };
 
-    public ActiveEffects()
+    public ActiveEffects(CombatantCore combatant)
     {
         inactiveUIDs.AddRange(allUIDs);
+        this.combatant = combatant;
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public readonly static string removeAny = "ANY";
 
     private byte NewUID()
     {
@@ -156,26 +160,72 @@ public class ActiveEffects
         return false;
     }
     
-    private bool Remove(int index, bool special = false)
+    public bool Remove(int index = -1, bool special = false)
     {
-        if (special)
+        if (index >= 0)
         {
-            if (Special.InBounds(index))
+            if (special)
             {
-                byte UID = Special[index].instanceUID;
-                Special.RemoveAt(index);
-                DeactivateUID(UID);
-                return true;
+                if (index < Special.Count)
+                {
+                    byte UID = Special[index].instanceUID;
+                    Special.RemoveAt(index);
+                    DeactivateUID(UID);
+                    return true;
+                }
+            }
+            else
+            {
+                if (index < Normal.Count)
+                {
+                    byte UID = Normal[index].instanceUID;
+                    Normal.RemoveAt(index);
+                    DeactivateUID(UID);
+                    return true;
+                }
             }
         }
         else
         {
-            if (Normal.InBounds(index))
+            if (Special.Count > 0)
             {
-                byte UID = Normal[index].instanceUID;
-                Normal.RemoveAt(index);
-                DeactivateUID(UID);
-                return true;
+                List<int> inds = new List<int>().IncrementalPopulate(0, 1, Special.Count);
+                int r;
+                for (int i = 0; i < Special.Count; i++)
+                {
+                    r = Random.Range(0, inds.Count);
+                    if (Special[inds[r]].removable)
+                    {
+                        byte UID = Special[inds[r]].instanceUID;
+                        Special.RemoveAt(inds[r]);
+                        DeactivateUID(UID);
+                        return true;
+                    }
+                    else
+                    {
+                        inds.RemoveAt(r);
+                    }
+                }
+            }
+            if (Normal.Count > 0)
+            {
+                List<int> inds = new List<int>().IncrementalPopulate(0, 1, Normal.Count);
+                int r;
+                for (int i = 0; i < Normal.Count; i++)
+                {
+                    r = Random.Range(0, inds.Count);
+                    if (Normal[inds[r]].removable)
+                    {
+                        byte UID = Normal[inds[r]].instanceUID;
+                        Normal.RemoveAt(inds[r]);
+                        DeactivateUID(UID);
+                        return true;
+                    }
+                    else
+                    {
+                        inds.RemoveAt(r);
+                    }
+                }
             }
         }
         return false;
@@ -183,13 +233,14 @@ public class ActiveEffects
 
     public int Remove(string internalName, bool special = false, bool onlyHarmful = true)
     {
-        return Remove(internalName, RemovalTarget.First, false, true);
+        return Remove(internalName, RemovalTarget.First, special, onlyHarmful);
     }
     
     public int Remove(string internalName, RemovalTarget target = RemovalTarget.First, bool special = false, bool onlyHarmful = true)
     {
         int removed, i;
-        if (special)
+        bool validForRemoval;
+        if (internalName == "ANY")
         {
             switch (target)
             {
@@ -197,7 +248,17 @@ public class ActiveEffects
                 case RemovalTarget.First:
                     for (i = 0; i < Special.Count; i++)
                     {
-                        if (internalName == Special[i].internalName)
+                        validForRemoval = !onlyHarmful || (onlyHarmful && Special[i].harmful);
+                        if (Special[i].removable && validForRemoval)
+                        {
+                            Remove(i, true);
+                            return 1;
+                        }
+                    }
+                    for (i = 0; i < Normal.Count; i++)
+                    {
+                        validForRemoval = !onlyHarmful || (onlyHarmful && Special[i].harmful);
+                        if (Normal[i].removable && validForRemoval)
                         {
                             Remove(i, true);
                             return 1;
@@ -208,7 +269,17 @@ public class ActiveEffects
                 case RemovalTarget.Last:
                     for (i = Special.Count - 1; i >= 0; i--)
                     {
-                        if (internalName == Special[i].internalName)
+                        validForRemoval = !onlyHarmful || (onlyHarmful && Special[i].harmful);
+                        if (Special[i].removable && validForRemoval)
+                        {
+                            Remove(i, true);
+                            return 1;
+                        }
+                    }
+                    for (i = Normal.Count - 1; i >= 0; i--)
+                    {
+                        validForRemoval = !onlyHarmful || (onlyHarmful && Special[i].harmful);
+                        if (Normal[i].removable && validForRemoval)
                         {
                             Remove(i, true);
                             return 1;
@@ -220,7 +291,17 @@ public class ActiveEffects
                     removed = 0;
                     for (i = Special.Count - 1; i >= 0; i--)
                     {
-                        if (internalName == Special[i].internalName)
+                        validForRemoval = !onlyHarmful || (onlyHarmful && Special[i].harmful);
+                        if (Special[i].removable && validForRemoval)
+                        {
+                            Remove(i, true);
+                            removed++;
+                        }
+                    }
+                    for (i = Normal.Count - 1; i >= 0; i--)
+                    {
+                        validForRemoval = !onlyHarmful || (onlyHarmful && Special[i].harmful);
+                        if (Normal[i].removable && validForRemoval)
                         {
                             Remove(i, true);
                             removed++;
@@ -231,42 +312,197 @@ public class ActiveEffects
         }
         else
         {
-            switch (target)
+            if (special)
             {
-                default:
-                case RemovalTarget.First:
-                    for (i = 0; i < Normal.Count; i++)
-                    {
-                        if (internalName == Normal[i].internalName)
+                switch (target)
+                {
+                    default:
+                    case RemovalTarget.First:
+                        for (i = 0; i < Special.Count; i++)
                         {
-                            Remove(i, true);
-                            return 1;
+                            if (internalName == Special[i].internalName)
+                            {
+                                Remove(i, true);
+                                return 1;
+                            }
                         }
-                    }
-                    return 0;
+                        return 0;
 
-                case RemovalTarget.Last:
-                    for (i = Normal.Count - 1; i >= 0; i--)
-                    {
-                        if (internalName == Normal[i].internalName)
+                    case RemovalTarget.Last:
+                        for (i = Special.Count - 1; i >= 0; i--)
                         {
-                            Remove(i, true);
-                            return 1;
+                            if (internalName == Special[i].internalName)
+                            {
+                                Remove(i, true);
+                                return 1;
+                            }
                         }
-                    }
-                    return 0;
+                        return 0;
 
-                case RemovalTarget.All:
-                    removed = 0;
-                    for (i = Normal.Count - 1; i >= 0; i--)
-                    {
-                        if (internalName == Normal[i].internalName)
+                    case RemovalTarget.All:
+                        removed = 0;
+                        for (i = Special.Count - 1; i >= 0; i--)
                         {
-                            Remove(i, true);
-                            removed++;
+                            if (internalName == Special[i].internalName)
+                            {
+                                Remove(i, true);
+                                removed++;
+                            }
                         }
-                    }
-                    return removed;
+                        return removed;
+                }
+            }
+            else
+            {
+                switch (target)
+                {
+                    default:
+                    case RemovalTarget.First:
+                        for (i = 0; i < Normal.Count; i++)
+                        {
+                            if (internalName == Normal[i].internalName)
+                            {
+                                Remove(i, true);
+                                return 1;
+                            }
+                        }
+                        return 0;
+
+                    case RemovalTarget.Last:
+                        for (i = Normal.Count - 1; i >= 0; i--)
+                        {
+                            if (internalName == Normal[i].internalName)
+                            {
+                                Remove(i, true);
+                                return 1;
+                            }
+                        }
+                        return 0;
+
+                    case RemovalTarget.All:
+                        removed = 0;
+                        for (i = Normal.Count - 1; i >= 0; i--)
+                        {
+                            if (internalName == Normal[i].internalName)
+                            {
+                                Remove(i, true);
+                                removed++;
+                            }
+                        }
+                        return removed;
+                }
+            }
+        }
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public int Stacks(string internalName, bool special = false, bool highestInstance = true)
+    {
+        int val = highestInstance ? int.MinValue : int.MaxValue;
+        if (special)
+        {
+            if (highestInstance)
+            {
+                foreach (StatusEffect effect in Special)
+                {
+                    if (internalName == effect.internalName && effect.stacks > val)
+                        val = effect.stacks;
+                }
+                if (val == int.MinValue)
+                    return -1;
+                return val;
+            }
+            else
+            {
+                foreach (StatusEffect effect in Special)
+                {
+                    if (internalName == effect.internalName && effect.stacks < val)
+                        val = effect.stacks;
+                }
+                if (val == int.MaxValue)
+                    return -1;
+                return val;
+            }
+        }
+        else
+        {
+            if (highestInstance)
+            {
+                foreach (StatusEffect effect in Normal)
+                {
+                    if (internalName == effect.internalName && effect.stacks > val)
+                        val = effect.stacks;
+                }
+                if (val == int.MinValue)
+                    return -1;
+                return val;
+            }
+            else
+            {
+                foreach (StatusEffect effect in Normal)
+                {
+                    if (internalName == effect.internalName && effect.stacks < val)
+                        val = effect.stacks;
+                }
+                if (val == int.MaxValue)
+                    return -1;
+                return val;
+            }
+        }
+    }
+
+    public int Lifetime(string internalName, bool special = false, bool highestInstance = true)
+    {
+        int val = highestInstance ? int.MinValue : int.MaxValue;
+        if (special)
+        {
+            if (highestInstance)
+            {
+                foreach (StatusEffect effect in Special)
+                {
+                    if (internalName == effect.internalName && effect.lifetime > val)
+                        val = effect.lifetime;
+                }
+                if (val == int.MinValue)
+                    return -1;
+                return val;
+            }
+            else
+            {
+                foreach (StatusEffect effect in Special)
+                {
+                    if (internalName == effect.internalName && effect.lifetime < val)
+                        val = effect.lifetime;
+                }
+                if (val == int.MaxValue)
+                    return -1;
+                return val;
+            }
+        }
+        else
+        {
+            if (highestInstance)
+            {
+                foreach (StatusEffect effect in Normal)
+                {
+                    if (internalName == effect.internalName && effect.lifetime > val)
+                        val = effect.lifetime;
+                }
+                if (val == int.MinValue)
+                    return -1;
+                return val;
+            }
+            else
+            {
+                foreach (StatusEffect effect in Normal)
+                {
+                    if (internalName == effect.internalName && effect.lifetime < val)
+                        val = effect.lifetime;
+                }
+                if (val == int.MaxValue)
+                    return -1;
+                return val;
             }
         }
     }
@@ -274,16 +510,29 @@ public class ActiveEffects
 
 public class StatusEffect
 {
-    public class SE_DamageOverTime
+    public class SE_HealthOverTime
     {
         public DamageType type;
         public int value;
+        public bool damage;
+
+        public void Trigger()
+        {
+
+        }
+    }
+    public static SE_HealthOverTime DamageOverTime(DamageType damageType, int value)
+    {
+        return new SE_HealthOverTime() { type = damageType, value = value, damage = true };
+    }
+    public static SE_HealthOverTime HealingOverTime(int value)
+    {
+        return new SE_HealthOverTime() { type = DamageType.None, value = value, damage = false };
     }
 
-    public enum TargetAttribute { Health, Attack, Defence, Speed }
     public class SE_AttributeModifier
     {
-        public TargetAttribute attribute;
+        public CombatantAttribute attribute;
         public bool additive;
         private int valAdd;
         private float valMlt;
@@ -319,43 +568,155 @@ public class StatusEffect
     public bool removable = true;
     public bool harmful;
 
+    public int stacks = 1;
     public int lifetime = 1;
     public bool tickOnTurnStart = true;
+    public bool noLifetime = false;
 
-    public SE_DamageOverTime damageOverTime = null;
+    private SE_HealthOverTime _healthOverTime = null;
+    public SE_HealthOverTime healthOverTime
+    {
+        get
+        {
+            return _healthOverTime;
+        }
+        set
+        {
+            _healthOverTime = value;
+            if (tickOnTurnStart)
+            {
+                if (onTurnStart.Contains("HealthOverTime"))
+                    onTurnStart[onTurnStart.IndexOf("HealthOverTime")].Set(_healthOverTime.Trigger);
+                else
+                    onTurnStart.Add(new NamedCallback("HealthOverTime", _healthOverTime.Trigger));
+            }
+            else
+            {
+                if (onTurnEnd.Contains("HealthOverTime"))
+                    onTurnEnd[onTurnEnd.IndexOf("HealthOverTime")].Set(_healthOverTime.Trigger);
+                else
+                    onTurnEnd.Add(new NamedCallback("HealthOverTime", _healthOverTime.Trigger));
+            }
+        }
+    }
     public SE_AttributeModifier attributeModifier = null;
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public virtual void OnTurnStart()
+    public List<NamedCallback> onTurnStart = new List<NamedCallback>();
+    public List<NamedCallback> onTurnEnd = new List<NamedCallback>();
+    public List<NamedCallback> onApply = new List<NamedCallback>();
+    public List<NamedCallback> onExpire = new List<NamedCallback>();
+    public List<NamedCallback> onDispel = new List<NamedCallback>();
+
+    public void LifetimeTick()
     {
+        lifetime -= 1;
+        if (lifetime <= 0)
+            onExpire.Invoke();
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    public StatusEffect()
+    {
+
+    }
+
+    public StatusEffect(bool tickOnTurnStart)
+    {
+        this.tickOnTurnStart = tickOnTurnStart;
+        NamedCallback lifetime = new NamedCallback("Lifetime", LifetimeTick);
         if (tickOnTurnStart)
-            lifetime -= 1;
-        if (lifetime <= 0)
-            OnExpire();
-    }
-
-    public virtual void OnTurnEnd()
-    {
-        if (!tickOnTurnStart)
-            lifetime -= 1;
-        if (lifetime <= 0)
-            OnExpire();
-    }
-
-    public virtual void OnApply()
-    {
-
-    }
-
-    public virtual void OnExpire()
-    {
-        container.Remove(instanceUID, special);
+            onTurnStart.Add(lifetime);
+        else
+            onTurnEnd.Add(lifetime);
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    public readonly static string dftFire = "defaultEffect_Fre";
+    public readonly static string dftIce = "defaultEffect_Ice";
+    public readonly static string dftEarth = "defaultEffect_Ert";
+    public readonly static string dftLightning = "defaultEffect_Ltn";
+    public readonly static string dftPhysical = "defaultEffect_Phy";
+    public readonly static string dftPsychic = "defaultEffect_Psy";
+    public readonly static string dftLight = "defaultEffect_Lht";
+    public readonly static string dftDark = "defaultEffect_Drk";
 
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public static StatusEffect Fire()
+    {
+        StatusEffect effect = new StatusEffect()
+        {
+
+        };
+        return effect;
+    }
+
+    public static StatusEffect Ice()
+    {
+        StatusEffect effect = new StatusEffect()
+        {
+
+        };
+        return effect;
+    }
+
+    public static StatusEffect Earth()
+    {
+        StatusEffect effect = new StatusEffect()
+        {
+
+        };
+        return effect;
+    }
+
+    public static StatusEffect Lightning()
+    {
+        StatusEffect effect = new StatusEffect()
+        {
+
+        };
+        return effect;
+    }
+
+    public static StatusEffect Physical()
+    {
+        StatusEffect effect = new StatusEffect()
+        {
+
+        };
+        return effect;
+    }
+
+    public static StatusEffect Psychic()
+    {
+        StatusEffect effect = new StatusEffect()
+        {
+
+        };
+        return effect;
+    }
+
+    public static StatusEffect Light()
+    {
+        StatusEffect effect = new StatusEffect()
+        {
+
+        };
+        return effect;
+    }
+
+    public static StatusEffect Dark()
+    {
+        StatusEffect effect = new StatusEffect()
+        {
+
+        };
+        return effect;
+    }
 }
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */

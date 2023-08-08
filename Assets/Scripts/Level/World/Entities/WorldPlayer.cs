@@ -176,9 +176,9 @@ public class WorldPlayer : WorldEntityCore
         data[1].modelHexUID = "8663CC29";
         data[2].modelHexUID = "8663CC29";
         
-        data[0].isFriendly = true;
-        data[1].isFriendly = true;
-        data[2].isFriendly = true;
+        data[0].friendly = true;
+        data[1].friendly = true;
+        data[2].friendly = true;
         data[0].playerControlled = true;
         data[1].playerControlled = true;
         data[2].playerControlled = true;

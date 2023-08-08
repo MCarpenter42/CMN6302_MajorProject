@@ -355,13 +355,13 @@ public class CombatManager : Core
         turnOfInd = cInd;
         combatTime = combatants[cInd].nextActionTime;
         turnIndicator.transform.position = combatants[cInd].pos;
-        if (combatants[cInd].playerControlled)
+        if (combatants[cInd].brain.autonomous)
         {
-            // ENABLE PLAYER CONTROL
+            
         }
         else
         {
-            // PASS THROUGH TO AI
+            
         }
         return cInd;
     }

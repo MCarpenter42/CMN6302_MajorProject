@@ -29,15 +29,13 @@ using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
 
-public class DamageType
+public struct DamageType
 {
-    public readonly uint ID = 0;
-    public string displayName = "UNASSIGNED";
-    public string iconPath = null;
+    public readonly uint ID;
+    public string displayName;
+    public string iconPath;
 
-    public StatusEffect defaultEffect;
-
-    protected DamageType(uint ID, string displayName, string iconPath)
+    private DamageType(uint ID, string displayName, string iconPath)
     {
         this.ID = ID;
         this.displayName = displayName;
@@ -53,13 +51,33 @@ public class DamageType
     
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    enum Type { None, Fire, Ice, Earth, Lightning, Physical, Psychic, Light, Dark }
-    public static DamageType Fire = new DamageType(1, "Fire", null);
-    public static DamageType Ice = new DamageType(2, "Ice", null);
-    public static DamageType Earth = new DamageType(3, "Earth", null);
-    public static DamageType Lightning = new DamageType(4, "Lightning", null);
-    public static DamageType Physical = new DamageType(5, "Physical", null);
-    public static DamageType Psychic = new DamageType(6, "Psychic", null);
-    public static DamageType Light = new DamageType(7, "Light", null);
-    public static DamageType Dark = new DamageType(8, "Dark", null);
+    public enum Type { None, Fire, Ice, Earth, Lightning, Physical, Psychic, Light, Dark }
+
+    public static DamageType[] Defaults = new DamageType[]
+    {
+        /*00*/ new DamageType(0, "None", null),
+        /*01*/ new DamageType(1, "Fire", null),
+        /*02*/ new DamageType(2, "Ice", null),
+        /*03*/ new DamageType(3, "Earth", null),
+        /*04*/ new DamageType(4, "Lightning", null),
+        /*05*/ new DamageType(5, "Physical", null),
+        /*06*/ new DamageType(6, "Psychic", null),
+        /*07*/ new DamageType(7, "Light", null),
+        /*08*/ new DamageType(8, "Dark", null),
+    };
+
+    public static DamageType Get(Type type)
+    {
+        return Defaults.InBounds((int)type) ? Defaults[(int)type] : Defaults[0];
+    }
+
+    public static DamageType None { get { return Defaults[0]; } }
+    public static DamageType Fire { get { return Defaults[1]; } }
+    public static DamageType Ice { get { return Defaults[2]; } }
+    public static DamageType Earth { get { return Defaults[3]; } }
+    public static DamageType Lightning { get { return Defaults[4]; } }
+    public static DamageType Physical { get { return Defaults[5]; } }
+    public static DamageType Psychic { get { return Defaults[6]; } }
+    public static DamageType Light { get { return Defaults[7]; } }
+    public static DamageType Dark { get { return Defaults[8]; } }
 }

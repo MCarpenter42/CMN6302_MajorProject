@@ -226,7 +226,7 @@ public class ElementData
 public class CombatantData : ElementData
 {
     public string modelHexUID;
-    public bool isFriendly;
+    public bool friendly;
     public bool playerControlled;
 
     public int baseHealth = 50;
@@ -239,9 +239,8 @@ public class CombatantData : ElementData
     public int defenceScaling;
 
     public SpeedAtLevel[] speeds = new SpeedAtLevel[0];
-    // Behaviour
-    // Damage reduction
-    // Speed
+
+    public CombatAction[] actions = new CombatAction[0];
 
     public CombatantData(string displayName)
     {

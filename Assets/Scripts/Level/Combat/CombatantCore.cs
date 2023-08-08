@@ -30,10 +30,12 @@ using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
 using System.Runtime.CompilerServices;
 using UnityEngine.UIElements;
+using System.Threading;
 
 // BASIC THREAT AND TAUNT SYSTEMS NEEDED
 // MEMORY (ATTACKED BY + ETC) NEEDED
 
+public enum CombatantAttribute { Health, Attack, Defence, Speed, InflictChance, InflictResist }
 public class CombatantCore : Core
 {
     #region [ OBJECTS / COMPONENTS ]
@@ -47,21 +49,25 @@ public class CombatantCore : Core
 
     public Vector3 pos { get { return gameObject.transform.position; } set { gameObject.transform.position = value; } }
     public Vector3 rot { get { return gameObject.transform.eulerAngles; } set { gameObject.transform.eulerAngles = value; } }
-
-    public bool gotData;
-    public bool isFriendly;
-    public bool playerControlled = false;
-    public int index = -1;
-
     public int size { get { return modelObj == null ? 0 : modelObj.size; } }
 
-    public string displayName;
+    public bool gotData;
+    public int index = -1;
 
+    public string displayName;
     public ushort level;
+
     public CombatValue health = null;
     public CombatValue attack = null;
     public CombatValue defence = null;
     public CombatSpeed speed = null;
+
+    public float inflictChance = 0.0f;
+    public float inflictResist = 0.0f;
+
+    // ADD DATA STORAGE FOR DAMAGE MODIFIERS
+
+    public CombatantBrain brain;
 
     public CombatEquipment equipment;
 
@@ -84,9 +90,8 @@ public class CombatantCore : Core
     }
 
     public int threat = 100;
-    public int tauntedBy = -1;
 
-    public ActiveEffects statusEffects = new ActiveEffects();
+    public ActiveEffects statusEffects;
 
     #endregion
 
@@ -102,7 +107,7 @@ public class CombatantCore : Core
 
     void Awake()
     {
-
+        statusEffects = new ActiveEffects(this);
     }
 
     void Start()
@@ -140,25 +145,71 @@ public class CombatantCore : Core
 
             displayName = data.displayName;
 
-            isFriendly = baseData.isFriendly;
-            playerControlled = baseData.playerControlled;
-
             health = new CombatValue(this, baseData.baseHealth, baseData.healthScaling);
             attack = new CombatValue(this, baseData.baseAttack, baseData.attackScaling);
             defence = new CombatValue(this, baseData.baseDefence, baseData.defenceScaling);
             speed = new CombatSpeed(this, baseData.speeds);
+
+            brain = new CombatantBrain(!data.playerControlled, data.friendly);
         }
+    }
+}
+
+public struct CombatantReturnData
+{
+    public bool isNull;
+    public bool isFriendly;
+    public int index;
+    public int intValue;
+    public float floatValue;
+
+    public CombatantReturnData(bool isFriendly, int index, int intValue = int.MinValue)
+    {
+        isNull = intValue == int.MinValue;
+        this.isFriendly = isFriendly;
+        this.index = index;
+        this.intValue = intValue;
+        this.floatValue = float.MinValue;
+    }
+
+    public CombatantReturnData(bool isFriendly, int index, float floatValue = float.MinValue)
+    {
+        isNull = floatValue == float.MinValue;
+        this.isFriendly = isFriendly;
+        this.index = index;
+        this.intValue = int.MinValue;
+        this.floatValue = floatValue;
     }
 }
 
 public static class CombatantUtility
 {
-    public static List<KeyValuePair<int, int>> SortedByThreat(this List<CombatantCore> combatants, bool descending = true, int includeThreshold = int.MinValue)
+    public static int TotalIntValue(this List<CombatantReturnData> list)
     {
-        List<KeyValuePair<int, int>> lOut = new List<KeyValuePair<int, int>>();
+        int result = 0;
+        foreach (CombatantReturnData data in list)
+        {
+            result += data.intValue;
+        }
+        return result;
+    }
+    
+    public static float TotalFloatValue(this List<CombatantReturnData> list)
+    {
+        float result = 0;
+        foreach (CombatantReturnData data in list)
+        {
+            result += data.floatValue;
+        }
+        return result;
+    }
+
+    public static List<CombatantReturnData> SortedByThreat(this List<CombatantCore> combatants, bool ascending = false, int includeThreshold = int.MinValue)
+    {
+        List<CombatantReturnData> lOut = new List<CombatantReturnData>();
         int i, j, threat;
-        lOut.Add(new KeyValuePair<int, int>(0, combatants[0] == null ? 0 : combatants[0].threat));
-        if (descending)
+        lOut.Add(new CombatantReturnData(combatants[0].brain.friendly, combatants[0].index, combatants[0] == null ? 0 : combatants[0].threat));
+        if (!ascending)
         {
             for (i = 1; i < combatants.Count; i++)
             {
@@ -168,10 +219,10 @@ public static class CombatantUtility
                     for (j = 0; j <= lOut.Count; j++)
                     {
                         if (j == lOut.Count)
-                            lOut.Add(new KeyValuePair<int, int>(i, threat));
-                        else if (threat >= lOut[j].Value)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, threat));
+                        else if (threat >= lOut[j].intValue)
                         {
-                            lOut.Insert(j, new KeyValuePair<int, int>(i, threat));
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, threat));
                             break;
                         }
                     }
@@ -190,10 +241,10 @@ public static class CombatantUtility
                     for (j = 0; j <= lOut.Count; j++)
                     {
                         if (j == lOut.Count)
-                            lOut.Add(new KeyValuePair<int, int>());
-                        else if (threat <= lOut[j].Value)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, combatants[i].threat));
+                        else if (threat <= lOut[j].intValue)
                         {
-                            lOut.Insert(j, new KeyValuePair<int, int>(i, threat));
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, combatants[i].threat));
                             break;
                         }
                     }
@@ -203,12 +254,12 @@ public static class CombatantUtility
         return lOut;
     }
     
-    public static List<KeyValuePair<int, int>> SortedByCurrentHealth(this List<CombatantCore> combatants, bool descending = true, int includeThreshold = int.MinValue)
+    public static List<CombatantReturnData> SortedByCurrentHealth(this List<CombatantCore> combatants, bool ascending = false, int includeThreshold = int.MinValue)
     {
-        List<KeyValuePair<int, int>> lOut = new List<KeyValuePair<int, int>>();
+        List<CombatantReturnData> lOut = new List<CombatantReturnData>();
         int i, j, health;
-        lOut.Add(new KeyValuePair<int, int>(0, combatants[0] == null ? 0 : combatants[0].health.Current));
-        if (descending)
+        lOut.Add(new CombatantReturnData(combatants[0].brain.friendly, combatants[0].index, combatants[0] == null ? 0 : combatants[0].health.Current));
+        if (!ascending)
         {
             for (i = 1; i < combatants.Count; i++)
             {
@@ -218,10 +269,10 @@ public static class CombatantUtility
                     for (j = 0; j <= lOut.Count; j++)
                     {
                         if (j == lOut.Count)
-                            lOut.Add(new KeyValuePair<int, int>(i, health));
-                        else if (health >= lOut[j].Value)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
+                        else if (health >= lOut[j].intValue)
                         {
-                            lOut.Insert(j, new KeyValuePair<int, int>(i, health));
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                             break;
                         }
                     }
@@ -240,10 +291,10 @@ public static class CombatantUtility
                     for (j = 0; j <= lOut.Count; j++)
                     {
                         if (j == lOut.Count)
-                            lOut.Add(new KeyValuePair<int, int>());
-                        else if (health <= lOut[j].Value)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
+                        else if (health <= lOut[j].intValue)
                         {
-                            lOut.Insert(j, new KeyValuePair<int, int>(i, health));
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                             break;
                         }
                     }
@@ -253,16 +304,16 @@ public static class CombatantUtility
         return lOut;
     }
     
-    public static List<KeyValuePair<int, float>> SortedByPercentHealth(this List<CombatantCore> combatants, bool descending = true, float includeThreshold = float.MinValue)
+    public static List<CombatantReturnData> SortedByPercentHealth(this List<CombatantCore> combatants, bool ascending = false, float includeThreshold = float.MinValue)
     {
-        List<KeyValuePair<int, float>> lOut = new List<KeyValuePair<int, float>>();
+        List<CombatantReturnData> lOut = new List<CombatantReturnData>();
         int i, j;
         float health;
-        if (includeThreshold == float.MinValue && !descending)
+        if (includeThreshold == float.MinValue && !ascending)
             includeThreshold = float.MaxValue;
         includeThreshold = Mathf.Clamp(includeThreshold, 0.0f, 100.0f);
-        lOut.Add(new KeyValuePair<int, float>(0, combatants[0] == null ? 0 : (float)combatants[0].health.Current / combatants[0].health.ScaledAsFloat));
-        if (descending)
+        lOut.Add(new CombatantReturnData(combatants[0].brain.friendly, combatants[0].index, combatants[0] == null ? 0 : (float)combatants[0].health.Current / combatants[0].health.ScaledAsFloat));
+        if (!ascending)
         {
             for (i = 1; i < combatants.Count; i++)
             {
@@ -272,10 +323,10 @@ public static class CombatantUtility
                     for (j = 0; j <= lOut.Count; j++)
                     {
                         if (j == lOut.Count)
-                            lOut.Add(new KeyValuePair<int, float>(i, health));
-                        else if (health >= lOut[j].Value)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
+                        else if (health >= lOut[j].floatValue)
                         {
-                            lOut.Insert(j, new KeyValuePair<int, float>(i, health));
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                             break;
                         }
                     }
@@ -292,10 +343,10 @@ public static class CombatantUtility
                     for (j = 0; j <= lOut.Count; j++)
                     {
                         if (j == lOut.Count)
-                            lOut.Add(new KeyValuePair<int, float>(i, health));
-                        else if (health <= lOut[j].Value)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
+                        else if (health <= lOut[j].floatValue)
                         {
-                            lOut.Insert(j, new KeyValuePair<int, float>(i, health));
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                             break;
                         }
                     }
@@ -305,12 +356,12 @@ public static class CombatantUtility
         return lOut;
     }
 
-    public static List<KeyValuePair<int, int>> SortedByMaxHealth(this List<CombatantCore> combatants, bool descending = true, int includeThreshold = int.MinValue)
+    public static List<CombatantReturnData> SortedByMaxHealth(this List<CombatantCore> combatants, bool ascending = false, int includeThreshold = int.MinValue)
     {
-        List<KeyValuePair<int, int>> lOut = new List<KeyValuePair<int, int>>();
+        List<CombatantReturnData> lOut = new List<CombatantReturnData>();
         int i, j, health;
-        lOut.Add(new KeyValuePair<int, int>(0, combatants[0] == null ? 0 : combatants[0].health.Scaled));
-        if (descending)
+        lOut.Add(new CombatantReturnData(combatants[0].brain.friendly, combatants[0].index, combatants[0] == null ? 0 : combatants[0].health.Scaled));
+        if (!ascending)
         {
             for (i = 1; i < combatants.Count; i++)
             {
@@ -320,10 +371,10 @@ public static class CombatantUtility
                     for (j = 0; j <= lOut.Count; j++)
                     {
                         if (j == lOut.Count)
-                            lOut.Add(new KeyValuePair<int, int>(i, health));
-                        else if (health >= lOut[j].Value)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
+                        else if (health >= lOut[j].intValue)
                         {
-                            lOut.Insert(j, new KeyValuePair<int, int>(i, health));
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                             break;
                         }
                     }
@@ -342,10 +393,10 @@ public static class CombatantUtility
                     for (j = 0; j <= lOut.Count; j++)
                     {
                         if (j == lOut.Count)
-                            lOut.Add(new KeyValuePair<int, int>());
-                        else if (health <= lOut[j].Value)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
+                        else if (health <= lOut[j].intValue)
                         {
-                            lOut.Insert(j, new KeyValuePair<int, int>(i, health));
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                             break;
                         }
                     }
@@ -355,25 +406,34 @@ public static class CombatantUtility
         return lOut;
     }
 
-    public static List<KeyValuePair<int, int>> SortedByStacks(this List<CombatantCore> combatants, string effectName, bool descending = true, int includeThreshold = int.MinValue)
+    public static List<CombatantReturnData> SortedByStatusStacks(this List<CombatantCore> combatants, string effectName, bool ascending = false, int includeThreshold = int.MinValue)
     {
-        List<KeyValuePair<int, int>> lOut = new List<KeyValuePair<int, int>>();
-        int i, j, stacks;
-        lOut.Add(new KeyValuePair<int, int>(0, combatants[0] == null ? 0 : combatants[0].threat));
-        if (descending)
+        return combatants.SortedByStatusStacks(effectName, false, ascending, includeThreshold);
+    }
+
+    public static List<CombatantReturnData> SortedByStatusStacks(this List<CombatantCore> combatants, string effectName, bool special, bool ascending = false, int includeThreshold = int.MinValue)
+    {
+        List<CombatantReturnData> lOut = new List<CombatantReturnData>();
+        int[] stacks = new int[combatants.Count];
+        int i, j;
+        for (i = 0; i < stacks.Length; i++)
+        {
+            stacks[i] = combatants[i] == null ? 0 : combatants[i].statusEffects.Stacks(effectName, special, !ascending);
+        }
+        lOut.Add(new CombatantReturnData(combatants[0].brain.friendly, combatants[0].index, combatants[0] == null ? 0 : stacks[0]));
+        if (!ascending)
         {
             for (i = 1; i < combatants.Count; i++)
             {
-                threat = combatants[i] == null ? 0 : combatants[i].threat;
-                if (threat >= includeThreshold)
+                if (stacks[i] >= includeThreshold && stacks[i] >= 0)
                 {
                     for (j = 0; j <= lOut.Count; j++)
                     {
                         if (j == lOut.Count)
-                            lOut.Add(new KeyValuePair<int, int>(i, threat));
-                        else if (threat >= lOut[j].Value)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, stacks[i]));
+                        else if (stacks[i] >= lOut[j].intValue)
                         {
-                            lOut.Insert(j, new KeyValuePair<int, int>(i, threat));
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, stacks[i]));
                             break;
                         }
                     }
@@ -386,16 +446,15 @@ public static class CombatantUtility
                 includeThreshold = int.MaxValue;
             for (i = 1; i < combatants.Count; i++)
             {
-                threat = combatants[1] == null ? 0 : combatants[1].threat;
-                if (threat <= includeThreshold)
+                if (stacks[i] <= includeThreshold && stacks[i] >= 0)
                 {
                     for (j = 0; j <= lOut.Count; j++)
                     {
                         if (j == lOut.Count)
-                            lOut.Add(new KeyValuePair<int, int>());
-                        else if (threat <= lOut[j].Value)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, stacks[i]));
+                        else if (stacks[i] <= lOut[j].intValue)
                         {
-                            lOut.Insert(j, new KeyValuePair<int, int>(i, threat));
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, stacks[i]));
                             break;
                         }
                     }
@@ -405,6 +464,63 @@ public static class CombatantUtility
         return lOut;
     }
 
+    public static List<CombatantReturnData> SortedByStatusLifetime(this List<CombatantCore> combatants, string effectName, bool ascending = false, int includeThreshold = int.MinValue)
+    {
+        return combatants.SortedByStatusLifetime(effectName, false, ascending, includeThreshold);
+    }
+
+    public static List<CombatantReturnData> SortedByStatusLifetime(this List<CombatantCore> combatants, string effectName, bool special, bool ascending = false, int includeThreshold = int.MinValue)
+    {
+        List<CombatantReturnData> lOut = new List<CombatantReturnData>();
+        int[] lifetime = new int[combatants.Count];
+        int i, j;
+        for (i = 0; i < lifetime.Length; i++)
+        {
+            lifetime[i] = combatants[i] == null ? 0 : combatants[i].statusEffects.Lifetime(effectName, special, !ascending);
+        }
+        lOut.Add(new CombatantReturnData(combatants[0].brain.friendly, combatants[0].index, combatants[0] == null ? 0 : lifetime[0]));
+        if (!ascending)
+        {
+            for (i = 1; i < combatants.Count; i++)
+            {
+                if (lifetime[i] >= includeThreshold && lifetime[i] >= 0)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, lifetime[i]));
+                        else if (lifetime[i] >= lOut[j].intValue)
+                        {
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, lifetime[i]));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (includeThreshold == int.MinValue)
+                includeThreshold = int.MaxValue;
+            for (i = 1; i < combatants.Count; i++)
+            {
+                if (lifetime[i] <= includeThreshold && lifetime[i] >= 0)
+                {
+                    for (j = 0; j <= lOut.Count; j++)
+                    {
+                        if (j == lOut.Count)
+                            lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, lifetime[i]));
+                        else if (lifetime[i] <= lOut[j].intValue)
+                        {
+                            lOut.Insert(j, new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, lifetime[i]));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return lOut;
+    }
 }
 
 public class CombatValue
@@ -804,10 +920,40 @@ public class CombatEquipment
 
 public class CombatantBrain
 {
-    // - Bool to enable/disable
+    public bool autonomous;
+    public bool friendly;
+    public int tauntedBy = -1;
+    public int lastAttackedBy = -1;
+    public int markedTarget = -1;
+
+    public SummonPool[] summonPools = null;
 
     // - List of possible actions
     // - Priority ranking
     // - Associated conditions
     // - Percentage chances
+
+    public CombatantBrain(bool autonomous, bool friendly)
+    {
+        this.autonomous = autonomous;
+        this.friendly = friendly;
+    }
+}
+
+[System.Serializable]
+public class SummonPool
+{
+    public SummonItem[] summons;
+}
+
+[System.Serializable]
+public class SummonItem
+{
+    public string hexUID;
+    public float priority;
+}
+
+public class CombatantTrait
+{
+
 }

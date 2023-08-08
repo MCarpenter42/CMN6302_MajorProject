@@ -1059,6 +1059,49 @@ namespace NeoCambion.Collections
         }
     }
 
+    public static class Ext_KVPCollection
+    {
+        public static Tkey[] Keys<Tkey, Tvalue>(this KeyValuePair<Tkey, Tvalue>[] array)
+        {
+            Tkey[] keys = new Tkey[array.Length];
+            for (int i = 0; i < array.Length; i++)
+            {
+                keys[i] = array[i].Key;
+            }
+            return keys;
+        }
+
+        public static List<Tkey> Keys<Tkey, Tvalue>(this List<KeyValuePair<Tkey, Tvalue>> list)
+        {
+            List<Tkey> keys = new List<Tkey>();
+            for (int i = 0; i < list.Count; i++)
+            {
+                keys.Add(list[i].Key);
+            }
+            return keys;
+        }
+
+        public static Tvalue[] Values<Tkey, Tvalue>(this KeyValuePair<Tkey, Tvalue>[] array)
+        {
+            Tvalue[] keys = new Tvalue[array.Length];
+            for (int i = 0; i < array.Length; i++)
+            {
+                keys[i] = array[i].Value;
+            }
+            return keys;
+        }
+
+        public static List<Tvalue> Values<Tkey, Tvalue>(this List<KeyValuePair<Tkey, Tvalue>> list)
+        {
+            List<Tvalue> keys = new List<Tvalue>();
+            for (int i = 0; i < list.Count; i++)
+            {
+                keys.Add(list[i].Value);
+            }
+            return keys;
+        }
+    }
+
     public static class Ext_StringCollection
     {
         public static List<bool> Contains(this List<string> strings, string value)

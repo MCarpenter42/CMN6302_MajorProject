@@ -5,6 +5,7 @@ namespace NeoCambion
     using System.Collections.Generic;
     using System.Linq;
     using System.Text;
+    using NeoCambion.Collections;
 
     #region [ ENUMERATION TYPES ]
 
@@ -49,12 +50,166 @@ namespace NeoCambion
     }
 
     public delegate void Callback();
+    public class NamedCallback
+    {
+        public string name;
+        private Callback callback;
+        public NamedCallback(string name, Callback callback)
+        {
+            this.name = name;
+            this.callback = callback;
+        }
+
+        public void Set(Callback callback) { this.callback = callback; }
+        public void Invoke()
+        {
+            Ext_Callback.InvokeIfValid(callback);
+        }
+    }
     public static class Ext_Callback
     {
         public static void InvokeIfValid(Callback callback)
         {
             if (callback != null)
                 callback.Invoke();
+        }
+
+        public static void Invoke(this Callback[] callbacks, int index = -1)
+        {
+            if (callbacks.InBounds(index))
+            {
+                InvokeIfValid(callbacks[index]);
+            }
+            else
+            {
+                foreach (Callback callback in callbacks)
+                {
+                    InvokeIfValid(callback);
+                }
+            }
+        }
+
+        public static void Invoke(this List<Callback> callbacks, int index = -1)
+        {
+            if (callbacks.InBounds(index))
+            {
+                InvokeIfValid(callbacks[index]);
+            }
+            else
+            {
+                foreach (Callback callback in callbacks)
+                {
+                    InvokeIfValid(callback);
+                }
+            }
+        }
+        
+        public static void Invoke(this NamedCallback[] callbacks, int index = -1)
+        {
+            if (callbacks.InBounds(index))
+            {
+                callbacks[index].Invoke();
+            }
+            else
+            {
+                foreach (NamedCallback callback in callbacks)
+                {
+                    callback.Invoke();
+                }
+            }
+        }
+
+        public static void Invoke(this List<NamedCallback> callbacks, int index = -1)
+        {
+            if (callbacks.InBounds(index))
+            {
+                callbacks[index].Invoke();
+            }
+            else
+            {
+                foreach (NamedCallback callback in callbacks)
+                {
+                    callback.Invoke();
+                }
+            }
+        }
+        
+        public static void Invoke(this NamedCallback[] callbacks, string callbackName)
+        {
+            if (callbackName != null)
+            {
+                foreach (NamedCallback callback in callbacks)
+                {
+                    if (callback.name == callbackName)
+                        callback.Invoke();
+                }
+            }
+            else
+            {
+                foreach (NamedCallback callback in callbacks)
+                {
+                    callback.Invoke();
+                }
+            }
+        }
+
+        public static void Invoke(this List<NamedCallback> callbacks, string callbackName)
+        {
+            if (callbackName != null)
+            {
+                foreach (NamedCallback callback in callbacks)
+                {
+                    if (callback.name == callbackName)
+                        callback.Invoke();
+                }
+            }
+            else
+            {
+                foreach (NamedCallback callback in callbacks)
+                {
+                    callback.Invoke();
+                }
+            }
+        }
+
+        public static int IndexOf(this NamedCallback[] callbacks, string callbackName)
+        {
+            for (int i = 0; i < callbacks.Length; i++)
+            {
+                if (callbackName == callbacks[i].name)
+                    return i;
+            }
+            return -1;
+        }
+
+        public static int IndexOf(this List<NamedCallback> callbacks, string callbackName)
+        {
+            for (int i = 0; i < callbacks.Count; i++)
+            {
+                if (callbackName == callbacks[i].name)
+                    return i;
+            }
+            return -1;
+        }
+
+        public static bool Contains(this NamedCallback[] callbacks, string callbackName)
+        {
+            foreach (NamedCallback callback in callbacks)
+            {
+                if (callbackName == callback.name)
+                    return true;
+            }
+            return false;
+        }
+
+        public static bool Contains(this List<NamedCallback> callbacks, string callbackName)
+        {
+            foreach (NamedCallback callback in callbacks)
+            {
+                if (callbackName == callback.name)
+                    return true;
+            }
+            return false;
         }
     }
 
