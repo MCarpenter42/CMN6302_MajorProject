@@ -555,6 +555,16 @@ public class StatusEffect
         }
     }
 
+    public class SE_DamageDealtModifier
+    {
+
+    }
+    
+    public class SE_DamageTakenModifier
+    {
+
+    }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public ActiveEffects container = null;
@@ -716,6 +726,23 @@ public class StatusEffect
 
         };
         return effect;
+    }
+}
+
+public struct StatusModifier
+{
+    public enum ModType { Weak, Resist, Immune }
+
+    public string modifierName;
+    public int typeID;
+    public ModType modType;
+    public float modifier { get { return modType == ModType.Weak ? 2.0f : (modType == ModType.Resist ? 0.5f : 0.0f); } }
+
+    public StatusModifier(string modifierName, int typeID, ModType modType)
+    {
+        this.modifierName = modifierName;
+        this.typeID = typeID;
+        this.modType = modType;
     }
 }
 

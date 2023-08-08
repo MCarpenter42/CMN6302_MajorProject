@@ -31,6 +31,7 @@ using NeoCambion.Unity.Interpolation;
 using System.Runtime.CompilerServices;
 using UnityEngine.UIElements;
 using System.Threading;
+using System;
 
 // BASIC THREAT AND TAUNT SYSTEMS NEEDED
 // MEMORY (ATTACKED BY + ETC) NEEDED
@@ -66,6 +67,9 @@ public class CombatantCore : Core
     public float inflictResist = 0.0f;
 
     // ADD DATA STORAGE FOR DAMAGE MODIFIERS
+    public List<DamageDealtModifier> damageOutMods = new List<DamageDealtModifier>();
+    public List<DamageTakenModifier> damageInMods = new List<DamageTakenModifier>();
+    public List<StatusModifier> statusModifiers = new List<StatusModifier>();
 
     public CombatantBrain brain;
 
@@ -152,6 +156,40 @@ public class CombatantCore : Core
 
             brain = new CombatantBrain(!data.playerControlled, data.friendly);
         }
+    }
+
+    public static int CalculateDamage(float baseDamage, int typeID, float defValue, DamageDealtModifier[] attackerMods, DamageTakenModifier[] defenderMods)
+    {
+        float defMult = 1 - (defValue / (100 + defValue)), dltMult = 1.0f, rcvMult = 1.0f;
+        foreach (DamageDealtModifier modifier in attackerMods)
+        {
+            if (modifier.typeID == typeID)
+                dltMult += modifier.mod;
+        }
+        foreach (DamageTakenModifier modifier in defenderMods)
+        {
+            if (modifier.typeID == typeID)
+                rcvMult *= modifier.mod;
+        }
+        float f_preDef = baseDamage * dltMult * rcvMult;
+        float f_postDef = f_preDef * defMult;
+        int preDef = Mathf.RoundToInt(f_preDef), postDef = Mathf.RoundToInt(f_postDef);
+        if (preDef - postDef < 1)
+            return preDef - 1;
+        else
+            return postDef;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public virtual void Damaged(CombatantCore origin, int finalDamage)
+    {
+
+    }
+
+    public virtual void Healed(CombatantCore origin, int finalHealing)
+    {
+
     }
 }
 

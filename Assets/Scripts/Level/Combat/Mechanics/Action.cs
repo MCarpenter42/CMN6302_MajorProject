@@ -87,6 +87,8 @@ public class CombatAction
     public CombatantAttribute refAttribute;
     public BlastAttributes blast;
 
+    public CombatAction[] subActions;
+
     public List<NamedCallback> onSuccess = new List<NamedCallback>();
     public List<NamedCallback> onFailure = new List<NamedCallback>();
 
@@ -142,7 +144,10 @@ public class CombatAction
 
     public ExecutionData Attack(CombatantCore actor)
     {
-        int[,] targets = targeting.GetTargets(actor);
+        return Attack(actor, targeting.GetTargets(actor));
+    }
+    public ExecutionData Attack(CombatantCore actor, int[,] targets)
+    {
         if (targets.GetLength(0) > 1)
         {
 
@@ -154,10 +159,13 @@ public class CombatAction
         onFailure.Invoke();
         return ExecutionData.Failed;
     }
-    
+
     public ExecutionData Heal(CombatantCore actor)
     {
-        int[,] targets = targeting.GetTargets(actor);
+        return Heal(actor, targeting.GetTargets(actor));
+    }
+    public ExecutionData Heal(CombatantCore actor, int[,] targets)
+    {
         if (targets.GetLength(0) > 1)
         {
 
@@ -172,7 +180,10 @@ public class CombatAction
 
     public ExecutionData Inflict(CombatantCore actor)
     {
-        int[,] targets = targeting.GetTargets(actor);
+        return Inflict(actor, targeting.GetTargets(actor));
+    }
+    public ExecutionData Inflict(CombatantCore actor, int[,] targets)
+    {
         if (targets.GetLength(0) > 1)
         {
 
@@ -187,7 +198,10 @@ public class CombatAction
 
     public ExecutionData Cleanse(CombatantCore actor)
     {
-        int[,] targets = targeting.GetTargets(actor);
+        return Cleanse(actor, targeting.GetTargets(actor));
+    }
+    public ExecutionData Cleanse(CombatantCore actor, int[,] targets)
+    {
         if (targets.GetLength(0) > 1)
         {
 
@@ -202,7 +216,10 @@ public class CombatAction
 
     public ExecutionData Mark(CombatantCore actor)
     {
-        int[,] targets = targeting.GetTargets(actor);
+        return Mark(actor, targeting.GetTargets(actor));
+    }
+    public ExecutionData Mark(CombatantCore actor, int[,] targets)
+    {
         if (targets.GetLength(0) > 1)
         {
 
@@ -217,7 +234,10 @@ public class CombatAction
 
     public ExecutionData Taunt(CombatantCore actor)
     {
-        int[,] targets = targeting.GetTargets(actor);
+        return Taunt(actor, targeting.GetTargets(actor));
+    }
+    public ExecutionData Taunt(CombatantCore actor, int[,] targets)
+    {
         if (targets.GetLength(0) > 1)
         {
 
@@ -232,7 +252,10 @@ public class CombatAction
 
     public ExecutionData Summon(CombatantCore actor)
     {
-        int[,] targets = targeting.GetTargets(actor);
+        return Summon(actor, targeting.GetTargets(actor));
+    }
+    public ExecutionData Summon(CombatantCore actor, int[,] targets)
+    {
         if (targets.GetLength(0) > 1)
         {
 
@@ -247,7 +270,10 @@ public class CombatAction
 
     public ExecutionData Dismiss(CombatantCore actor)
     {
-        int[,] targets = targeting.GetTargets(actor);
+        return Dismiss(actor, targeting.GetTargets(actor));
+    }
+    public ExecutionData Dismiss(CombatantCore actor, int[,] targets)
+    {
         if (targets.GetLength(0) > 1)
         {
 
@@ -262,7 +288,10 @@ public class CombatAction
 
     public ExecutionData MultiAction(CombatantCore actor)
     {
-        int[,] targets = targeting.GetTargets(actor);
+        return MultiAction(actor, targeting.GetTargets(actor));
+    }
+    public ExecutionData MultiAction(CombatantCore actor, int[,] targets)
+    {
         if (targets.GetLength(0) > 1)
         {
 

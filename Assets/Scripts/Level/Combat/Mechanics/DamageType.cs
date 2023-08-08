@@ -28,6 +28,7 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
+using System;
 
 public struct DamageType
 {
@@ -80,4 +81,42 @@ public struct DamageType
     public static DamageType Psychic { get { return Defaults[6]; } }
     public static DamageType Light { get { return Defaults[7]; } }
     public static DamageType Dark { get { return Defaults[8]; } }
+}
+
+public struct DamageDealtModifier
+{
+    public string modifierName;
+    public int typeID;
+    public float mod;
+
+    public DamageDealtModifier(string modifierName, int typeID, float mod)
+    {
+        this.modifierName = modifierName;
+        this.typeID = typeID;
+        this.mod = mod;
+    }
+
+    public DamageDealtModifier(string modifierName, int typeID, int percentMod)
+    {
+        this.modifierName = modifierName;
+        this.typeID = typeID;
+        this.mod = percentMod / 100.0f;
+    }
+}
+
+public struct DamageTakenModifier
+{
+    public enum ModType { Weak, Resist, Immune }
+
+    public string modifierName;
+    public int typeID;
+    public ModType modType;
+    public float mod { get { return modType == ModType.Weak ? 2.0f : (modType == ModType.Resist ? 0.5f : 0.0f); } }
+
+    public DamageTakenModifier(string modifierName, int typeID, ModType modType)
+    {
+        this.modifierName = modifierName;
+        this.typeID = typeID;
+        this.modType = modType;
+    }
 }
