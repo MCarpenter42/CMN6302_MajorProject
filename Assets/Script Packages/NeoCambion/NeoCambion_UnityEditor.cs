@@ -540,7 +540,7 @@ namespace NeoCambion.Unity.Editor
 
         /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-        public static GUIContent ButtonIcon(Texture tx_DarkTheme, Texture tx_LightTheme, string tooltip = null)
+        public static GUIContent IconContent(Texture tx_DarkTheme, Texture tx_LightTheme, string tooltip = null)
         {
             GUIContent content = new GUIContent()
             {
@@ -550,7 +550,7 @@ namespace NeoCambion.Unity.Editor
             return content;
         }
         
-        public static GUIContent ButtonIcon(string iconName, string tooltip = null)
+        public static GUIContent IconContentBuiltin(string iconName, string tooltip = null)
         {
             if (EditorStylesExtras.darkTheme && iconName.Substring(0, 2) != "d_")
                 iconName = "d_" + iconName;
@@ -563,14 +563,14 @@ namespace NeoCambion.Unity.Editor
         {
             GUIStyle btnStyle = GUI.skin.button;
             btnStyle.padding = new RectOffset(2, 2, 2, 2);
-            return GUI.Button(position, ButtonIcon(tx_DarkTheme, tx_LightTheme, tooltip), btnStyle);
+            return GUI.Button(position, IconContent(tx_DarkTheme, tx_LightTheme, tooltip), btnStyle);
         }
         
         public static bool IconButton(Rect position, string iconName, string tooltip = null)
         {
             GUIStyle btnStyle = GUI.skin.button;
             btnStyle.padding = new RectOffset(2, 2, 2, 2);
-            return GUI.Button(position, ButtonIcon(iconName, tooltip), btnStyle);
+            return GUI.Button(position, IconContentBuiltin(iconName, tooltip), btnStyle);
         }
 
         public static void UndockButton(Rect position, EditorWindow targetWindow)
@@ -582,6 +582,15 @@ namespace NeoCambion.Unity.Editor
                     targetWindow.position = targetWindow.position;
                 }
             }
+        }
+
+        public static void RequiredComponent(string reasonRequired)
+        {
+            Rect rect = EditorGUILayout.GetControlRect(false, 24);
+            rect.x += (rect.width - 24) / 2.0f;
+            rect.width = 24;
+            EditorGUI.LabelField(rect, IconContentBuiltin("AssemblyLock", "Required Component"));
+            EditorGUILayout.LabelField(reasonRequired, EditorStylesExtras.LabelStyle(TextAnchor.MiddleCenter, FontStyle.Italic));
         }
 
         /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */

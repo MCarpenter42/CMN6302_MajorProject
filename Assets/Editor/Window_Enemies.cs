@@ -543,7 +543,7 @@ public class Window_Enemies : EditorWindow
                 elementRect.height = 24;
                 GUIStyle btnStyle = GUI.skin.button;
                 btnStyle.padding = new RectOffset(2, 2, 2, 2);
-                if (GUI.Button(elementRect, EditorElements.ButtonIcon("Toolbar Plus", "Add Entry"), btnStyle))
+                if (GUI.Button(elementRect, EditorElements.IconContentBuiltin("Toolbar Plus", "Add Entry"), btnStyle))
                 {
                     speedData.Add(new SpeedAtLevel(newSpeedLevel, newSpeedValue));
                     newSpeedLevel = 1;

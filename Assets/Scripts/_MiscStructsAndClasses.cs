@@ -33,19 +33,35 @@ using NeoCambion.Unity.Interpolation;
 public struct MeshData
 {
 	public Vector3[] verts;
+    public int[] triInds;
 	public Triangle[] tris;
 
 	public MeshData(Triangle[] tris) : this()
 	{
 		this.tris = tris;
 		this.verts = VertsFromTris();
+        this.triInds = GetMeshTriInds();
 	}
 
-	public MeshData(Vector3[] verts, Triangle[] tris) : this()
+	public MeshData(Vector3[] verts, int[] triInds, bool useTris = true) : this()
+	{
+		this.verts = verts;
+        this.triInds = triInds;
+        if (useTris)
+            tris = GetTris();
+        else
+            tris = null;
+    }
+    
+	public MeshData(Vector3[] verts, Triangle[] tris, bool useTriInds = true) : this()
 	{
 		this.verts = verts;
 		this.tris = tris;
-	}
+        if (useTriInds)
+            triInds = GetMeshTriInds();
+        else
+            triInds = null;
+    }
 
 	private Vector3[] VertsFromTris()
 	{
@@ -92,6 +108,28 @@ public struct MeshData
 		}
 		return inds;
 	}
+
+    public Triangle[] GetTris()
+    {
+        int n = triInds.Length <= verts.Length * 3 ? triInds.Length - (triInds.Length % 3) : verts.Length * 3;
+        Triangle[] tris = new Triangle[n];
+        for (int i = 0; i < n; i++)
+        {
+            tris[i] = new Triangle(verts[triInds[3 * n]], verts[triInds[3 * n + 1]], verts[triInds[3 * n + 2]]);
+        }
+        return tris;
+    }
+
+    public static Triangle[] GetTris(Vector3[] verts, int[] triInds)
+    {
+        int n = triInds.Length - (triInds.Length % 3);
+        Triangle[] tris = new Triangle[n];
+        for (int i = 0; i < n; i++)
+        {
+            tris[i] = new Triangle(verts[triInds[3 * n]], verts[triInds[3 * n + 1]], verts[triInds[3 * n + 2]]);
+        }
+        return tris;
+    }
 }
 
 // GENERIC NON-ABSTRACT DEPRECATED

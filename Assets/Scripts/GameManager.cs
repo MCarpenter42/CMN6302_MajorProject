@@ -32,6 +32,7 @@ using NeoCambion.Unity.PersistentUID;
 using System.Diagnostics.SymbolStore;
 
 [RequireComponent(typeof(ControlsHandler))]
+[RequireComponent(typeof(RandTuning))]
 public class GameManager : Core
 {
     public static string prefabPath { get { return AssetDatabase.GetAssetPath(Instance.gameObject); } }

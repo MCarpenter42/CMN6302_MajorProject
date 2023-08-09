@@ -30,6 +30,8 @@ using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
 using Unity.VisualScripting;
 
+// ADD IN CHARGE ACTIONS
+
 public enum CombatActionType { Attack, Heal, Inflict, Cleanse, Taunt, Summon, Mark, Dismiss, MultiAction }
 [System.Serializable]
 public class CombatAction

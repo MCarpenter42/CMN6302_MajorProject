@@ -2,8 +2,10 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEditor;
 
 using NeoCambion;
+using NeoCambion.Unity.Editor;
 
 public class ControlsHandler : Core
 {
@@ -174,5 +176,19 @@ public class ControlsHandler : Core
 			else
 				Cursor.lockState = CursorLockMode.Locked;
 		}
+	}
+}
+
+[CustomEditor(typeof(ControlsHandler))]
+[CanEditMultipleObjects]
+public class ControlsHandlerEditor : Editor
+{
+	RandTuning targ { get { return target as RandTuning; } }
+	Rect elementRect;
+	GUIContent label = new GUIContent();
+
+	public override void OnInspectorGUI()
+	{
+		EditorElements.RequiredComponent("Necessary for user input functionality");
 	}
 }

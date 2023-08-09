@@ -1181,3 +1181,288 @@ public class InDevRoomGen : Core
             Destroy(baseObj);
     }
 }
+
+public static class RoomGenTemplatePoints
+{
+    public static float cos30 = Mathf.Cos(30.0f.ToRad());
+    public static float cos60 = Mathf.Cos(60.0f.ToRad());
+    public static float sin30 { get { return cos60; } }
+    public static float sin60 { get { return cos30; } }
+
+    /* "rm" ---> room */
+    /* "cr" ---> corridor */
+    /* "wl" ---> wall */
+    /* "inr" --> inner */
+    /* "otr" --> outer */
+    /* "rad" --> radius*/
+    /* "wdt" --> width */
+
+    public static float tileRad = 6.0f;
+    public static float tileRadC60 { get { return tileRad * cos60; } }
+    public static float tileRadS60 { get { return tileRad * sin60; } }
+    public static float wlWdt = 0.5f;
+
+    public static float rmInrRad = 5.0f;
+    public static float rmInrRadC60 { get { return tileRad * cos60; } }
+    public static float rmInrRadS60 { get { return tileRad * sin60; } }
+    public static float rmOtrRad { get { return rmInrRad + (wlWdt / Mathf.Sin(60.0f.ToRad())); } }
+    public static float rmOtrRadC60 { get { return tileRad * cos60; } }
+    public static float rmOtrRadS60 { get { return tileRad * sin60; } }
+
+    public static float crOtrWdt { get { return rmInrRadC60 - 0.2f; } }
+    public static float crInrWdt { get { return crOtrWdt - wlWdt; } }
+
+    private static Vector3 Rotate(Vector3 point, float rotRadCos, float rotRadSin)
+    {
+        float x = point.x * rotRadCos - point.z * rotRadSin;
+        float z = point.z * rotRadCos + point.x * rotRadSin;
+        return new Vector3(x, point.y, z);
+    }
+
+    private static Vector3 A1P = new Vector3(rmInrRadC60, -0.1f, rmInrRadS60);
+    private static Vector3 A1N = new Vector3(-rmInrRadC60, -0.1f, rmInrRadS60);
+    private static Vector3 A2P = new Vector3(crInrWdt, -0.1f, rmInrRadS60);
+    private static Vector3 A2N = new Vector3(-crInrWdt, -0.1f, rmInrRadS60);
+    private static Vector3 A3P = new Vector3(2 * rmOtrRadC60 - rmInrRadC60, -0.1f, rmInrRadS60);
+    private static Vector3 A3N = new Vector3(-(2 * rmOtrRadC60 - rmInrRadC60), -0.1f, rmInrRadS60);
+
+    private static Vector3 B1P = new Vector3(rmOtrRadC60, -0.1f, rmOtrRadS60);
+    private static Vector3 B1N = new Vector3(-rmOtrRadC60, -0.1f, rmOtrRadS60);
+    private static Vector3 B2P = new Vector3(rmInrRadC60 - (rmOtrRadC60 - rmInrRadC60) * 2, -0.1f, rmOtrRadS60);
+    private static Vector3 B2N = new Vector3(-(rmInrRadC60 - (rmOtrRadC60 - rmInrRadC60) * 2), -0.1f, rmOtrRadS60);
+
+    private static Vector3 AB1P = new Vector3(rmInrRadC60 + wlWdt, -0.1f, rmInrRadS60 + wlWdt * Mathf.Sin(15.0f.ToDeg()));
+    private static Vector3 AB1N = new Vector3(-(rmInrRadC60 + wlWdt), -0.1f, rmInrRadS60 + wlWdt * Mathf.Sin(15.0f.ToDeg()));
+
+    private static Vector3 C1P = new Vector3(crOtrWdt, -0.1f, tileRadS60);
+    private static Vector3 C1N = new Vector3(crOtrWdt, -0.1f, tileRadS60);
+    private static Vector3 C2P = new Vector3(crInrWdt, -0.1f, tileRadS60);
+    private static Vector3 C2N = new Vector3(crInrWdt, -0.1f, tileRadS60);
+    private static Vector3 C3P = new Vector3(rmInrRadC60, -0.1f, tileRadS60);
+    private static Vector3 C3N = new Vector3(-rmInrRadC60, -0.1f, tileRadS60);
+    private static Vector3 C4P = new Vector3(tileRadC60, -0.1f, tileRadS60);
+    private static Vector3 C4N = new Vector3(-tileRadC60, -0.1f, tileRadS60);
+
+    public static MeshData WallBasic(float height, float rotDeg)
+    {
+        float rCos = Mathf.Cos(rotDeg.ToRad());
+        float rSin = Mathf.Sin(rotDeg.ToRad());
+        Vector3 hOffset = Vector3.up * (height + 0.1f);
+        Vector3[] verts = new Vector3[8]
+        {
+            Rotate(A1N, rCos, rSin),
+            Vector3.zero,
+            Rotate(B2N, rCos, rSin),
+            Vector3.zero,
+            Rotate(A1P, rCos, rSin),
+            Vector3.zero,
+            Rotate(B2P, rCos, rSin),
+            Vector3.zero,
+        };
+        verts[1] = verts[0] + hOffset;
+        verts[3] = verts[2] + hOffset;
+        verts[5] = verts[4] + hOffset;
+        verts[7] = verts[6] + hOffset;
+        int[] tris = new int[18]
+        {
+            // 0 1 5 4
+            0, 1, 4,
+            0, 5, 4,
+            // 1 3 7 5
+            1, 3, 7,
+            1, 7, 5,
+            // 3 2 7 6
+            3, 2, 7,
+            3, 7, 6,
+        };
+        return new MeshData(verts, tris, false);
+    }
+
+    public static MeshData WallDoor(float height, float rotDeg)
+    {
+        float rCos = Mathf.Cos(rotDeg.ToRad());
+        float rSin = Mathf.Sin(rotDeg.ToRad());
+        Vector3 hOffset = Vector3.up * (height + 0.1f);
+        Vector3[] verts = new Vector3[20]
+        {
+            Rotate(A1N, rCos, rSin),
+            Vector3.zero,
+            Rotate(A2N, rCos, rSin),
+            Vector3.zero,
+            Rotate(C2N, rCos, rSin),
+            Vector3.zero,
+            Rotate(C1N, rCos, rSin),
+            Vector3.zero,
+            Rotate(B2N, rCos, rSin),
+            Vector3.zero,
+            Rotate(A1P, rCos, rSin),
+            Vector3.zero,
+            Rotate(A2P, rCos, rSin),
+            Vector3.zero,
+            Rotate(C2P, rCos, rSin),
+            Vector3.zero,
+            Rotate(C1P, rCos, rSin),
+            Vector3.zero,
+            Rotate(B2P, rCos, rSin),
+            Vector3.zero,
+        };
+        verts[1] = verts[0] + hOffset;
+        verts[3] = verts[2] + hOffset;
+        verts[5] = verts[4] + hOffset;
+        verts[7] = verts[6] + hOffset;
+        verts[9] = verts[8] + hOffset;
+        verts[11] = verts[10] + hOffset;
+        verts[13] = verts[12] + hOffset;
+        verts[15] = verts[14] + hOffset;
+        verts[17] = verts[16] + hOffset;
+        verts[19] = verts[18] + hOffset;
+        int[] tris = new int[54]
+        {
+            // 0 1 3 2
+            0, 1, 3,
+            0, 3, 2,
+            // 2 3 5 4
+            2, 3, 5,
+            2, 5, 4,
+            // 6 7 9 8
+            6, 7, 9,
+            6, 9, 8,
+            // 0 2 4 6 8
+            8, 2, 0,
+            8, 4, 2,
+            8, 6, 4,
+
+            // 10 11 13 12
+            10, 11, 13,
+            10, 13, 12,
+            // 12 13 15 14
+            12, 13, 15,
+            12, 15, 14,
+            // 16 17 19 18
+            16, 17, 19,
+            16, 19, 18,
+            // 10 12 14 16 18
+            18, 12, 10,
+            18, 14, 12,
+            18, 16, 14,
+        };
+        return new MeshData(verts, tris, false);
+    }
+
+    public static MeshData WallCornerInner(float height, float rotDeg)
+    {
+        float rCos = Mathf.Cos(rotDeg.ToRad());
+        float rSin = Mathf.Sin(rotDeg.ToRad());
+        Vector3 hOffset = Vector3.up * (height + 0.1f);
+        Vector3[] verts = new Vector3[8]
+        {
+            Rotate(A1P, rCos, rSin),
+            Vector3.zero,
+            Rotate(B2P, rCos, rSin),
+            Vector3.zero,
+            Rotate(B1P, rCos, rSin),
+            Vector3.zero,
+            Rotate(A3P, rCos, rSin),
+            Vector3.zero,
+        };
+        verts[1] = verts[0] + hOffset;
+        verts[3] = verts[2] + hOffset;
+        verts[5] = verts[4] + hOffset;
+        verts[7] = verts[6] + hOffset;
+        int[] tris = new int[18]
+        {
+            // 1 3 5 7
+            1, 3, 5,
+            1, 5, 7,
+            // 3 2 4 5
+            3, 2, 4,
+            3, 4, 5,
+            // 5 4 6 7
+            5, 4, 6,
+            5, 6, 7,
+        };
+        return new MeshData(verts, tris, false);
+    }
+    
+    public static MeshData WallCornerOuterL(float height, float rotDeg)
+    {
+        float rCos = Mathf.Cos(rotDeg.ToRad());
+        float rSin = Mathf.Sin(rotDeg.ToRad());
+        Vector3 hOffset = Vector3.up * (height + 0.1f);
+        Vector3[] verts = new Vector3[10]
+        {
+            Rotate(A3N, rCos, rSin),
+            Vector3.zero,
+            Rotate(A1N, rCos, rSin),
+            Vector3.zero,
+            Rotate(AB1N, rCos, rSin),
+            Vector3.zero,
+            Rotate(C3N, rCos, rSin),
+            Vector3.zero,
+            Rotate(C4N, rCos, rSin),
+            Vector3.zero,
+        };
+        verts[1] = verts[0] + hOffset;
+        verts[3] = verts[2] + hOffset;
+        verts[5] = verts[4] + hOffset;
+        verts[7] = verts[6] + hOffset;
+        int[] tris = new int[27]
+        {
+            // 0 1 9 8
+            0, 1, 9,
+            0, 9, 8,
+            // 3 2 4 5
+            3, 2, 4,
+            3, 4, 5,
+            // 5 4 6 7
+            5, 4, 6,
+            5, 6, 7,
+            // 5 7 9 1 3
+            5, 7, 9,
+            5, 9, 1,
+            5, 1, 3,
+        };
+        return new MeshData(verts, tris, false);
+    }
+    
+    public static MeshData WallCornerOuterR(float height, float rotDeg)
+    {
+        float rCos = Mathf.Cos(rotDeg.ToRad());
+        float rSin = Mathf.Sin(rotDeg.ToRad());
+        Vector3 hOffset = Vector3.up * (height + 0.1f);
+        Vector3[] verts = new Vector3[10]
+        {
+            Rotate(A3P, rCos, rSin),
+            Vector3.zero,
+            Rotate(A1P, rCos, rSin),
+            Vector3.zero,
+            Rotate(AB1P, rCos, rSin),
+            Vector3.zero,
+            Rotate(C3P, rCos, rSin),
+            Vector3.zero,
+            Rotate(C4P, rCos, rSin),
+            Vector3.zero,
+        };
+        verts[1] = verts[0] + hOffset;
+        verts[3] = verts[2] + hOffset;
+        verts[5] = verts[4] + hOffset;
+        verts[7] = verts[6] + hOffset;
+        int[] tris = new int[27]
+        {
+            // 0 1 9 8
+            0, 1, 9,
+            0, 9, 8,
+            // 3 2 4 5
+            3, 2, 4,
+            3, 4, 5,
+            // 5 4 6 7
+            5, 4, 6,
+            5, 6, 7,
+            // 5 7 9 1 3
+            5, 7, 9,
+            5, 9, 1,
+            5, 1, 3,
+        };
+        return new MeshData(verts, tris, false);
+    }
+}
