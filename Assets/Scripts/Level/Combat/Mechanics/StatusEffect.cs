@@ -33,6 +33,7 @@ public class ActiveEffects
 {
     private CombatantCore combatant;
 
+    [System.Serializable]
     public enum RemovalTarget { First, Last, All }
 
     private List<StatusEffect> Special = new List<StatusEffect>();
@@ -532,6 +533,7 @@ public class StatusEffect
 
     public class SE_AttributeModifier
     {
+        public string name;
         public CombatantAttribute attribute;
         public bool additive;
         private int valAdd;
@@ -554,15 +556,53 @@ public class StatusEffect
             }
         }
     }
+    private void AddAttributeMod()
+    {
+        if (attributeModifier != null)
+        {
+            switch (attributeModifier.attribute)
+            {
+                default:
+                    break;
+
+                case CombatantAttribute.Health:
+                    break;
+
+                case CombatantAttribute.Defence:
+                    break;
+
+                case CombatantAttribute.Speed:
+                    break;
+
+                case CombatantAttribute.InflictChance:
+                    break;
+
+                case CombatantAttribute.InflictResist:
+                    break;
+            }
+        }
+    }
+    private void RemoveAttributeMod()
+    {
+
+    }
 
     public class SE_DamageDealtModifier
     {
+        public string name;
+        public int typeID;
+        public float value;
 
+        public DamageDealtModifier Modifier { get { return new DamageDealtModifier(name, typeID, value); } }
     }
     
     public class SE_DamageTakenModifier
     {
+        public string name;
+        public int typeID;
+        public DamageTakenModifier.ModType value;
 
+        public DamageTakenModifier Modifier { get { return new DamageTakenModifier(name, typeID, value); } }
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -609,7 +649,52 @@ public class StatusEffect
             }
         }
     }
-    public SE_AttributeModifier attributeModifier = null;
+    private SE_AttributeModifier _attributeModifier = null;
+    public SE_AttributeModifier attributeModifier
+    {
+        get
+        {
+            return _attributeModifier;
+        }
+        set
+        {
+            _attributeModifier = value;
+            _attributeModifier.name = internalName + "_" + instanceUID;
+            if (value != null)
+            {
+                if (onApply.Contains("HealthOverTime"))
+                    onApply[onApply.IndexOf("HealthOverTime")].Set(_healthOverTime.Trigger);
+                else
+                    onTurnStart.Add(new NamedCallback("HealthOverTime", _healthOverTime.Trigger));
+            }
+        }
+    }
+    private SE_DamageDealtModifier _dmgOutModifier = null;
+    public SE_DamageDealtModifier dmgOutModifier
+    {
+        get
+        {
+            return _dmgOutModifier;
+        }
+        set
+        {
+            _dmgOutModifier = value;
+            _dmgOutModifier.name = internalName + "_" + instanceUID;
+        }
+    }
+    private SE_DamageTakenModifier _dmgInModifier = null;
+    public SE_DamageTakenModifier dmgInModifier
+    {
+        get
+        {
+            return _dmgInModifier;
+        }
+        set
+        {
+            _dmgInModifier = value;
+            _dmgInModifier.name = internalName + "_" + instanceUID;
+        }
+    }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 

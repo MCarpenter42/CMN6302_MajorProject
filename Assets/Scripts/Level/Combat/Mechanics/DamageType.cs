@@ -49,6 +49,11 @@ public struct DamageType
         this.displayName = displayName;
         this.iconPath = iconPath;
     }
+
+    public bool Matches(int ID)
+    {
+        return ID == this.ID || ID == int.MaxValue;
+    }
     
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -81,6 +86,8 @@ public struct DamageType
     public static DamageType Psychic { get { return Defaults[6]; } }
     public static DamageType Light { get { return Defaults[7]; } }
     public static DamageType Dark { get { return Defaults[8]; } }
+
+    public static DamageType Modifier_Any { get { return new DamageType(int.MaxValue, "Universal", null); } }
 }
 
 public struct DamageDealtModifier

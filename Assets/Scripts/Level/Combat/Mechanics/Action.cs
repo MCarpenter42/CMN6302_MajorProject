@@ -32,7 +32,7 @@ using Unity.VisualScripting;
 
 // ADD IN CHARGE ACTIONS
 
-public enum CombatActionType { Attack, Heal, Inflict, Cleanse, Taunt, Summon, Mark, Dismiss, MultiAction }
+public enum CombatActionType { Attack, Heal, ApplyStatus, RemoveStatus, Taunt, Summon, Mark, Dismiss, MultiAction }
 [System.Serializable]
 public class CombatAction
 {
@@ -121,11 +121,11 @@ public class CombatAction
             case CombatActionType.Heal:
                 return Heal(actor);
 
-            case CombatActionType.Inflict:
-                return Inflict(actor);
+            case CombatActionType.ApplyStatus:
+                return ApplyStatus(actor);
 
-            case CombatActionType.Cleanse:
-                return Cleanse(actor);
+            case CombatActionType.RemoveStatus:
+                return RemoveStatus(actor);
 
             case CombatActionType.Mark:
                 return Mark(actor);
@@ -180,11 +180,11 @@ public class CombatAction
         return ExecutionData.Failed;
     }
 
-    public ExecutionData Inflict(CombatantCore actor)
+    public ExecutionData ApplyStatus(CombatantCore actor)
     {
-        return Inflict(actor, targeting.GetTargets(actor));
+        return ApplyStatus(actor, targeting.GetTargets(actor));
     }
-    public ExecutionData Inflict(CombatantCore actor, int[,] targets)
+    public ExecutionData ApplyStatus(CombatantCore actor, int[,] targets)
     {
         if (targets.GetLength(0) > 1)
         {
@@ -198,11 +198,11 @@ public class CombatAction
         return ExecutionData.Failed;
     }
 
-    public ExecutionData Cleanse(CombatantCore actor)
+    public ExecutionData RemoveStatus(CombatantCore actor)
     {
-        return Cleanse(actor, targeting.GetTargets(actor));
+        return RemoveStatus(actor, targeting.GetTargets(actor));
     }
-    public ExecutionData Cleanse(CombatantCore actor, int[,] targets)
+    public ExecutionData RemoveStatus(CombatantCore actor, int[,] targets)
     {
         if (targets.GetLength(0) > 1)
         {
@@ -312,7 +312,7 @@ public class CombatAction
     //      - Actor ATK
     //      - Damage modifiers
     //      - Status effect
-    //      - Inflict chance
+    //      - ApplyStatus chance
     //  - Heal
     //      - 
     //  - Apply status effect

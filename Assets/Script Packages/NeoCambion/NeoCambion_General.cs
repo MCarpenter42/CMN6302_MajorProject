@@ -215,6 +215,13 @@ namespace NeoCambion
 
     public static class Ext_Byte
     {
+        public static bool Bit(this byte value, int index)
+        {
+            if (index < 0 || index > 7)
+                return false;
+            return (value & (1u << (7 - index))) != 0;
+        }
+
         public static int ToInt(this byte[] bytes)
         {
             return BitConverter.IsLittleEndian ? BitConverter.ToInt32(bytes, 0) : BitConverter.ToInt32(bytes.Reverse().ToArray(), 0);
@@ -497,6 +504,13 @@ namespace NeoCambion
 
     public static class Ext_Int
     {
+        public static bool Bit(this int value, int index)
+        {
+            if (index < 0 || index > 31)
+                return false;
+            return (value & (1 << (31 - index))) != 0;
+        }
+
         public static byte[] ToBytes(this int intVal)
         {
             return BitConverter.GetBytes(intVal);
@@ -518,6 +532,13 @@ namespace NeoCambion
     
     public static class Ext_Long
     {
+        public static bool Bit(this long value, int index)
+        {
+            if (index < 0 || index > 63)
+                return false;
+            return (value & (1l << (63 - index))) != 0;
+        }
+
         public static byte[] ToBytes(this long longVal)
         {
             return BitConverter.GetBytes(longVal);
@@ -784,6 +805,13 @@ namespace NeoCambion
 
     public static class Ext_Short
     {
+        public static bool Bit(this short value, int index)
+        {
+            if (index < 0 || index > 15)
+                return false;
+            return (value & (1 << (15 - index))) != 0;
+        }
+
         public static byte[] ToBytes(this short shortVal)
         {
             return BitConverter.GetBytes(shortVal);
@@ -792,6 +820,13 @@ namespace NeoCambion
 
     public static class Ext_UInt
     {
+        public static bool Bit(this uint value, int index)
+        {
+            if (index < 0 || index > 31)
+                return false;
+            return (value & (1u << (31 - index))) != 0;
+        }
+
         public static byte[] ToBytes(this uint uintVal)
         {
             return BitConverter.GetBytes(uintVal);
@@ -813,6 +848,13 @@ namespace NeoCambion
 
     public static class Ext_ULong
     {
+        public static bool Bit(this ulong value, int index)
+        {
+            if (index < 0 || index > 63)
+                return false;
+            return (value & (1ul << (63 - index))) != 0;
+        }
+
         public static byte[] ToBytes(this ulong ulongVal)
         {
             return BitConverter.GetBytes(ulongVal);
@@ -826,6 +868,13 @@ namespace NeoCambion
 
     public static class Ext_UShort
     {
+        public static bool Bit(this ushort value, int index)
+        {
+            if (index < 0 || index > 15)
+                return false;
+            return (value & (1u << (15 - index))) != 0;
+        }
+
         public static byte[] ToBytes(this ushort ushortVal)
         {
             return BitConverter.GetBytes(ushortVal);

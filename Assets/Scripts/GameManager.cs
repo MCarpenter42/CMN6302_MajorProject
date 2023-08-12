@@ -55,6 +55,18 @@ public class GameManager : Core
         }
     }
     public ElementDataStorage ElementDataStorage = new ElementDataStorage();
+    private RandTuning _RandTuning = null;
+    public RandTuning RandTuning
+    {
+        get
+        {
+            if (_RandTuning == null)
+            {
+                _RandTuning = Instance.gameObject.GetComponent<RandTuning>();
+            }
+            return _RandTuning;
+        }
+    }
 
     public UIManager UI = null;
     public LevelManager Level = null;

@@ -31,7 +31,6 @@ using NeoCambion.Unity.Interpolation;
 using System.Runtime.CompilerServices;
 using UnityEngine.UIElements;
 using System.Threading;
-using System;
 
 // BASIC THREAT AND TAUNT SYSTEMS NEEDED
 // MEMORY (ATTACKED BY + ETC) NEEDED
@@ -72,6 +71,7 @@ public class CombatantCore : Core
     public List<StatusModifier> statusModifiers = new List<StatusModifier>();
 
     public CombatantBrain brain;
+    public KeyValuePair<bool, int> teamIndex { get { return new KeyValuePair<bool, int>(brain.friendly, index); } }
 
     public CombatEquipment equipment;
 
@@ -133,7 +133,32 @@ public class CombatantCore : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public virtual void GetData(CombatantData data)
+    private int BaseStatVariance(int value, CombatantAttribute attribute)
+    {
+        float v;
+        switch (attribute)
+        {
+            default:
+                v = 0.0f;
+                break;
+
+            case CombatantAttribute.Health:
+                v = GameManager.Instance.RandTuning.value_stats_health;
+                break;
+
+            case CombatantAttribute.Defence:
+                v = GameManager.Instance.RandTuning.value_stats_defence;
+                break;
+
+            case CombatantAttribute.Speed:
+                v = GameManager.Instance.RandTuning.value_stats_speed;
+                break;
+        }
+
+        return Mathf.RoundToInt(value * (1.0f + Random.Range(-v, v)));
+    }
+
+    public void GetData(CombatantData data)
     {
         gotData = data != null;
         if (gotData)
@@ -149,45 +174,55 @@ public class CombatantCore : Core
 
             displayName = data.displayName;
 
-            health = new CombatValue(this, baseData.baseHealth, baseData.healthScaling);
+            health = new CombatValue(this, BaseStatVariance(baseData.baseHealth, CombatantAttribute.Health), baseData.healthScaling);
             attack = new CombatValue(this, baseData.baseAttack, baseData.attackScaling);
-            defence = new CombatValue(this, baseData.baseDefence, baseData.defenceScaling);
-            speed = new CombatSpeed(this, baseData.speeds);
+            defence = new CombatValue(this, BaseStatVariance(baseData.baseDefence, CombatantAttribute.Defence), baseData.defenceScaling);
+            speed = new CombatSpeed(this, baseData.speeds); speed.ApplyVariance(GameManager.Instance.RandTuning.value_stats_speed);
 
             brain = new CombatantBrain(!data.playerControlled, data.friendly);
         }
     }
 
-    public static int CalculateDamage(float baseDamage, int typeID, float defValue, DamageDealtModifier[] attackerMods, DamageTakenModifier[] defenderMods)
+    public float AttackDamage(float actionMultiplier, int typeID)
     {
-        float defMult = 1 - (defValue / (100 + defValue)), dltMult = 1.0f, rcvMult = 1.0f;
-        foreach (DamageDealtModifier modifier in attackerMods)
+        float dmgMult = 1.0f;
+        foreach (DamageDealtModifier modifier in damageOutMods)
         {
             if (modifier.typeID == typeID)
-                dltMult += modifier.mod;
+                dmgMult += modifier.mod;
         }
-        foreach (DamageTakenModifier modifier in defenderMods)
+        return attack.ScaledAsFloat * actionMultiplier * dmgMult;
+    }
+
+    public int DamageTaken(KeyValuePair<bool, int> origin, float baseDamage, int typeID, bool crit = false)
+    {
+        float dmgVar = GameManager.Instance.RandTuning.value_damage_base;
+        if (dmgVar > 0.0f)
+            baseDamage *= 1.0f + Random.Range(-dmgVar, dmgVar);
+        if (crit)
+            baseDamage *= GameManager.Instance.RandTuning.value_damage_critScale;
+
+        float defValue = defence.ScaledAsFloat, defMult = 1 - (defValue / (100 + defValue)), rcvMult = 1.0f;
+        foreach (DamageTakenModifier modifier in damageInMods)
         {
             if (modifier.typeID == typeID)
                 rcvMult *= modifier.mod;
         }
-        float f_preDef = baseDamage * dltMult * rcvMult;
+
+        float f_preDef = baseDamage * rcvMult;
         float f_postDef = f_preDef * defMult;
         int preDef = Mathf.RoundToInt(f_preDef), postDef = Mathf.RoundToInt(f_postDef);
+
+        if (origin.Key != brain.friendly)
+            brain.lastAttackedBy = origin.Value;
+
         if (preDef - postDef < 1)
             return preDef - 1;
         else
             return postDef;
     }
 
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-    public virtual void Damaged(CombatantCore origin, int finalDamage)
-    {
-
-    }
-
-    public virtual void Healed(CombatantCore origin, int finalHealing)
+    public virtual void Healed(KeyValuePair<bool, int> origin, int finalHealing)
     {
 
     }
@@ -201,6 +236,15 @@ public struct CombatantReturnData
     public int intValue;
     public float floatValue;
 
+    public CombatantReturnData(KeyValuePair<bool, int> teamAndIndex, int intValue = int.MinValue)
+    {
+        isNull = intValue == int.MinValue;
+        this.isFriendly = teamAndIndex.Key;
+        this.index = teamAndIndex.Value;
+        this.intValue = intValue;
+        this.floatValue = float.MinValue;
+    }
+    
     public CombatantReturnData(bool isFriendly, int index, int intValue = int.MinValue)
     {
         isNull = intValue == int.MinValue;
@@ -208,6 +252,15 @@ public struct CombatantReturnData
         this.index = index;
         this.intValue = intValue;
         this.floatValue = float.MinValue;
+    }
+
+    public CombatantReturnData(KeyValuePair<bool, int> teamAndIndex, float floatValue = float.MinValue)
+    {
+        isNull = floatValue == float.MinValue;
+        this.isFriendly = teamAndIndex.Key;
+        this.index = teamAndIndex.Value;
+        this.intValue = int.MinValue;
+        this.floatValue = floatValue;
     }
 
     public CombatantReturnData(bool isFriendly, int index, float floatValue = float.MinValue)
@@ -887,6 +940,17 @@ public class CombatSpeed
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    public void ApplyVariance(float variance)
+    {
+        float v = Random.Range(-variance, variance);
+        foreach (SpeedAtLevel speed in speeds)
+        {
+            speed.value = Mathf.RoundToInt(speed.value * (1.0f * v));
+            if (speed.value < 1)
+                speed.value = 1;
+        }
+    }
+
     public int GetAtLevel(ushort level)
     {
         for (int i = 0; i < speeds.Count; i++)
@@ -958,10 +1022,49 @@ public class CombatEquipment
 
 public class CombatantBrain
 {
+    private static CombatManager CombatManager
+    {
+        get
+        {
+            if (GameManager.Instance != null)
+            {
+                if (GameManager.Instance.Level != null)
+                {
+                    return GameManager.Instance.Level.Combat;
+                }
+            }
+            return null;
+        }
+    }
+
     public bool autonomous;
     public bool friendly;
     public int tauntedBy = -1;
-    public int lastAttackedBy = -1;
+    private int _lastAttackedBy = -1;
+    public int lastAttackedBy
+    {
+        get
+        {
+            if (friendly)
+            {
+                if (CombatManager.enemyTeam.InBounds(_lastAttackedBy) && CombatManager.enemyTeam[_lastAttackedBy].alive)
+                    return _lastAttackedBy;
+                else
+                    return -1;
+            }
+            else
+            {
+                if (CombatManager.playerTeam.InBounds(_lastAttackedBy) && CombatManager.playerTeam[_lastAttackedBy].alive)
+                    return _lastAttackedBy;
+                else
+                    return -1;
+            }
+        }
+        set
+        {
+            _lastAttackedBy = value;
+        }
+    }
     public int markedTarget = -1;
 
     public SummonPool[] summonPools = null;
