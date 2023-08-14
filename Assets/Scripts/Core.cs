@@ -45,7 +45,7 @@ public class Core : MonoBehaviour
 
     #region [ PROPERTIES ]
 
-
+    public const char markdownDelimiter = '%';
 
     #endregion
 

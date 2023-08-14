@@ -6,29 +6,35 @@ namespace NeoCambion
     using System.Linq;
     using System.Text;
     using NeoCambion.Collections;
+    using UnityEditor;
 
     #region [ ENUMERATION TYPES ]
 
-    public enum Axis { X, Y, Z };
-    public enum DualAxis { XY, XZ, YZ };
-    public enum CompassBearing_Simple { North, East, South, West };
+    public enum Axis { X, Y, Z }
+    public enum DualAxis { XY, XZ, YZ }
+    public enum CompassBearing_Precision0 { North, East, South, West }
     public enum CompassBearing_Precision1
     {
-        North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest
-    };
+        North, NorthEast,
+        East, SouthEast,
+        South, SouthWest,
+        West, NorthWest
+    }
     public enum CompassBearing_Precision2
     {
         North, NorthNorthEast, NorthEast, EastNorthEast,
         East, EastSouthEast, SouthEast, SouthSouthEast,
         South, SouthSouthWest, SouthWest, WestSouthWest,
         West, WestNorthWest, NorthWest, NorthNorthWest
-    };
-    public enum RotDirection { Clockwise, CounterClockwise };
+    }
+    public enum RotDirection { Clockwise, CounterClockwise }
 
-    public enum Condition_Number { Never, LessThan, LessThanOrEqualTo, EqualTo, GreaterThanOrEqualTo, GreaterThan, Always };
-    public enum Condition_String { Never, Matches, DoesNotMatch, Contains, DoesNotContain, IsSubstring, IsNotSubstring, Always };
+    public enum Condition_Number { Never, LessThan, LessThanOrEqualTo, EqualTo, GreaterThanOrEqualTo, GreaterThan, Always }
+    public enum Condition_String { Never, Matches, DoesNotMatch, Contains, DoesNotContain, IsSubstring, IsNotSubstring, Always }
 
-    public enum RectProperty { X, Y, Width, Height };
+    public enum RectProperty { X, Y, Width, Height }
+
+    public enum CaseSesitivity { None, Exact, Lower, Upper }
 
     #endregion
 
@@ -341,6 +347,18 @@ namespace NeoCambion
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
             'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
             'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+            'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+            'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+        };
+
+        public static char[] LatinBasicLowercase = new char[]
+        {
+            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+            'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
+        };
+
+        public static char[] LatinBasicUppercase = new char[]
+        {
             'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
             'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
         };
@@ -800,6 +818,55 @@ namespace NeoCambion
             {
                 return filepath;
             }
+        }
+
+        public static bool MatchesLatinBasic(this string str, CaseSesitivity caseSesitivity)
+        {
+            switch (caseSesitivity)
+            {
+                default:
+                    for (int i = 0; i < str.Length; i++)
+                    {
+                        if (!(Ext_Char.LatinBasicLowercase.Contains(str[i]) || Ext_Char.LatinBasicUppercase.Contains(str[i])))
+                            return false;
+                    }
+                    break;
+
+                case CaseSesitivity.Lower:
+                    for (int i = 0; i < str.Length; i++)
+                    {
+                        if (Ext_Char.LatinBasicLowercase.Contains(str[i]))
+                            return false;
+                    }
+                    break;
+
+                case CaseSesitivity.Upper:
+                    for (int i = 0; i < str.Length; i++)
+                    {
+                        if (Ext_Char.LatinBasicUppercase.Contains(str[i]))
+                            return false;
+                    }
+                    break;
+            }
+            return true;
+        }
+
+        public static bool LatinBasicLowercase(this string str, int charInd)
+        {
+            if (charInd > -1 && charInd < str.Length)
+            {
+                return Ext_Char.LatinBasicLowercase.Contains(str[charInd]);
+            }
+            return false;
+        }
+
+        public static bool LatinBasicUppercase(this string str, int charInd)
+        {
+            if (charInd > -1 && charInd < str.Length)
+            {
+                return Ext_Char.LatinBasicUppercase.Contains(str[charInd]);
+            }
+            return false;
         }
     }
 

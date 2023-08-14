@@ -28,6 +28,7 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
+using Unity.VisualScripting;
 
 public class ActiveEffects
 {
@@ -64,8 +65,6 @@ public class ActiveEffects
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-    public readonly static string removeAny = "ANY";
 
     private byte NewUID()
     {
@@ -241,7 +240,7 @@ public class ActiveEffects
     {
         int removed, i;
         bool validForRemoval;
-        if (internalName == "ANY")
+        if (internalName == StatusEffect.checkAny)
         {
             switch (target)
             {
@@ -303,6 +302,134 @@ public class ActiveEffects
                     {
                         validForRemoval = !onlyHarmful || (onlyHarmful && Special[i].harmful);
                         if (Normal[i].removable && validForRemoval)
+                        {
+                            Remove(i, true);
+                            removed++;
+                        }
+                    }
+                    return removed;
+            }
+        }
+        else if (internalName == StatusEffect.checkAnyNegative)
+        {
+            switch (target)
+            {
+                default:
+                case RemovalTarget.First:
+                    for (i = 0; i < Special.Count; i++)
+                    {
+                        if (Special[i].removable && Special[i].harmful)
+                        {
+                            Remove(i, true);
+                            return 1;
+                        }
+                    }
+                    for (i = 0; i < Normal.Count; i++)
+                    {
+                        if (Normal[i].removable && Normal[i].harmful)
+                        {
+                            Remove(i, true);
+                            return 1;
+                        }
+                    }
+                    return 0;
+
+                case RemovalTarget.Last:
+                    for (i = Special.Count - 1; i >= 0; i--)
+                    {
+                        if (Special[i].removable && Special[i].harmful)
+                        {
+                            Remove(i, true);
+                            return 1;
+                        }
+                    }
+                    for (i = Normal.Count - 1; i >= 0; i--)
+                    {
+                        if (Normal[i].removable && Normal[i].harmful)
+                        {
+                            Remove(i, true);
+                            return 1;
+                        }
+                    }
+                    return 0;
+
+                case RemovalTarget.All:
+                    removed = 0;
+                    for (i = Special.Count - 1; i >= 0; i--)
+                    {
+                        if (Special[i].removable && Special[i].harmful)
+                        {
+                            Remove(i, true);
+                            removed++;
+                        }
+                    }
+                    for (i = Normal.Count - 1; i >= 0; i--)
+                    {
+                        if (Normal[i].removable && Normal[i].harmful)
+                        {
+                            Remove(i, true);
+                            removed++;
+                        }
+                    }
+                    return removed;
+            }
+        }
+        else if (internalName == StatusEffect.checkAnyPositive)
+        {
+            switch (target)
+            {
+                default:
+                case RemovalTarget.First:
+                    for (i = 0; i < Special.Count; i++)
+                    {
+                        if (Special[i].removable && !Special[i].harmful)
+                        {
+                            Remove(i, true);
+                            return 1;
+                        }
+                    }
+                    for (i = 0; i < Normal.Count; i++)
+                    {
+                        if (Normal[i].removable && !Normal[i].harmful)
+                        {
+                            Remove(i, true);
+                            return 1;
+                        }
+                    }
+                    return 0;
+
+                case RemovalTarget.Last:
+                    for (i = Special.Count - 1; i >= 0; i--)
+                    {
+                        if (Special[i].removable && !Special[i].harmful)
+                        {
+                            Remove(i, true);
+                            return 1;
+                        }
+                    }
+                    for (i = Normal.Count - 1; i >= 0; i--)
+                    {
+                        if (Normal[i].removable && !Normal[i].harmful)
+                        {
+                            Remove(i, true);
+                            return 1;
+                        }
+                    }
+                    return 0;
+
+                case RemovalTarget.All:
+                    removed = 0;
+                    for (i = Special.Count - 1; i >= 0; i--)
+                    {
+                        if (Special[i].removable && !Special[i].harmful)
+                        {
+                            Remove(i, true);
+                            removed++;
+                        }
+                    }
+                    for (i = Normal.Count - 1; i >= 0; i--)
+                    {
+                        if (Normal[i].removable && !Normal[i].harmful)
                         {
                             Remove(i, true);
                             removed++;
@@ -393,6 +520,115 @@ public class ActiveEffects
                         return removed;
                 }
             }
+        }
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public byte AddAttributeMod(StatusEffect.SE_AttributeModifier modifier)
+    {
+        if (modifier != null && combatant != null)
+        {
+            switch (modifier.attribute)
+            {
+                default:
+                    return 0;
+
+                case CombatantAttribute.Health:
+                    if (modifier.additive)
+                        return combatant.health.modifiers.AddToAdd(modifier.value);
+                    else
+                        return combatant.health.modifiers.AddToMultiply(modifier.value);
+
+                case CombatantAttribute.Attack:
+                    if (modifier.additive)
+                        return combatant.attack.modifiers.AddToAdd(modifier.value);
+                    else
+                        return combatant.attack.modifiers.AddToMultiply(modifier.value);
+
+                case CombatantAttribute.Defence:
+                    if (modifier.additive)
+                        return combatant.defence.modifiers.AddToAdd(modifier.value);
+                    else
+                        return combatant.defence.modifiers.AddToMultiply(modifier.value);
+
+                case CombatantAttribute.Speed:
+                    if (modifier.additive)
+                        return combatant.speed.modifiers.AddToAdd(modifier.value);
+                    else
+                        return combatant.speed.modifiers.AddToMultiply(modifier.value);
+
+                case CombatantAttribute.InflictChance:
+                    return 0;
+
+                case CombatantAttribute.InflictResist:
+                    return 0;
+            }
+        }
+        else
+            return 0;
+    }
+    public bool RemoveAttributeMod(StatusEffect.SE_AttributeModifier modifier)
+    {
+        if (modifier != null && combatant != null)
+        {
+            switch (modifier.attribute)
+            {
+                default:
+                    return false;
+
+                case CombatantAttribute.Health:
+                    return combatant.health.modifiers.Remove(modifier.modID);
+
+                case CombatantAttribute.Attack:
+                    return combatant.attack.modifiers.Remove(modifier.modID);
+
+                case CombatantAttribute.Defence:
+                    return combatant.defence.modifiers.Remove(modifier.modID);
+
+                case CombatantAttribute.Speed:
+                    return combatant.speed.modifiers.Remove(modifier.modID);
+
+                case CombatantAttribute.InflictChance:
+                    return false;
+
+                case CombatantAttribute.InflictResist:
+                    return false;
+            }
+        }
+        else
+            return false;
+    }
+
+    public string AddDamageDealtMod(StatusEffect.SE_DamageDealtModifier modifier)
+    {
+        string name = modifier.typeID + "_" + System.DateTime.Now.Ticks;
+        modifier.name = name;
+        combatant.damageOutMods.Add(modifier.asStruct);
+        return name;
+    }
+    public void RemoveDamageDealtMod(StatusEffect.SE_DamageDealtModifier modifier)
+    {
+        for (int i = 0; i < combatant.damageOutMods.Count; i++)
+        {
+            if (modifier.name == combatant.damageOutMods[i].modifierName)
+                combatant.damageOutMods.RemoveAt(i);
+        }
+    }
+    
+    public string AddDamageTakenMod(StatusEffect.SE_DamageTakenModifier modifier)
+    {
+        string name = modifier.typeID + "_" + System.DateTime.Now.Ticks;
+        modifier.name = name;
+        combatant.damageInMods.Add(modifier.asStruct);
+        return name;
+    }
+    public void RemoveDamageTakenMod(StatusEffect.SE_DamageTakenModifier modifier)
+    {
+        for (int i = 0; i < combatant.damageInMods.Count; i++)
+        {
+            if (modifier.name == combatant.damageInMods[i].modifierName)
+                combatant.damageInMods.RemoveAt(i);
         }
     }
 
@@ -509,6 +745,19 @@ public class ActiveEffects
     }
 }
 
+public struct StatusEffectReturnData
+{
+    public string internalName;
+    public bool special;
+
+    public StatusEffectReturnData(string internalName = null, bool special = false)
+    {
+        this.internalName = internalName;
+        this.special = special;
+    }
+
+    public bool Null { get { return internalName == null; } }
+}
 public class StatusEffect
 {
     public class SE_HealthOverTime
@@ -533,7 +782,7 @@ public class StatusEffect
 
     public class SE_AttributeModifier
     {
-        public string name;
+        public byte modID;
         public CombatantAttribute attribute;
         public bool additive;
         private int valAdd;
@@ -556,36 +805,6 @@ public class StatusEffect
             }
         }
     }
-    private void AddAttributeMod()
-    {
-        if (attributeModifier != null)
-        {
-            switch (attributeModifier.attribute)
-            {
-                default:
-                    break;
-
-                case CombatantAttribute.Health:
-                    break;
-
-                case CombatantAttribute.Defence:
-                    break;
-
-                case CombatantAttribute.Speed:
-                    break;
-
-                case CombatantAttribute.InflictChance:
-                    break;
-
-                case CombatantAttribute.InflictResist:
-                    break;
-            }
-        }
-    }
-    private void RemoveAttributeMod()
-    {
-
-    }
 
     public class SE_DamageDealtModifier
     {
@@ -593,7 +812,7 @@ public class StatusEffect
         public int typeID;
         public float value;
 
-        public DamageDealtModifier Modifier { get { return new DamageDealtModifier(name, typeID, value); } }
+        public DamageDealtModifier asStruct { get { return new DamageDealtModifier(name, typeID, value); } }
     }
     
     public class SE_DamageTakenModifier
@@ -601,8 +820,9 @@ public class StatusEffect
         public string name;
         public int typeID;
         public DamageTakenModifier.ModType value;
+        public float floatValue { get { return asStruct.mod; } }
 
-        public DamageTakenModifier Modifier { get { return new DamageTakenModifier(name, typeID, value); } }
+        public DamageTakenModifier asStruct { get { return new DamageTakenModifier(name, typeID, value); } }
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -612,10 +832,27 @@ public class StatusEffect
     public string displayName = "UNASSIGNED";
     public string internalName = null;
 
+    private string _descriptionRaw = null;
+    public string descriptionRaw
+    {
+        get
+        {
+            return _descriptionRaw;
+        }
+        set
+        {
+            descriptionRaw = value;
+            UpdateDescription();
+        }
+    }
+    public string description { get; private set; }
+
     public byte instanceUID = 0;
+    public KeyValuePair<bool, int> appliedBy = new KeyValuePair<bool, int>(true, -1);
 
     public bool special = false;
     public bool removable = true;
+    public bool resistable = true;
     public bool harmful;
 
     public int stacks = 1;
@@ -649,6 +886,9 @@ public class StatusEffect
             }
         }
     }
+
+    public void AddAttributeMod() { _attributeModifier.modID = container.AddAttributeMod(_attributeModifier); }
+    public void RemoveAttributeMod() { container.RemoveAttributeMod(_attributeModifier); }
     private SE_AttributeModifier _attributeModifier = null;
     public SE_AttributeModifier attributeModifier
     {
@@ -659,16 +899,28 @@ public class StatusEffect
         set
         {
             _attributeModifier = value;
-            _attributeModifier.name = internalName + "_" + instanceUID;
             if (value != null)
             {
-                if (onApply.Contains("HealthOverTime"))
-                    onApply[onApply.IndexOf("HealthOverTime")].Set(_healthOverTime.Trigger);
+                if (onApply.Contains("AttributeMod"))
+                    onApply[onApply.IndexOf("AttributeMod")].Set(AddAttributeMod);
                 else
-                    onTurnStart.Add(new NamedCallback("HealthOverTime", _healthOverTime.Trigger));
+                    onApply.Add(new NamedCallback("AttributeMod", AddAttributeMod));
+
+                if (onExpire.Contains("AttributeMod"))
+                    onExpire[onExpire.IndexOf("AttributeMod")].Set(RemoveAttributeMod);
+                else
+                    onExpire.Add(new NamedCallback("AttributeMod", RemoveAttributeMod));
+
+                if (onDispel.Contains("AttributeMod"))
+                    onDispel[onDispel.IndexOf("AttributeMod")].Set(RemoveAttributeMod);
+                else
+                    onDispel.Add(new NamedCallback("AttributeMod", RemoveAttributeMod));
             }
         }
     }
+
+    public void AddDamageDealtMod() { _dmgOutModifier.name = container.AddDamageDealtMod(_dmgOutModifier); }
+    public void RemoveDamageDealtMod() { container.RemoveDamageDealtMod(_dmgOutModifier); }
     private SE_DamageDealtModifier _dmgOutModifier = null;
     public SE_DamageDealtModifier dmgOutModifier
     {
@@ -679,9 +931,28 @@ public class StatusEffect
         set
         {
             _dmgOutModifier = value;
-            _dmgOutModifier.name = internalName + "_" + instanceUID;
+            if (value != null)
+            {
+                if (onApply.Contains("DmgOutMod"))
+                    onApply[onApply.IndexOf("DmgOutMod")].Set(AddDamageDealtMod);
+                else
+                    onApply.Add(new NamedCallback("DmgOutMod", AddDamageDealtMod));
+
+                if (onExpire.Contains("DmgOutMod"))
+                    onExpire[onExpire.IndexOf("DmgOutMod")].Set(RemoveDamageDealtMod);
+                else
+                    onExpire.Add(new NamedCallback("DmgOutMod", RemoveDamageDealtMod));
+
+                if (onDispel.Contains("DmgOutMod"))
+                    onDispel[onDispel.IndexOf("DmgOutMod")].Set(RemoveDamageDealtMod);
+                else
+                    onDispel.Add(new NamedCallback("DmgOutMod", RemoveDamageDealtMod));
+            }
         }
     }
+
+    public void AddDamageTakenMod() { _dmgInModifier.name = container.AddDamageTakenMod(_dmgInModifier); }
+    public void RemoveDamageTakenMod() { container.RemoveDamageTakenMod(_dmgInModifier); }
     private SE_DamageTakenModifier _dmgInModifier = null;
     public SE_DamageTakenModifier dmgInModifier
     {
@@ -692,7 +963,23 @@ public class StatusEffect
         set
         {
             _dmgInModifier = value;
-            _dmgInModifier.name = internalName + "_" + instanceUID;
+            if (value != null)
+            {
+                if (onApply.Contains("DmgInMod"))
+                    onApply[onApply.IndexOf("DmgInMod")].Set(AddDamageTakenMod);
+                else
+                    onApply.Add(new NamedCallback("DmgInMod", AddDamageTakenMod));
+
+                if (onExpire.Contains("DmgInMod"))
+                    onExpire[onExpire.IndexOf("DmgInMod")].Set(RemoveDamageTakenMod);
+                else
+                    onExpire.Add(new NamedCallback("DmgInMod", RemoveDamageTakenMod));
+
+                if (onDispel.Contains("DmgInMod"))
+                    onDispel[onDispel.IndexOf("DmgInMod")].Set(RemoveDamageTakenMod);
+                else
+                    onDispel.Add(new NamedCallback("DmgInMod", RemoveDamageTakenMod));
+            }
         }
     }
 
@@ -707,6 +994,7 @@ public class StatusEffect
     public void LifetimeTick()
     {
         lifetime -= 1;
+        UpdateDescription();
         if (lifetime <= 0)
             onExpire.Invoke();
     }
@@ -728,7 +1016,149 @@ public class StatusEffect
             onTurnEnd.Add(lifetime);
     }
 
+    public bool Matches(string internalName)
+    {
+        return internalName == this.internalName || internalName == checkAny || harmful ? internalName == checkAnyNegative : internalName == checkAnyPositive;
+    }
+
+    public static bool Matches(string refInternalName, string checkInternalName)
+    {
+        return Matches(refInternalName, false, checkInternalName);
+    }
+    
+    public static bool Matches(string refInternalName, bool refHarmful, string checkInternalName)
+    {
+        return checkInternalName == refInternalName || checkInternalName == checkAny || refHarmful ? checkInternalName == checkAnyNegative : checkInternalName == checkAnyPositive;
+    }
+
+    public void UpdateDescription(int roundTo = 2)
+    {
+        string str = descriptionRaw, check;
+        float val;
+        description = "";
+        if (descriptionRaw != null)
+        {
+            int[] inds = new int[3] { str.IndexOf(Core.markdownDelimiter), -1, -1 };
+            while (inds[0] > -1 && str.Length > inds[0] + 1)
+            {
+                if (inds[0] > 0)
+                {
+                    description += str.Substring(0, inds[0]);
+                }
+                inds[1] = str.IndexOf(' ', inds[0] + 1);
+                inds[2] = str.IndexOf(Core.markdownDelimiter, inds[0] + 1);
+                if (inds[2] < 0)
+                {
+                    description += str.Substring(inds[1]);
+                    inds[0] = -1;
+                }
+                else if (inds[1] > -1 && inds[1] < inds[2])
+                {
+                    description += str.Substring(0, inds[2]);
+                    str = str.Substring(inds[2]);
+                    inds[0] = 0;
+                    inds[1] = -1;
+                    inds[2] = -1;
+                }
+                else
+                {
+                    check = str.Substring(inds[0] + 1, inds[2] - inds[0] - 1);
+                    bool firstUpper = check.LatinBasicUppercase(0);
+                    switch (check.ToLower())
+                    {
+                        default:
+                            description += "<VALUE>";
+                            break;
+
+                        case "turnstarttick":
+                            description += (firstUpper ? 'A' : 'a') + "t the " + (tickOnTurnStart ? "start" : "end") + " of each turn";
+                            break;
+
+                        case "removable":
+                            description += (firstUpper ? 'C' : 'c') + "an" + (removable ? " " : "'t ") + "be removed";
+                            break;
+
+                        case "dot_type":
+                            description += healthOverTime == null ? "TYPE" : healthOverTime.type.displayName;
+                            break;
+
+                        case "dot_val":
+                            description += healthOverTime.value;
+                            break;
+
+                        case "dmgout_type":
+                            description += dmgOutModifier == null ? "TYPE" : DamageType.Defaults[dmgOutModifier.typeID].displayName;
+                            break;
+
+                        case "dmgout_perc":
+                            if (dmgOutModifier == null)
+                                description += "PERCENT%";
+                            else
+                            {
+                                val = (float)System.Math.Round((dmgOutModifier.value - 1.0f) * 100.0f, roundTo);
+                                description += val + "%";
+                            }
+                            break;
+
+                        case "dmgout_drct":
+                            if (dmgOutModifier == null)
+                                description += "CHANGES";
+                            else
+                            {
+                                if (dmgOutModifier.value >= 1.0f)
+                                    description += (firstUpper ? 'I' : 'i') + "ncreases";
+                                else
+                                    description += (firstUpper ? 'D' : 'd') + "ecreases";
+                            }
+                            break;
+
+                        case "dmgin_type":
+                            description += dmgInModifier == null ? "TYPE" : DamageType.Defaults[dmgInModifier.typeID].displayName;
+                            break;
+
+                        case "dmgin_perc":
+                            if (dmgInModifier == null)
+                                description += "PERCENT%";
+                            else
+                            {
+                                val = (float)System.Math.Round((dmgInModifier.floatValue - 1.0f) * 100.0f, roundTo);
+                                description += val + "%";
+                            }
+                            break;
+
+                        case "dmgin_drct":
+                            if (dmgInModifier == null)
+                                description += "CHANGES";
+                            else
+                            {
+                                if (dmgInModifier.floatValue >= 1.0f)
+                                    description += (firstUpper ? 'I' : 'i') + "ncreases";
+                                else
+                                    description += (firstUpper ? 'D' : 'd') + "ecreases";
+                            }
+                            break;
+                    }
+                    if (str.Length > inds[2] + 1)
+                    {
+                        str = str.Substring(inds[2] + 1);
+                        inds[0] = str.IndexOf(Core.markdownDelimiter);
+                    }
+                    else
+                    {
+                        str = "";
+                        inds[0] = -1;
+                    }
+                }
+            }
+            description += str;
+        }
+    }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public readonly static string checkAny = "anyEffect";
+    public readonly static string checkAnyNegative = "anyEffect_Ngt";
+    public readonly static string checkAnyPositive = "anyEffect_Pst";
 
     public readonly static string dftFire = "defaultEffect_Fre";
     public readonly static string dftIce = "defaultEffect_Ice";
@@ -812,21 +1242,33 @@ public class StatusEffect
         };
         return effect;
     }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public static StatusEffect Marked()
+    {
+        StatusEffect effect = new StatusEffect()
+        {
+
+        };
+        return effect;
+    }
 }
 
+[System.Serializable]
 public struct StatusModifier
 {
     public enum ModType { Weak, Resist, Immune }
 
     public string modifierName;
-    public int typeID;
+    public string internalName;
     public ModType modType;
     public float modifier { get { return modType == ModType.Weak ? 2.0f : (modType == ModType.Resist ? 0.5f : 0.0f); } }
 
-    public StatusModifier(string modifierName, int typeID, ModType modType)
+    public StatusModifier(string modifierName, string internalName, ModType modType)
     {
         this.modifierName = modifierName;
-        this.typeID = typeID;
+        this.internalName = internalName;
         this.modType = modType;
     }
 }

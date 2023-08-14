@@ -76,7 +76,7 @@ public struct DamageType
     {
         return Defaults.InBounds((int)type) ? Defaults[(int)type] : Defaults[0];
     }
-
+    
     public static DamageType None { get { return Defaults[0]; } }
     public static DamageType Fire { get { return Defaults[1]; } }
     public static DamageType Ice { get { return Defaults[2]; } }
