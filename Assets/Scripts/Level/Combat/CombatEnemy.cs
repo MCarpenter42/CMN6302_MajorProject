@@ -52,8 +52,5 @@ public class CombatEnemy : CombatantCore
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public override void GetData(CombatantData data)
-    {
-        base.GetData(data);
-    }
+
 }

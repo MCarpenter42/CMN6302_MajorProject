@@ -67,11 +67,15 @@ public class CombatantCore : Core
     public float inflictChance = 40.0f;
     public float inflictResist = 0.0f;
 
-    // ADD DATA STORAGE FOR DAMAGE MODIFIERS
     public List<DamageDealtModifier> damageOutMods = new List<DamageDealtModifier>();
     public List<DamageTakenModifier> damageInMods = new List<DamageTakenModifier>();
-    public List<DamageDealtModifier> healingOutMods = new List<DamageDealtModifier>();
-    public List<DamageTakenModifier> healingInMods = new List<DamageTakenModifier>();
+
+    public List<HealingModifier> healingOutMods = new List<HealingModifier>();
+    public List<HealingModifier> healingInMods = new List<HealingModifier>();
+    
+    public List<ShieldModifier> shieldOutMods = new List<ShieldModifier>();
+    public List<ShieldModifier> shieldInMods = new List<ShieldModifier>();
+
     public List<StatusModifier> statusInMods = new List<StatusModifier>();
 
     public CombatantBrain brain;
@@ -183,6 +187,25 @@ public class CombatantCore : Core
         }
     }
 
+    public void ModifyHealth(int value)
+    {
+        int newValue = health.Current += value;
+        if (newValue <= 0)
+        {
+            health.Current = 0;
+        }
+        else if (newValue >= health.Scaled)
+        {
+            health.Current = health.Scaled;
+        }
+        else
+        {
+            health.Current = newValue;
+        }
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
     public float DamageOut(float actionMultiplier, int typeID)
     {
         return DamageOut(CombatantAttribute.Attack, actionMultiplier, typeID);
@@ -212,6 +235,39 @@ public class CombatantCore : Core
                 return (float)speed.Current * actionMultiplier * dmgMult;
         }
     }
+    
+    public float HealingOut(float actionMultiplier)
+    {
+        return HealingOut(CombatantAttribute.Health, actionMultiplier);
+    }
+
+    public float HealingOut(CombatantAttribute baseAttribute, float actionMultiplier)
+    {
+        float healMult = 1.0f;
+        foreach (HealingModifier modifier in healingOutMods)
+        {
+            healMult += modifier.mod;
+        }
+        switch (baseAttribute)
+        {
+            default:
+            case CombatantAttribute.Attack:
+                return attack.ScaledAsFloat * actionMultiplier * healMult;
+
+            case CombatantAttribute.Health:
+                return health.ScaledAsFloat * actionMultiplier * healMult;
+
+            case CombatantAttribute.Defence:
+                return defence.ScaledAsFloat * actionMultiplier * healMult;
+
+            case CombatantAttribute.Speed:
+                return (float)speed.Current * actionMultiplier * healMult;
+        }
+    }
+
+    
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public int DamageTaken(KeyValuePair<bool, int> origin, float baseDamage, int typeID, bool crit = false)
     {
@@ -230,20 +286,29 @@ public class CombatantCore : Core
 
         float f_preDef = baseDamage * rcvMult;
         float f_postDef = f_preDef * defMult;
-        int preDef = Mathf.RoundToInt(f_preDef), postDef = Mathf.RoundToInt(f_postDef);
+        int preDef = Mathf.RoundToInt(f_preDef), postDef = Mathf.RoundToInt(f_postDef), dmgOut;
 
         if (origin.Key != brain.friendly)
             brain.lastAttackedBy = origin.Value;
 
         if (preDef - postDef < 1)
-            return preDef - 1;
+            dmgOut = preDef - 1;
         else
-            return postDef;
+            dmgOut = postDef;
+        ModifyHealth(-dmgOut);
+        return postDef;
     }
 
-    public void Healed(KeyValuePair<bool, int> origin, float baseDamage)
+    public int Healed(KeyValuePair<bool, int> origin, float baseHealing)
     {
-
+        float healedFloat = baseHealing;
+        foreach (HealingModifier modifier in healingInMods)
+        {
+            healedFloat *= modifier.mod;
+        }
+        int healedBy = Mathf.RoundToInt(healedFloat);
+        ModifyHealth(healedBy);
+        return healedBy;
     }
 
     /*public float StatusApplyChance(float actionModifier)

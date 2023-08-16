@@ -316,8 +316,9 @@ public class CombatAction
     public ExecutionData Heal(CombatantCore actor, KeyValuePair<bool, int>[] targets)
     {
         bool selfCondMet = selfMultCondition.MetBy(actor), targCondMet;
-        float healOut;
+        float healOut = actor.HealingOut(baseAttribute, actionMultiplier * (selfCondMet ? selfMultiplier : 1.0f));
         bool playerTeam = actor.brain.friendly;
+        KeyValuePair<bool, int> actorTeamIndex = actor.teamIndex;
         if (targets.Length > 1)
         {
             foreach (KeyValuePair<bool, int> target in targets)
@@ -325,12 +326,12 @@ public class CombatAction
                 if (target.Key)
                 {
                     targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[target.Value]);
-                    /* SINGLE-TARGET FUNCTION */
+                    CombatManager.playerTeam[target.Value].Healed(actorTeamIndex, healOut);
                 }
                 else
                 {
                     targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.Value]);
-                    /* SINGLE-TARGET FUNCTION */
+                    CombatManager.enemyTeam[target.Value].Healed(actorTeamIndex, healOut);
                 }
             }
             return new ExecutionData() { succeeded = true };
@@ -353,9 +354,9 @@ public class CombatAction
                             blastL = lInd >= 0;
                             blastR = rInd < CombatManager.playerTeam.Count;
                             if (blastL)
-                                /* SINGLE-TARGET FUNCTION ACCOUNTING FOR FALLOFF */;
+                                CombatManager.playerTeam[lInd].Healed(actorTeamIndex, healOut * power);
                             if (blastR)
-                                /* SINGLE-TARGET FUNCTION ACCOUNTING FOR FALLOFF */;
+                                CombatManager.playerTeam[rInd].Healed(actorTeamIndex, healOut * power);
                             if (!blastL && !blastR)
                                 break;
                         }
@@ -368,7 +369,7 @@ public class CombatAction
                         {
                             bounceTargets[i] = new KeyValuePair<bool, int>(false, Random.Range(0, CombatManager.playerTeam.Count));
                         }
-                        /* START BOUNCE SEQUENCE COROUTINE */
+                        HealBounceSequence(actor, bounceTargets, healOut, falloffFactor);
                     }
                 }
             }
@@ -388,9 +389,9 @@ public class CombatAction
                             blastL = lInd >= 0;
                             blastR = rInd < CombatManager.enemyTeam.Count;
                             if (blastL)
-                                /* SINGLE-TARGET FUNCTION ACCOUNTING FOR FALLOFF */;
+                                CombatManager.enemyTeam[lInd].Healed(actorTeamIndex, healOut * power);
                             if (blastR)
-                                /* SINGLE-TARGET FUNCTION ACCOUNTING FOR FALLOFF */;
+                                CombatManager.enemyTeam[rInd].Healed(actorTeamIndex, healOut * power);
                             if (!blastL && !blastR)
                                 break;
                         }
@@ -403,7 +404,7 @@ public class CombatAction
                         {
                             bounceTargets[i] = new KeyValuePair<bool, int>(false, Random.Range(0, CombatManager.enemyTeam.Count));
                         }
-                        /* START BOUNCE SEQUENCE COROUTINE */
+                        HealBounceSequence(actor, bounceTargets, healOut, falloffFactor);
                     }
                 }
             }
@@ -436,8 +437,9 @@ public class CombatAction
     public ExecutionData Shield(CombatantCore actor, KeyValuePair<bool, int>[] targets)
     {
         bool selfCondMet = selfMultCondition.MetBy(actor), targCondMet;
-        float shieldOut;
+        float shieldOut = actor.HealingOut(baseAttribute, actionMultiplier * (selfCondMet ? selfMultiplier : 1.0f));
         bool playerTeam = actor.brain.friendly;
+        KeyValuePair<bool, int> actorTeamIndex = actor.teamIndex;
         if (targets.Length > 1)
         {
             foreach (KeyValuePair<bool, int> target in targets)
@@ -445,12 +447,12 @@ public class CombatAction
                 if (target.Key)
                 {
                     targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[target.Value]);
-                    /* SINGLE-TARGET FUNCTION */
+                    CombatManager.playerTeam[target.Value].Healed(actorTeamIndex, shieldOut);
                 }
                 else
                 {
                     targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.Value]);
-                    /* SINGLE-TARGET FUNCTION */
+                    CombatManager.enemyTeam[target.Value].Healed(actorTeamIndex, shieldOut);
                 }
             }
             return new ExecutionData() { succeeded = true };
@@ -473,24 +475,12 @@ public class CombatAction
                             blastL = lInd >= 0;
                             blastR = rInd < CombatManager.playerTeam.Count;
                             if (blastL)
-                                /* SINGLE-TARGET FUNCTION ACCOUNTING FOR FALLOFF */
-                                ;
+                                CombatManager.playerTeam[lInd].Healed(actorTeamIndex, shieldOut * power);
                             if (blastR)
-                                /* SINGLE-TARGET FUNCTION ACCOUNTING FOR FALLOFF */
-                                ;
+                                CombatManager.playerTeam[rInd].Healed(actorTeamIndex, shieldOut * power);
                             if (!blastL && !blastR)
                                 break;
                         }
-                    }
-                    else if (multiTarget.type == MultiTargetType.Bounce)
-                    {
-                        float falloffFactor = 1.0f - multiTarget.falloff;
-                        KeyValuePair<bool, int>[] bounceTargets = new KeyValuePair<bool, int>[multiTarget.count];
-                        for (int i = 0; i < bounceTargets.Length; i++)
-                        {
-                            bounceTargets[i] = new KeyValuePair<bool, int>(false, Random.Range(0, CombatManager.playerTeam.Count));
-                        }
-                        /* START BOUNCE SEQUENCE COROUTINE */
                     }
                 }
             }
@@ -510,24 +500,12 @@ public class CombatAction
                             blastL = lInd >= 0;
                             blastR = rInd < CombatManager.enemyTeam.Count;
                             if (blastL)
-                                /* SINGLE-TARGET FUNCTION ACCOUNTING FOR FALLOFF */
-                                ;
+                                CombatManager.enemyTeam[lInd].Healed(actorTeamIndex, shieldOut * power);
                             if (blastR)
-                                /* SINGLE-TARGET FUNCTION ACCOUNTING FOR FALLOFF */
-                                ;
+                                CombatManager.enemyTeam[rInd].Healed(actorTeamIndex, shieldOut * power);
                             if (!blastL && !blastR)
                                 break;
                         }
-                    }
-                    else if (multiTarget.type == MultiTargetType.Bounce)
-                    {
-                        float falloffFactor = 1.0f - multiTarget.falloff;
-                        KeyValuePair<bool, int>[] bounceTargets = new KeyValuePair<bool, int>[multiTarget.count];
-                        for (int i = 0; i < bounceTargets.Length; i++)
-                        {
-                            bounceTargets[i] = new KeyValuePair<bool, int>(false, Random.Range(0, CombatManager.enemyTeam.Count));
-                        }
-                        /* START BOUNCE SEQUENCE COROUTINE */
                     }
                 }
             }

@@ -758,6 +758,7 @@ public struct StatusEffectReturnData
 
     public bool Null { get { return internalName == null; } }
 }
+[System.Serializable]
 public class StatusEffect
 {
     public class SE_HealthOverTime
@@ -853,7 +854,8 @@ public class StatusEffect
     public bool special = false;
     public bool removable = true;
     public bool resistable = true;
-    public bool harmful;
+    public bool harmful = true;
+    public bool noExpiry = false;
 
     public int stacks = 1;
     public int lifetime = 1;
@@ -983,6 +985,30 @@ public class StatusEffect
         }
     }
 
+    public int shielding = -1;
+    public int currentShield = -1;
+    public bool expireOnShieldBroken = true;
+
+    public int DamageShield(int damage)
+    {
+        int spill = 0;
+        if (currentShield > 0)
+        {
+            if (damage > currentShield)
+            {
+                spill = damage - currentShield;
+            }
+            currentShield -= damage;
+            if (expireOnShieldBroken)
+                onDispel.Invoke();
+        }
+        else
+        {
+            spill = damage;
+        }
+        return spill;
+    }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public List<NamedCallback> onTurnStart = new List<NamedCallback>();
@@ -999,21 +1025,32 @@ public class StatusEffect
             onExpire.Invoke();
     }
 
+    public void Expire()
+    {
+        container.Remove(instanceUID);
+    }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     
     public StatusEffect()
     {
-
+        onExpire.Add(new NamedCallback("Expiry", Expire));
+        onDispel.Add(new NamedCallback("Expiry", Expire));
     }
 
     public StatusEffect(bool tickOnTurnStart)
     {
-        this.tickOnTurnStart = tickOnTurnStart;
-        NamedCallback lifetime = new NamedCallback("Lifetime", LifetimeTick);
-        if (tickOnTurnStart)
-            onTurnStart.Add(lifetime);
-        else
-            onTurnEnd.Add(lifetime);
+        onExpire.Add(new NamedCallback("Expiry", Expire));
+        onDispel.Add(new NamedCallback("Expiry", Expire));
+        if (!noExpiry)
+        {
+            this.tickOnTurnStart = tickOnTurnStart;
+            NamedCallback lifetime = new NamedCallback("Lifetime", LifetimeTick);
+            if (tickOnTurnStart)
+                onTurnStart.Add(lifetime);
+            else
+                onTurnEnd.Add(lifetime);
+        }
     }
 
     public bool Matches(string internalName)
@@ -1252,24 +1289,6 @@ public class StatusEffect
 
         };
         return effect;
-    }
-}
-
-[System.Serializable]
-public struct StatusModifier
-{
-    public enum ModType { Weak, Resist, Immune }
-
-    public string modifierName;
-    public string internalName;
-    public ModType modType;
-    public float modifier { get { return modType == ModType.Weak ? 2.0f : (modType == ModType.Resist ? 0.5f : 0.0f); } }
-
-    public StatusModifier(string modifierName, string internalName, ModType modType)
-    {
-        this.modifierName = modifierName;
-        this.internalName = internalName;
-        this.modType = modType;
     }
 }
 
