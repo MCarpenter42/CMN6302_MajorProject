@@ -577,7 +577,7 @@ namespace NeoCambion.Unity.Editor
         {
             if (targetWindow.docked)
             {
-                if (IconButton(position, "winbtn_win_restore@2x"))
+                if (IconButton(position, "winbtn_win_restore@2x", "Undock window"))
                 {
                     targetWindow.position = targetWindow.position;
                 }

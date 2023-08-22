@@ -32,20 +32,34 @@ using System;
 
 public struct DamageType
 {
-    public readonly uint ID;
+    private int _ID;
+    public int ID
+    {
+        get
+        {
+            return _ID;
+        }
+        set
+        {
+            if (Defaults.InBounds(value))
+            {
+                this = Defaults[value];
+            }
+        }
+    }
     public string displayName;
     public string iconPath;
 
-    private DamageType(uint ID, string displayName, string iconPath)
+    private DamageType(int ID, string displayName, string iconPath)
     {
-        this.ID = ID;
+        _ID = ID;
         this.displayName = displayName;
         this.iconPath = iconPath;
     }
 
     public DamageType(string displayName = "UNASSIGNED", string iconPath = null)
     {
-        ID = 0;
+        _ID = 0;
         this.displayName = displayName;
         this.iconPath = iconPath;
     }
@@ -58,6 +72,8 @@ public struct DamageType
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public enum Type { None, Fire, Ice, Earth, Lightning, Physical, Psychic, Light, Dark }
+    public static int TypeCount = typeof(Type).GetCount();
+    public static string[] TypeNames = typeof(Type).GetNames();
 
     public static DamageType[] Defaults = new DamageType[]
     {
@@ -88,4 +104,36 @@ public struct DamageType
     public static DamageType Dark { get { return Defaults[8]; } }
 
     public static DamageType Modifier_Any { get { return new DamageType(int.MaxValue, "Universal", null); } }
+}
+
+[CustomPropertyDrawer(typeof(DamageType.Type))]
+public class DamageTypeDrawer : PropertyDrawer
+{
+    public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+    {
+        int n = Enum.GetNames(typeof(DamageType.Type)).Length;
+        string[] options = new string[n];
+        int[] optInds = new int[n].IncrementalPopulate();
+        int selected = property.intValue;
+
+        EditorGUI.BeginProperty(position, label, property);
+        {
+            Rect elementRect = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
+            if (options.Length > 0)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    options[i] = ((DamageType.Type)i).ToString();
+                }
+                selected = EditorGUI.IntPopup(elementRect, selected, options, optInds);
+                property.intValue = selected;
+            }
+            else
+            {
+                EditorGUI.LabelField(elementRect, "No damage types available!");
+                property.intValue = 0;
+            }
+        }
+        EditorGUI.EndProperty();
+    }
 }

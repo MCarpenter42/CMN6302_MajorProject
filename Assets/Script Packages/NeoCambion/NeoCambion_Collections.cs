@@ -681,6 +681,54 @@ namespace NeoCambion.Collections
 
         #endregion
 
+        #region [ COUNT IF ]
+
+        public static int CountIf<T>(this T[] collection, T checkValue, bool invert = false)
+        {
+            int count = 0;
+            foreach (T value in collection)
+            {
+                if ((value.Equals(checkValue) && !invert) || (!value.Equals(checkValue) && invert))
+                    count++;
+            }
+            return count;
+        }
+        
+        public static int CountIf<T>(this List<T> collection, T checkValue, bool invert = false)
+        {
+            int count = 0;
+            foreach (T value in collection)
+            {
+                if ((value.Equals(checkValue) && !invert) || (!value.Equals(checkValue) && invert))
+                    count++;
+            }
+            return count;
+        }
+        
+        public static int CountIf(this bool[] collection, bool checkAgainst)
+        {
+            int count = 0;
+            foreach (bool value in collection)
+            {
+                if (value == checkAgainst)
+                    count++;
+            }
+            return count;
+        }
+        
+        public static int CountIf(this List<bool> collection, bool checkAgainst)
+        {
+            int count = 0;
+            foreach (bool value in collection)
+            {
+                if (value == checkAgainst)
+                    count++;
+            }
+            return count;
+        }
+        
+        #endregion
+
         /// <summary>
         /// Checks if the target dictionary already contains the key, and removes the key-value pair if it does.
         /// </summary>

@@ -338,9 +338,10 @@ public class CombatManager : Core
     private IEnumerator IOpeningEvents()
     {
         yield return null;
+        NextTurn();
     }
 
-    public int NextTurn()
+    private int NextTurn()
     {
         float lowest = float.MaxValue;
         int cInd = -1;
@@ -357,12 +358,31 @@ public class CombatManager : Core
         turnIndicator.transform.position = combatants[cInd].pos;
         if (combatants[cInd].brain.autonomous)
         {
-            
+            float t = combatants[cInd].NextAction();
+            AdvanceTurnOrder(t);
         }
         else
         {
-            
+            // ENABLE ACTION SELECTION HERE
         }
         return cInd;
+    }
+
+    public void AdvanceTurnOrder(float delay)
+    {
+        if (delay > 0.0f)
+        {
+            StartCoroutine(IAdvanceTurnOrder(delay));
+        }
+        else
+        {
+            NextTurn();
+        }
+    }
+
+    private IEnumerator IAdvanceTurnOrder(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        NextTurn();
     }
 }

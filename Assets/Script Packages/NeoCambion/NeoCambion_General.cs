@@ -490,6 +490,25 @@ namespace NeoCambion
         }
     }
 
+    public static class Ext_Enum
+    {
+        public static int GetCount(this Type enumType) 
+        {
+            if (enumType.IsEnum)
+                return Enum.GetNames(enumType).Length;
+            else
+                return -1;
+        }
+
+        public static string[] GetNames(this Type enumType)
+        {
+            if (enumType.IsEnum)
+                return Enum.GetNames(enumType);
+            else
+                return null;
+        }
+    }
+
     public static class Ext_Float
     {
         public static byte[] ToBytes(this float floatVal)

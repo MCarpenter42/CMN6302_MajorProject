@@ -240,6 +240,13 @@ public class CombatantData : ElementData
 
     public SpeedAtLevel[] speeds = new SpeedAtLevel[0];
 
+    public int inflictChance = 40;
+    public int inflictResist = 0;
+
+    public DamageType.Type attackType;
+    public bool[] weakAgainst;
+
+    public ActionSetName actionSet;
     public CombatAction[] actions = new CombatAction[0];
 
     public CombatantData(string displayName)

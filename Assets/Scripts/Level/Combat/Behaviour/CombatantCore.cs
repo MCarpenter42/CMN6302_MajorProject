@@ -67,6 +67,9 @@ public class CombatantCore : Core
     public float inflictChance = 40.0f;
     public float inflictResist = 0.0f;
 
+    public DamageType.Type attackType;
+    public bool[] weakAgainst;
+
     public List<DamageDealtModifier> damageOutMods = new List<DamageDealtModifier>();
     public List<DamageTakenModifier> damageInMods = new List<DamageTakenModifier>();
 
@@ -183,7 +186,33 @@ public class CombatantCore : Core
             defence = new CombatValue(this, BaseStatVariance(baseData.baseDefence, CombatantAttribute.Defence), baseData.defenceScaling);
             speed = new CombatSpeed(this, baseData.speeds, RandTuning.value_stats_speed ? 10.0f : -1.0f);
 
-            brain = new CombatantBrain(!data.playerControlled, data.friendly);
+            if (GameManager.Instance.RandTuning.value_stats_types)
+            {
+                attackType = (DamageType.Type)Random.Range(1, DamageType.TypeCount);
+                weakAgainst = new bool[data.weakAgainst.Length];
+                List<int> inds = new List<int>();
+                int r;
+                for (int i = 0; i < weakAgainst.Length; i++)
+                {
+                    if (i != (int)attackType)
+                        inds.Add(i);
+                }
+                for (int i = 0; i < data.weakAgainst.CountIf(true); i++)
+                {
+                    r = Random.Range(0, inds.Count);
+                    weakAgainst[inds[r]] = true;
+                    inds.RemoveAt(r);
+                }
+            }
+            else
+            {
+                attackType = data.attackType;
+                weakAgainst = data.weakAgainst;
+            }
+
+            brain = new CombatantBrain(this, !data.playerControlled, data.friendly);
+            brain.actions = ActionSet.GetSet(data.actionSet);
+            brain.actions.GetActions(attackType, !brain.friendly && GameManager.Instance.RandTuning.value_behaviour_available);
         }
     }
 
@@ -202,6 +231,13 @@ public class CombatantCore : Core
         {
             health.Current = newValue;
         }
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    public float NextAction()
+    {
+        return brain.ExecuteNextAction();
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -265,7 +301,34 @@ public class CombatantCore : Core
         }
     }
 
-    
+    public float ShieldOut(float actionMultiplier)
+    {
+        return ShieldOut(CombatantAttribute.Health, actionMultiplier);
+    }
+
+    public float ShieldOut(CombatantAttribute baseAttribute, float actionMultiplier)
+    {
+        float healMult = 1.0f;
+        foreach (HealingModifier modifier in healingOutMods)
+        {
+            healMult += modifier.mod;
+        }
+        switch (baseAttribute)
+        {
+            default:
+            case CombatantAttribute.Attack:
+                return attack.ScaledAsFloat * actionMultiplier * healMult;
+
+            case CombatantAttribute.Health:
+                return health.ScaledAsFloat * actionMultiplier * healMult;
+
+            case CombatantAttribute.Defence:
+                return defence.ScaledAsFloat * actionMultiplier * healMult;
+
+            case CombatantAttribute.Speed:
+                return (float)speed.Current * actionMultiplier * healMult;
+        }
+    }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -278,6 +341,10 @@ public class CombatantCore : Core
             baseDamage *= GameManager.Instance.RandTuning.value_damage_critScale;
 
         float defValue = defence.ScaledAsFloat, defMult = 1 - (defValue / (100 + defValue)), rcvMult = 1.0f;
+        if (weakAgainst.InBounds(typeID) && weakAgainst[typeID])
+            rcvMult *= 2.0f;
+        else if (typeID == (int)attackType)
+            rcvMult *= 0.5f;
         foreach (DamageTakenModifier modifier in damageInMods)
         {
             if (modifier.typeID == typeID)
@@ -1151,6 +1218,8 @@ public class CombatantBrain
         }
     }
 
+    private CombatantCore combatant;
+
     public bool autonomous;
     public bool friendly;
     public int tauntedBy = -1;
@@ -1181,19 +1250,30 @@ public class CombatantBrain
     }
     public int markedTarget = -1;
 
+    public ActionSet actions;
+
+    public int nextAction = 0;
+
     public SummonPool[] summonPools = null;
     public List<CombatantCore> summons = new List<CombatantCore>();
     public KeyValuePair<bool, int> summonedBy = new KeyValuePair<bool, int>(true, -1);
 
-    // - List of possible actions
-    // - Priority ranking
-    // - Associated conditions
-    // - Percentage chances
-
-    public CombatantBrain(bool autonomous, bool friendly)
+    public CombatantBrain(CombatantCore combatant, bool autonomous, bool friendly)
     {
+        this.combatant = combatant;
         this.autonomous = autonomous;
         this.friendly = friendly;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public float ExecuteNextAction()
+    {
+        float t = actions.ExecuteAction(combatant, nextAction);
+        nextAction++;
+        if (nextAction >= actions.Sequence.Length)
+            nextAction = 0;
+        return t;
     }
 }
 

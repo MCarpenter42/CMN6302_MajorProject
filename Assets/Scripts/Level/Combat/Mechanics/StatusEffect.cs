@@ -632,6 +632,11 @@ public class ActiveEffects
         }
     }
 
+    public void ClearTaunted()
+    {
+        combatant.brain.tauntedBy = -1;
+    }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public int Stacks(string internalName, bool special = false, bool highestInstance = true)
@@ -1009,6 +1014,8 @@ public class StatusEffect
         return spill;
     }
 
+    public bool clearTauntedOnExpire = false;
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public List<NamedCallback> onTurnStart = new List<NamedCallback>();
@@ -1027,6 +1034,8 @@ public class StatusEffect
 
     public void Expire()
     {
+        if (clearTauntedOnExpire)
+            container.ClearTaunted();
         container.Remove(instanceUID);
     }
 

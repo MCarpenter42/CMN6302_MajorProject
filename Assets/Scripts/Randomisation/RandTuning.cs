@@ -72,10 +72,8 @@ public class RandTuning : Core
     private Var2Bit variance_behaviour_selection = Var2Bit.Off;
     private Var2Bit variance_behaviour_targeting = Var2Bit.Off;
     
-    private int[] options_behaviour_selection = new int[] { 0, 0, 0, 0 };
-
     public bool value_behaviour_available { get { return variance_behaviour_available; } }
-    public int value_behaviour_selection { get { return options_behaviour_selection[(int)variance_behaviour_selection]; } }
+    public int value_behaviour_selection { get { return (int)variance_behaviour_selection; } }
     public int value_behaviour_targeting { get { return (int)variance_behaviour_targeting; } }
 
     #endregion

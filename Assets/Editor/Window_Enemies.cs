@@ -47,7 +47,7 @@ public class Window_Enemies : EditorWindow
     private Vector2 scrollPosList = new Vector2();
     private Vector2 scrollPosSpeeds = new Vector2();
 
-    private enum RegionToggle { EnemyList, Health, Attack, Defence, Speed }
+    private enum RegionToggle { EnemyList, Health, Attack, Defence, Speed, WeakAgainst, StrongAgainst }
     private List<bool> regionToggles = new List<bool>();
     private int toggleCount { get { return Enum.GetNames(typeof(RegionToggle)).Length; } }
 
@@ -136,13 +136,14 @@ public class Window_Enemies : EditorWindow
         bool changesMade = false;
         EditorGUILayout.BeginHorizontal(EditorStyles.inspectorFullWidthMargins);
         {
+            int i;
             float avWidth = EditorGUILayout.BeginVertical(EditorStylesExtras.noMarginsNoPadding).width;
             if (avWidth > 0.0f)
                 lastAvWidth = avWidth;
             else
                 avWidth = lastAvWidth;
             {
-                EditorGUILayout.Space(8.0f);
+                EditorGUILayout.Space(8);
 
                 label.text = "ENEMIES";
                 label.tooltip = null;
@@ -155,13 +156,19 @@ public class Window_Enemies : EditorWindow
                 btnRect.y += (elementRect.height - btnRect.height) / 2;
                 EditorElements.UndockButton(btnRect, Window);
 
+                btnRect.x = elementRect.x + elementRect.width - btnRect.width;
+                if (EditorElements.IconButton(btnRect, "SaveAs", "Force save data"))
+                {
+                    ElementDataStorage.SaveCache(enemyList);
+                }
+
                 EditorElements.SeparatorBar();
 
                 elementRect = EditorGUILayout.GetControlRect(true, slHeight + 2);
                 bSize = Vector2.one * (elementRect.height + 4);
                 elementRect.width -= bSize.x + 4;
 
-                bool _showPickList = (enemyList.Count > 0 && enemyList.InBounds(selectedEnemy)) ? regionToggles[0] : true;
+                bool _showPickList = (enemyList.Count > 0 && enemyList.InBounds(selectedEnemy)) ? regionToggles[(int)RegionToggle.EnemyList] : true;
 
                 label.text = _showPickList ? "Select Enemy to Edit" : "Editing: \"" + enemyList[selectedEnemy].displayName + "\"";
                 label.tooltip = null;
@@ -184,7 +191,7 @@ public class Window_Enemies : EditorWindow
                     }
                 }
 
-                EditorGUILayout.Space(4.0f);
+                EditorGUILayout.Space(4);
 
                 if (_showPickList)
                 {
@@ -198,7 +205,7 @@ public class Window_Enemies : EditorWindow
                         if (enemyList.Count > 0)
                         {
                             //EnemyData enemy in enemyList
-                            for (int i = 0; i < enemyList.Count; i++)
+                            for (i = 0; i < enemyList.Count; i++)
                             {
                                 elementRect = EditorGUILayout.GetControlRect(true, slHeight + 4);
                                 bSize.y = elementRect.height;
@@ -225,7 +232,7 @@ public class Window_Enemies : EditorWindow
                                 }
                             }
 
-                            EditorGUILayout.Space(2.0f);
+                            EditorGUILayout.Space(2);
 
                             elementRect = EditorGUILayout.GetControlRect(true, slHeight);
                             elementRect.x += 40;
@@ -243,7 +250,7 @@ public class Window_Enemies : EditorWindow
                         }
                         else
                         {
-                            EditorGUILayout.Space(4.0f);
+                            EditorGUILayout.Space(4);
                             EditorGUILayout.LabelField("No enemy data found! Click below to add one:", centreWrapLabel);
                             elementRect = EditorGUILayout.GetControlRect(true, slHeight + 10);
                             elementRect.x += 40;
@@ -261,7 +268,7 @@ public class Window_Enemies : EditorWindow
                     {
                         if (selectedEnemy > -1 && enemyList.Count > 0)
                         {
-                            EditorGUILayout.Space(4.0f);
+                            EditorGUILayout.Space(4);
 
                             label.text = "Display Name";
                             label.tooltip = null;
@@ -308,7 +315,7 @@ public class Window_Enemies : EditorWindow
                             }
                             //Debug.Log("modelObj: " + (modelObj == null ? "null" : hexUIDs[0]) + " | model: " + (model == null ? "null" : hexUIDs[1]));
 
-                            EditorGUILayout.Space(2.0f);
+                            EditorGUILayout.Space(2);
 
                             label.text = "Preview at Level: " + previewLevel;
                             label.tooltip = null;
@@ -316,7 +323,7 @@ public class Window_Enemies : EditorWindow
                             elementRect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), label);
                             previewLevel = (ushort)GUI.HorizontalSlider(elementRect, previewLevel, 1, 100);
 
-                            EditorGUILayout.Space(2.0f);
+                            EditorGUILayout.Space(2);
 
                             ReturnScalingData healthData = ScalingStatFoldoutRegion(RegionToggle.Health, "Health", enemyList[selectedEnemy].baseHealth, enemyList[selectedEnemy].healthScaling);
                             if (healthData.value != enemyList[selectedEnemy].baseHealth || healthData.scaling != enemyList[selectedEnemy].healthScaling)
@@ -342,8 +349,6 @@ public class Window_Enemies : EditorWindow
                                 enemyList[selectedEnemy].defenceScaling = defenceData.scaling;
                             }
 
-                            EditorGUILayout.Space(2.0f);
-
                             SpeedAtLevel[] spdData = SpeedListFoldoutRegion(enemyList[selectedEnemy].speeds);
                             if (speedDataChanged)
                             {
@@ -351,6 +356,156 @@ public class Window_Enemies : EditorWindow
                                 speedData.Overwrite(spdData);
                                 enemyList[selectedEnemy].speeds = spdData;
                                 speedDataChanged = false;
+                            }
+
+                            EditorGUILayout.Space(8);
+
+                            Rect rSlider, rBox;
+                            int[] sliderVal = new int[2];
+
+                            label.text = "Status Inflict Chance";
+                            label.tooltip = null;
+
+                            elementRect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), label);
+                            rSlider = new Rect(elementRect);
+                            rSlider.width -= 44;
+                            rBox = new Rect(rSlider);
+                            rBox.x += rSlider.width + 4;
+                            rBox.width = 40;
+                            sliderVal[0] = (int)GUI.HorizontalSlider(rSlider, enemyList[selectedEnemy].inflictChance, 0.0f, 100.0f).Round(0);
+                            sliderVal[1] = (int)EditorElements.IntPercentField(rBox, enemyList[selectedEnemy].inflictChance, false);
+                            if (sliderVal[0] != enemyList[selectedEnemy].inflictChance)
+                            {
+                                enemyList[selectedEnemy].inflictChance = sliderVal[0];
+                                changesMade = true;
+                            }
+                            else if (sliderVal[1] != enemyList[selectedEnemy].inflictChance)
+                            {
+                                enemyList[selectedEnemy].inflictChance = sliderVal[1];
+                                changesMade = true;
+                            }
+
+                            EditorGUILayout.Space(2);
+
+                            label.text = "Status Inflict Resistance";
+                            label.tooltip = null;
+
+                            elementRect = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), label);
+                            rSlider = new Rect(elementRect);
+                            rSlider.width -= 44;
+                            rBox = new Rect(rSlider);
+                            rBox.x += rSlider.width + 4;
+                            rBox.width = 40;
+                            sliderVal[0] = (int)GUI.HorizontalSlider(rSlider, enemyList[selectedEnemy].inflictResist, 0.0f, 100.0f).Round(0);
+                            sliderVal[1] = (int)EditorElements.IntPercentField(rBox, enemyList[selectedEnemy].inflictResist, false);
+                            if (sliderVal[0] != enemyList[selectedEnemy].inflictResist)
+                            {
+                                enemyList[selectedEnemy].inflictResist = sliderVal[0];
+                                changesMade = true;
+                            }
+                            else if (sliderVal[1] != enemyList[selectedEnemy].inflictResist)
+                            {
+                                enemyList[selectedEnemy].inflictResist = sliderVal[1];
+                                changesMade = true;
+                            }
+
+                            EditorGUILayout.Space(8);
+
+                            int nWeak, toggleWidth = 20;
+                            string[] damageTypeOptions = DamageType.TypeNames;
+                            for (i = 0; i < DamageType.TypeCount; i++)
+                            {
+                                damageTypeOptions[i] = ((DamageType.Type)i).ToString();
+                            }
+
+                            label.text = "Attack Damage Type";
+                            label.tooltip = null;
+
+                            DamageType.Type attackType = (DamageType.Type)EditorGUILayout.Popup(label, (int)enemyList[selectedEnemy].attackType, damageTypeOptions);
+                            if (attackType != enemyList[selectedEnemy].attackType)
+                            {
+                                enemyList[selectedEnemy].attackType = attackType;
+                                changesMade = true;
+                            }
+
+                            EditorGUILayout.Space(2);
+
+                            label.text = "Damage Type Weaknesses (" + enemyList[selectedEnemy].weakAgainst.CountIf(true) + ")";
+                            label.tooltip = null;
+
+                            if (regionToggles[(int)RegionToggle.WeakAgainst] = EditorGUILayout.Foldout(regionToggles[(int)RegionToggle.WeakAgainst], label, true, EditorStylesExtras.foldoutLabel))
+                            {
+                                nWeak = enemyList[selectedEnemy].weakAgainst.Length;
+                                if (nWeak < DamageType.TypeCount)
+                                {
+                                    bool[] bools = new bool[DamageType.TypeCount];
+                                    for (i = 0; i < nWeak; i++)
+                                    {
+                                        bools[i] = enemyList[selectedEnemy].weakAgainst[i];
+                                    }
+                                    for (i = nWeak; i < DamageType.TypeCount; i++)
+                                    {
+                                        bools[i] = false;
+                                    }
+                                    enemyList[selectedEnemy].weakAgainst = bools;
+                                    changesMade = true;
+                                }
+                                else if (nWeak > DamageType.TypeCount)
+                                {
+                                    bool[] bools = new bool[DamageType.TypeCount];
+                                    for (i = 0; i < DamageType.TypeCount; i++)
+                                    {
+                                        bools[i] = enemyList[selectedEnemy].weakAgainst[i];
+                                    }
+                                    enemyList[selectedEnemy].weakAgainst = bools;
+                                    changesMade = true;
+                                }
+
+                                EditorElements.BeginSubSection(10.0f, 0);
+                                {
+                                    bool weakAgainst;
+                                    for (i = 1; i < enemyList[selectedEnemy].weakAgainst.Length; i++)
+                                    {
+                                        if (i != (int)enemyList[selectedEnemy].attackType)
+                                        {
+                                            elementRect = EditorGUILayout.GetControlRect(true);
+                                            elementRect.x += 2;
+                                            weakAgainst = EditorGUI.Toggle(elementRect, enemyList[selectedEnemy].weakAgainst[i]);
+                                            if (weakAgainst != enemyList[selectedEnemy].weakAgainst[i])
+                                            {
+                                                enemyList[selectedEnemy].weakAgainst[i] = weakAgainst;
+                                                changesMade = true;
+                                            }
+                                            elementRect.x += toggleWidth - 2;
+                                            elementRect.width -= toggleWidth;
+                                            label.text = damageTypeOptions[i];
+                                            EditorGUI.LabelField(elementRect, label);
+                                        }
+                                        else
+                                        {
+                                            elementRect = EditorGUILayout.GetControlRect(true);
+                                            EditorGUI.LabelField(elementRect, EditorElements.IconContentBuiltin("scenepicking_notpickable-mixed_hover", "Combatants cannot have an innate\nweankess to their attack type!"));
+                                            enemyList[selectedEnemy].weakAgainst[i] = false;
+                                            elementRect.x += toggleWidth;
+                                            elementRect.width -= toggleWidth;
+                                            label.text = damageTypeOptions[i];
+                                            EditorGUI.LabelField(elementRect, label);
+                                        }
+                                    }
+                                }
+                                EditorElements.EndSubSection();
+                            }
+
+                            EditorGUILayout.Space(8);
+
+                            label.text = "Action Set";
+                            label.tooltip = null;
+
+                            ActionSetName actionSet = (ActionSetName)EditorGUILayout.Popup(label, (int)enemyList[selectedEnemy].actionSet, typeof(ActionSetName).GetNames());
+                            if (actionSet != enemyList[selectedEnemy].actionSet)
+                            {
+                                enemyList[selectedEnemy].actionSet = actionSet;
+                                changesMade = true;
                             }
                         }
                         else
