@@ -5,6 +5,7 @@ using UnityEngine;
 using NeoCambion;
 using NeoCambion.Maths;
 using NeoCambion.Unity;
+using System;
 
 public class WorldPlayer : WorldEntityCore
 {
@@ -20,13 +21,17 @@ public class WorldPlayer : WorldEntityCore
     private Vector3 camDir { get { return UnityExt_Vector3.Flatten(GameManager.Instance.cameraW.facingVector); } }
 
     [Header("Player")]
+    [SerializeField] Vector3 interactCentre;
+
+    public Vector3 posInteract => transform.position + interactCentre;
+
     public float sprintMultiplier = 2.0f;
     [HideInInspector] public bool sprintActive = false;
 
     [SerializeField] float interactionRange = 3.0f;
     [SerializeField] float maxInteractAngle = 40.0f;
     private List<int> inRangeInteracts = new List<int>();
-    private int targetInteractInd = -1;
+    private int targetInteractInd = int.MaxValue;
 
     [HideInInspector] public CombatantData[] playerCharacters = null;
 
@@ -45,26 +50,24 @@ public class WorldPlayer : WorldEntityCore
     protected override void Awake()
     {
         base.Awake();
-        playerCharacters = INDEV_PlayerCharacters();
+        //playerCharacters = INDEV_PlayerCharacters();
     }
 
     protected override void Start()
     {
         base.Start();
+        GetInRangeInteracts();
     }
 
     protected override void Update()
     {
         base.Update();
-        GetInRangeInteracts();
-        int newTarget = GetTargetInteract();
-        if (newTarget != targetInteractInd)
-            UpdateTargetInteract(newTarget);
     }
 
     protected override void FixedUpdate()
     {
         base.FixedUpdate();
+        HandleInteractions();
     }
 
     #endregion
@@ -91,6 +94,16 @@ public class WorldPlayer : WorldEntityCore
         float camAngle = camDir.x >= 0.0f ? Vector3.Angle(Vector3.forward, camDir) : -Vector3.Angle(Vector3.forward, camDir);
         float angle = (velAngle + camAngle).WrapClamp(0.0f, 360.0f).ToRad();
         return new Vector3(Mathf.Sin(angle), 0, Mathf.Cos(angle)) * m;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void HandleInteractions()
+    {
+        GetInRangeInteracts();
+        int newTarget = GetTargetInteract();
+        if (newTarget != targetInteractInd)
+            UpdateTargetInteract(newTarget);
     }
 
     public void AddInteraction(InteractPoint interaction)
@@ -123,7 +136,7 @@ public class WorldPlayer : WorldEntityCore
 
     private bool IsInteractVisible(InteractPoint interact)
     {
-        Vector3 rayDir = interact.transform.position - transform.position;
+        Vector3 rayDir = interact.transform.position - posInteract;
         return !Physics.Raycast(transform.position, rayDir.normalized, rayDir.magnitude);
     }
 
@@ -136,7 +149,7 @@ public class WorldPlayer : WorldEntityCore
         {
             if (IsInteractVisible(interactions[inRangeInteracts[i]]))
             {
-                dir = (interactions[inRangeInteracts[i]].transform.position - transform.position).Flatten();
+                dir = (interactions[inRangeInteracts[i]].transform.position - posInteract).Flatten();
                 angle = Vector3.Angle(dir, camDir);
                 if (angle < targetAngle)
                 {
@@ -150,14 +163,7 @@ public class WorldPlayer : WorldEntityCore
 
     private void UpdateTargetInteract(int index)
     {
-        if (index == -1)
-        {
-            GameManager.Instance.UI.HUD.interactHLVisible = false;
-        }
-        else
-        {
-            GameManager.Instance.UI.HUD.interactHLVisible = true;
-        }
+        UIManager.HUD.SetInteractHightlightVis(index > -1 ? true : false);
         targetInteractInd = index;
     }
 
@@ -167,9 +173,9 @@ public class WorldPlayer : WorldEntityCore
     {
         CombatantData[] data = new CombatantData[3]
         {
-            new CombatantData("Player Character 1"),
-            new CombatantData("Player Character 2"),
-            new CombatantData("Player Character 3")
+            new CombatantData() { displayName = "Player Character 1" },
+            new CombatantData() { displayName = "Player Character 2" },
+            new CombatantData() { displayName = "Player Character 3" }
         };
 
         data[0].modelHexUID = "8663CC29";

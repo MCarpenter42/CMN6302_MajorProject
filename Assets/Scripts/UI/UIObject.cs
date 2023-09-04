@@ -1,13 +1,17 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using UnityEditor;
+using TMPro;
 
 using NeoCambion;
 using NeoCambion.Unity;
 
+[System.Serializable]
 [RequireComponent(typeof(RectTransform))]
-public class UIObject : Core
+public class UIObject : Core, IPointerEnterHandler, IPointerExitHandler
 {
     #region [ OBJECTS / COMPONENTS ]
 
@@ -23,12 +27,16 @@ public class UIObject : Core
         }
     }
 
+    protected Image imageComponent;
+    protected TMP_Text textComponent;
+
     #endregion
 
     #region [ PROPERTIES ]
 
+    [SerializeField] bool visibleOnStart = true;
     public bool visible { get; private set; }
-    
+
     // ADD TAGGING SYSTEM?
 
     #endregion
@@ -41,14 +49,20 @@ public class UIObject : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    #region [ BUILT-IN UNITY FUNCTIONS ]
+
     protected virtual void Awake()
     {
         GetContents();
+        imageComponent = GetComponent<Image>();
+        textComponent = GetComponent<TMP_Text>();
     }
 
     protected virtual void Start()
     {
-
+        visible = visibleOnStart;
+        if (!visibleOnStart)
+            OnHide();
     }
 
     protected virtual void Update()
@@ -60,6 +74,24 @@ public class UIObject : Core
     {
 
     }
+
+    #endregion
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    #region [ INTERFACE FUNCTIONS ]
+
+    public virtual void OnPointerEnter(PointerEventData eventData)
+    {
+
+    }
+
+    public virtual void OnPointerExit(PointerEventData eventData)
+    {
+
+    }
+
+    #endregion
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -75,14 +107,26 @@ public class UIObject : Core
 
     public void Show(bool show = true)
     {
-        visible = show;
-        if (show)
+        if (show/* && !visible*/)
             OnShow();
-        else
+        else/* if (!show && visible)*/
             OnHide();
+        visible = show;
     }
 
-    public void Toggle()
+    [MenuItem("Component/UI/UI Object", false, 10)]
+    private static void AddAsComponent()
+    {
+        Selection.activeGameObject.AddComponent<UIObject>();
+    }
+    
+    [MenuItem("Component/UI/UI Object", true)]
+    private static bool AddAsComponentValidation()
+    {
+        return Selection.activeGameObject != null;
+    }
+
+    public virtual void Toggle()
     {
         Show(!visible);
     }
@@ -93,6 +137,8 @@ public class UIObject : Core
         {
             obj.SetActive(true);
         }
+        if (imageComponent != null)
+            imageComponent.enabled = true;
     }
 
     protected virtual void OnHide()
@@ -101,5 +147,7 @@ public class UIObject : Core
         {
             obj.SetActive(false);
         }
+        if (imageComponent != null)
+            imageComponent.enabled = false;
     }
 }

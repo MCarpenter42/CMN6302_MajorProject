@@ -9,7 +9,6 @@ public class PathPointSet : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 
-    public Transform boundaryArea;
     private List<GameObject> pathPointObjects = new List<GameObject>();
     [HideInInspector] public List<Vector3> pathPoints = new List<Vector3>();
 

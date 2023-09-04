@@ -757,8 +757,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Exit Combat View
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 2e498d1c8094910479dc3e1b768306a4, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 2e498d1c8094910479dc3e1b768306a4, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -9443,9 +9443,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   allyParent: {fileID: 772517954}
   enemyParent: {fileID: 1175953209}
-  combatants: []
+  playerTeam: []
+  enemyTeam: []
   turnIndicator: {fileID: 0}
   turnOfInd: -1
+  disableStart: 1
 --- !u!224 &1586299253 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 6513478671734779095, guid: 8853285840402b5459b15547759f582a, type: 3}
@@ -12181,38 +12183,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 6093536486883756753, guid: c5274dd0c7ee73845a05222cb1add373, type: 3}
-      propertyPath: ElementDataStorage.guiFoldout
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6093536486883756753, guid: c5274dd0c7ee73845a05222cb1add373, type: 3}
-      propertyPath: ElementDataStorage.enemyList.Enemies.Array.size
-      value: 3
-      objectReference: {fileID: 0}
-    - target: {fileID: 6093536486883756753, guid: c5274dd0c7ee73845a05222cb1add373, type: 3}
-      propertyPath: ElementDataStorage.enemyList.Enemies.Array.data[0].model
-      value: 
-      objectReference: {fileID: 6565933023328135375, guid: 0a3faadcfb627d040bd4369f8c00436c, type: 3}
-    - target: {fileID: 6093536486883756753, guid: c5274dd0c7ee73845a05222cb1add373, type: 3}
-      propertyPath: ElementDataStorage.enemyList.Enemies.Array.data[1].model
-      value: 
-      objectReference: {fileID: 3449218494492485171, guid: 6cc2045205c2514488caecbca5d0def6, type: 3}
-    - target: {fileID: 6093536486883756753, guid: c5274dd0c7ee73845a05222cb1add373, type: 3}
-      propertyPath: ElementDataStorage.enemyList.Enemies.Array.data[2].model
-      value: 
-      objectReference: {fileID: 2358826667260420567, guid: 7a992ee2b04c44c4c80fd2884047ddef, type: 3}
-    - target: {fileID: 6093536486883756753, guid: c5274dd0c7ee73845a05222cb1add373, type: 3}
-      propertyPath: ElementDataStorage.enemyList.Enemies.Array.data[0].displayName
-      value: '[PH] Generic Enemy 1'
-      objectReference: {fileID: 0}
-    - target: {fileID: 6093536486883756753, guid: c5274dd0c7ee73845a05222cb1add373, type: 3}
-      propertyPath: ElementDataStorage.enemyList.Enemies.Array.data[1].displayName
-      value: '[PH] Generic Enemy 2'
-      objectReference: {fileID: 0}
-    - target: {fileID: 6093536486883756753, guid: c5274dd0c7ee73845a05222cb1add373, type: 3}
-      propertyPath: ElementDataStorage.enemyList.Enemies.Array.data[2].displayName
-      value: '[PH] Generic Enemy 3'
-      objectReference: {fileID: 0}
     - target: {fileID: 7694941838269217774, guid: c5274dd0c7ee73845a05222cb1add373, type: 3}
       propertyPath: m_Name
       value: GameManager
@@ -12466,6 +12436,10 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 2264479815829998188, guid: 8853285840402b5459b15547759f582a, type: 3}
+      propertyPath: m_RootOrder
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 3369024408070196085, guid: 8853285840402b5459b15547759f582a, type: 3}
       propertyPath: m_RootOrder
       value: 1

@@ -29,84 +29,116 @@ using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
 
+[System.Serializable]
 public class RandTuning : Core
 {
-    private enum Var2Bit { Off, Low, High, Max }
+    public enum Var2Bit { Min, Low, High, Max }
 
     #region [ LEVEL GENERATION ] - 15
 
-    private Var2Bit variance_map_roomCount = Var2Bit.Off;
-    private Var2Bit variance_map_roomSize = Var2Bit.Off;
-    private bool variance_map_roomConnections = false;
-    private Var2Bit variance_map_corridorLength_min = Var2Bit.Off;
-    private Var2Bit variance_map_corridorLength_max = Var2Bit.Off;
+    private bool varMap_iterations = false;
+    private Var2Bit varMap_roomStructure = Var2Bit.Min;
+    private Var2Bit varMap_corridorStructure = Var2Bit.Min;
+    private bool varMap_connectToExisting = true;
 
-    private int[] options_map_roomCount = new int[] { 0, 0, 0, 0 };
-    private int[] options_map_roomSize = new int[] { 0, 0, 0, 0 };
-    private int[] options_map_corridorLength_min = new int[] { 0, 0, 0, 0 };
-    private int[] options_map_corridorLength_max = new int[] { 0, 0, 0, 0 };
+    private static RoomStructureVariance[] optMap_roomStructure = new RoomStructureVariance[]
+    {
+        new RoomStructureVariance(3, 3, 6, 6),
+        new RoomStructureVariance(2, 3, 6, 7),
+        new RoomStructureVariance(2, 4, 5, 7),
+        new RoomStructureVariance(1, 4, 5, 8)
+    };
+    private static CorridorStructureVariance[] optMap_corridorStructure = new CorridorStructureVariance[]
+    {
+        new CorridorStructureVariance(4, 6, false),
+        new CorridorStructureVariance(4, 6, true),
+        new CorridorStructureVariance(3, 8, false),
+        new CorridorStructureVariance(3, 8, true)
+    };
 
-    public int value_map_roomCount { get { return options_map_roomCount[(int)variance_map_roomCount]; } }
-    public int value_map_roomSize { get { return options_map_roomSize[(int)variance_map_roomSize]; } }
-    public bool value_map_roomConnections { get { return variance_map_roomConnections; } }
-    public int value_map_corridorLength_min { get { return options_map_corridorLength_min[(int)variance_map_corridorLength_min]; } }
-    public int value_map_corridorLength_max { get { return options_map_corridorLength_max[(int)variance_map_corridorLength_max]; } }
+    public int valMap_iterations { get { return varMap_iterations ? 3 : 2; } }
+    public RoomStructureVariance valMap_roomStructure { get { return optMap_roomStructure[(int)varMap_roomStructure]; } }
+    public CorridorStructureVariance valMap_corridorStructure { get { return optMap_corridorStructure[(int)varMap_corridorStructure]; } }
+    public bool valMap_connectToExisting { get { return varMap_connectToExisting; } }
 
-    private Var2Bit variance_level_enemyCount = Var2Bit.Off;
-    private Var2Bit variance_level_chestCount = Var2Bit.Off;
-    private Var2Bit variance_level_spawnSpread = Var2Bit.Off;
+    private Var2Bit varLvl_enemyDensity = Var2Bit.Min;
+    private Var2Bit varLvl_itemDensity = Var2Bit.Min;
 
-    private int[] options_level_enemyCount = new int[] { 0, 0, 0, 0 };
-    private int[] options_level_chestCount = new int[] { 0, 0, 0, 0 };
-    private int[] options_level_spawnSpread = new int[] { 0, 0, 0, 0 };
+    private static FloatRange[] optLvl_enemyDensity = new FloatRange[]
+    {
+        new FloatRange(0.76f, 0.76f),
+        new FloatRange(0.68f, 0.84f),
+        new FloatRange(0.60f, 0.92f),
+        new FloatRange(0.52f, 1.00f)
+    };
+    private static FloatRange[] optLvl_itemDensity = new FloatRange[]
+    {
+        new FloatRange(0.55f, 0.55f),
+        new FloatRange(0.50f, 0.60f),
+        new FloatRange(0.45f, 0.65f),
+        new FloatRange(0.40f, 0.70f),
+    };
     
-    public int value_level_enemyCount { get { return options_level_enemyCount[(int)variance_level_enemyCount]; } }
-    public int value_level_chestCount { get { return options_level_chestCount[(int)variance_level_chestCount]; } }
-    public int value_level_spawnSpread { get { return options_level_spawnSpread[(int)variance_level_spawnSpread]; } }
+    public FloatRange valLvl_enemyDensity { get { return optLvl_enemyDensity[(int)varLvl_enemyDensity]; } }
+    public FloatRange valLvl_itemDensity { get { return optLvl_itemDensity[(int)varLvl_itemDensity]; } }
+
+    public GenerationSettings GenSettings
+    {
+        get
+        {
+            return new GenerationSettings()
+            {
+                iterations = valMap_iterations,
+                roomStructure = valMap_roomStructure,
+                corridorStructure = valMap_corridorStructure,
+                connectToExisting = valMap_connectToExisting,
+                enemyDensity = valLvl_enemyDensity,
+                itemDensity = valLvl_itemDensity,
+            };
+        }
+    }
 
     #endregion
 
     #region [ AI BEHAVIOUR ] - 5
 
-    private bool variance_behaviour_available = false;
-    private Var2Bit variance_behaviour_selection = Var2Bit.Off;
-    private Var2Bit variance_behaviour_targeting = Var2Bit.Off;
+    private Var2Bit varBhv_selection = Var2Bit.Min;
+    private Var2Bit varBhv_targeting = Var2Bit.Min;
     
-    public bool value_behaviour_available { get { return variance_behaviour_available; } }
-    public int value_behaviour_selection { get { return (int)variance_behaviour_selection; } }
-    public int value_behaviour_targeting { get { return (int)variance_behaviour_targeting; } }
+    public int valBhv_selection { get { return (int)varBhv_selection; } }
+    public int valBhv_targeting { get { return (int)varBhv_targeting; } }
 
     #endregion
 
     #region [ STAT VARIANCE ] - 6
 
-    private Var2Bit variance_stats_health = Var2Bit.Off;
-    private Var2Bit variance_stats_defence = Var2Bit.Off;
-    private bool variance_stats_speed = false;
-    private bool variance_stats_types = false;
-    
-    private float[] options_stats_floats = new float[] { 0.00f, 0.00f, 0.00f, 0.10f };
+    private Var2Bit varSts_health = Var2Bit.Min;
+    private Var2Bit varSts_defence = Var2Bit.Min;
+    private bool varSts_speed = false;
+    //private bool varSts_types = false;
 
-    public float value_stats_health { get { return options_stats_floats[(int)variance_stats_health]; } }
-    public float value_stats_defence { get { return options_stats_floats[(int)variance_stats_defence]; } }
-    public bool value_stats_speed { get { return variance_stats_speed; } }
-    public bool value_stats_types { get { return variance_stats_types; } }
+    private static float[] optSts_floats = new float[] { 0.00f, 0.00f, 0.00f, 0.10f };
+
+    public float valSts_health { get { return optSts_floats[(int)varSts_health]; } }
+    public float valSts_defence { get { return optSts_floats[(int)varSts_defence]; } }
+    public bool valSts_speed { get { return varSts_speed; } }
+    //public bool valSts_types { get { return varSts_types; } }
 
     #endregion
 
     #region [ DAMAGE VARIANCE ] - 6
 
-    private Var2Bit variance_damage_base = Var2Bit.Off;
-    private Var2Bit variance_damage_critRate = Var2Bit.Off;
-    private Var2Bit variance_damage_critScale = Var2Bit.Off;
-    
-    private float[] options_damage_base = new float[] { 0.00f, 0.05f, 0.10f, 0.15f };
-    private float[] options_damage_critRate = new float[] { 0.00f, 0.02f, 0.05f, 0.10f };
-    private float[] options_damage_critScale = new float[] { 1.20f, 1.50f, 1.70f, 2.00f };
+    private Var2Bit varDmg_base = Var2Bit.Min;
+    private Var2Bit varDmg_critRate = Var2Bit.Min;
+    private Var2Bit varDmg_critScale = Var2Bit.Min;
 
-    public float value_damage_base { get { return options_damage_base[(int)variance_damage_base]; } }
-    public float value_damage_critRate { get { return options_damage_critRate[(int)variance_damage_critRate]; } }
-    public float value_damage_critScale { get { return options_damage_critScale[(int)variance_damage_critScale]; } }
+    private static float[] optDmg_base = new float[] { 0.00f, 0.05f, 0.10f, 0.15f };
+    private static float[] optDmg_critRate = new float[] { 0.00f, 0.02f, 0.05f, 0.10f };
+    private static float[] optDmg_critScale = new float[] { 1.20f, 1.50f, 1.70f, 2.00f };
+
+    public float valDmg_base { get { return optDmg_base[(int)varDmg_base]; } }
+    public float valDmg_critRate { get { return optDmg_critRate[(int)varDmg_critRate]; } }
+    public float valDmg_critScale { get { return optDmg_critScale[(int)varDmg_critScale]; } }
 
     #endregion
 
@@ -114,48 +146,47 @@ public class RandTuning : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    public bool randOnAwake = false;
+
+    void Awake()
+    {
+        SetRef_RandTuning(this);
+        if (randOnAwake)
+        {
+            NewRandomness();
+            string str = "More map iterations: " + (varMap_iterations ? "Enabled (" : "Disabled (") + varMap_iterations + ")";
+            Debug.Log(str);
+        }
+    }
+
     public void NewRandomness()
     {
         Random.InitState((int)System.DateTime.Now.Ticks);
-        byte bRand = (byte)Random.Range(0, 1 << 4);
+        byte bRand = (byte)Random.Range(0, 1 << 5);
+        int bBit = 7;
 
-        variance_map_roomCount = (Var2Bit)Random.Range(0, 4);
-        variance_map_roomSize = (Var2Bit)Random.Range(0, 4);
-        variance_map_roomConnections = bRand.Bit(7);
-        variance_map_corridorLength_min = (Var2Bit)Random.Range(0, 4);
-        variance_map_corridorLength_max = (Var2Bit)Random.Range(0, 4);
+        varMap_iterations = bRand.Bit(bBit--);
+        varMap_roomStructure = (Var2Bit)Random.Range(0, 4);
+        varMap_connectToExisting = bRand.Bit(bBit--);
+        varMap_corridorStructure = (Var2Bit)Random.Range(0, 4);
 
-        variance_level_enemyCount = (Var2Bit)Random.Range(0, 4);
-        variance_level_chestCount = (Var2Bit)Random.Range(0, 4);
-        variance_level_spawnSpread = (Var2Bit)Random.Range(0, 4);
+        varLvl_enemyDensity = (Var2Bit)Random.Range(0, 4);
+        varLvl_itemDensity = (Var2Bit)Random.Range(0, 4);
 
-        variance_behaviour_available = bRand.Bit(6);
-        variance_behaviour_selection = (Var2Bit)Random.Range(0, 4);
-        variance_behaviour_targeting = (Var2Bit)Random.Range(0, 4);
+        varBhv_selection = (Var2Bit)Random.Range(0, 4);
+        varBhv_targeting = (Var2Bit)Random.Range(0, 4);
 
-        variance_stats_health = (Var2Bit)Random.Range(0, 4);
-        variance_stats_defence = (Var2Bit)Random.Range(0, 4);
-        variance_stats_speed = bRand.Bit(5);
-        variance_stats_types = bRand.Bit(4);
+        varSts_health = (Var2Bit)Random.Range(0, 4);
+        varSts_defence = (Var2Bit)Random.Range(0, 4);
+        varSts_speed = bRand.Bit(bBit--);
+        //varSts_types = bRand.Bit(bBit--);
 
-        variance_damage_base = (Var2Bit)Random.Range(0, 4);
-        variance_damage_critRate = (Var2Bit)Random.Range(0, 4);
-        variance_damage_critScale = (Var2Bit)Random.Range(0, 4);
+        varDmg_base = (Var2Bit)Random.Range(0, 4);
+        varDmg_critRate = (Var2Bit)Random.Range(0, 4);
+        varDmg_critScale = (Var2Bit)Random.Range(0, 4);
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-    public static char[] base64 = new char[]
-    {
-        '0', '1', '2', '3', '4', '5', '6', '7',
-        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
-        'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-        'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
-        'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D',
-        'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
-        'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
-        'U', 'V', 'W', 'X', 'Y', 'Z', '_', '-',
-    };
 
     // 1 character (base 64) --> 6 bits
     //    --> Use a multiple of 6 total bit count
@@ -175,7 +206,7 @@ public class RandTuning : Core
         return (ulong)var << lShift;
     }
 
-    private ulong BitShiftLoop(ulong value, int bitStart, int bitEnd, int shift)
+    private ulong BitShiftLoop(ulong val, int bitStart, int bitEnd, int shift)
     {
         int range = bitEnd - bitStart + 1;
 
@@ -199,47 +230,44 @@ public class RandTuning : Core
 
         ulong c = ((1ul << range) - 1) << (64 - bitStart - range);
 
-        ulong d = ((value & a2) >> (shift - range)) & a3;
-        ulong e = ((value & b2) << shift) & b3;
+        ulong d = ((val & a2) >> (shift - range)) & a3;
+        ulong e = ((val & b2) << shift) & b3;
 
-        return (value ^ c) | d | e;
+        return (val ^ c) | d | e;
     }
 
-    private char BitsToBase64(ulong value, int bitStart)
+    private char BitsToBase64(ulong val, int bitStart)
     {
         if (bitStart > 58)
             bitStart = 58;
-        ulong ind = ((ulong)value >> (58 - bitStart)) & 31ul;
-        return base64[(int)ind];
+        ulong ind = ((ulong)val >> (58 - bitStart)) & 31ul;
+        return Ext_Char.Base64[(int)ind];
     }
 
     private string TuningSettingsString()
     {
-        int bitCount = 36;
+        int bitCount = 30;
         lShift = bitCount;
 
-        ulong bits = Shift(variance_map_roomCount); // -2 --> 34
-        bits |= Shift(variance_map_roomSize); // -2 --> 32
-        bits |= Shift(variance_map_roomConnections); // -1 --> 31
-        bits |= Shift(variance_map_corridorLength_min); // -2 --> 29
-        bits |= Shift(variance_map_corridorLength_max); // -2 --> 27
+        ulong bits = Shift(varMap_iterations); // -1 --> 29
+        bits |= Shift(varMap_roomStructure); // -2 --> 27
+        bits |= Shift(varMap_corridorStructure); // -2 --> 25
+        bits |= Shift(varMap_connectToExisting); // -1 --> 24
 
-        bits |= Shift(variance_level_enemyCount); // -2 --> 25
-        bits |= Shift(variance_level_chestCount); // -2 --> 23
-        bits |= Shift(variance_level_spawnSpread); // -2 --> 21
+        bits |= Shift(varLvl_enemyDensity); // -2 --> 22
+        bits |= Shift(varLvl_itemDensity); // -2 --> 20
 
-        bits |= Shift(variance_behaviour_available); // -1 --> 20
-        bits |= Shift(variance_behaviour_selection); // -2 --> 18
-        bits |= Shift(variance_behaviour_targeting); // -2 --> 16
+        bits |= Shift(varBhv_selection); // -2 --> 18
+        bits |= Shift(varBhv_targeting); // -2 --> 16
 
-        bits |= Shift(variance_stats_health); // -2 --> 14
-        bits |= Shift(variance_stats_defence); // -2 --> 12
-        bits |= Shift(variance_stats_speed); // -1 --> 11
-        bits |= Shift(variance_stats_types); // -1 --> 10
+        bits |= Shift(varSts_health); // -2 --> 14
+        bits |= Shift(varSts_defence); // -2 --> 12
+        bits |= Shift(varSts_speed); // -1 --> 11
+        //bits |= Shift(varSts_types); // -1 --> 10
 
-        bits |= Shift(variance_damage_base); // -2 --> 8
-        bits |= Shift(variance_damage_critRate); // -2 --> 6
-        bits |= Shift(variance_damage_critScale); // -2 --> 4
+        bits |= Shift(varDmg_base); // -2 --> 8
+        bits |= Shift(varDmg_critRate); // -2 --> 6
+        bits |= Shift(varDmg_critScale); // -2 --> 4
 
         int startBit = 64 - bitCount, r = Random.Range(0, 1 << lShift);
         bits = BitShiftLoop(bits, 64 - bitCount, 63 - lShift, r);
@@ -255,12 +283,115 @@ public class RandTuning : Core
     public string SettingsString { get { return TuningSettingsString(); } }
 }
 
+public struct RoomStructureVariance
+{
+    public ushort standardMin;
+    public ushort standardMax;
+    public ushort largeMin;
+    public ushort largeMax;
+
+    public int Min(bool large) { return large ? largeMin : standardMin; }
+    public int Max(bool large) { return large ? largeMax : standardMax; }
+
+    public RoomStructureVariance(ushort standardMin, ushort standardMax, ushort largeMin, ushort largeMax)
+    {
+        if (standardMin > standardMax)
+        {
+            this.standardMin = standardMax;
+            this.standardMax = standardMin;
+        }
+        else
+        {
+            this.standardMin = standardMin;
+            this.standardMax = standardMax;
+        }
+
+        if (largeMin > largeMax)
+        {
+            this.largeMin = largeMax;
+            this.largeMax = largeMin;
+        }
+        else
+        {
+            this.largeMin = largeMin;
+            this.largeMax = largeMax;
+        }
+
+        Check();
+    }
+
+    private void Check()
+    {
+        if (largeMin < standardMin)
+            (largeMin, standardMin) = (standardMin, largeMin);
+
+        if (largeMax < standardMax)
+            (largeMax, standardMax) = (standardMax, largeMax);
+    }
+}
+
+public struct CorridorStructureVariance
+{
+    public uint lengthMin;
+    public uint lengthMax;
+    public bool allowSplit;
+
+    public CorridorStructureVariance(uint lengthMin, uint lengthMax, bool allowSplit)
+    {
+        if (lengthMin > lengthMax)
+        {
+            this.lengthMin = lengthMax;
+            this.lengthMax = lengthMin;
+        }
+        else
+        {
+            this.lengthMin = lengthMin;
+            this.lengthMax = lengthMax;
+        }
+        this.allowSplit = allowSplit;
+    }
+}
+
+public struct GenerationSettings
+{
+    public int iterations;
+
+    public RoomStructureVariance roomStructure;
+    public int RoomMin(bool largeRoom) => roomStructure.Min(largeRoom);
+    public int RoomMax(bool largeRoom) => roomStructure.Max(largeRoom);
+
+    public CorridorStructureVariance corridorStructure;
+    public int corridorMin => (int)corridorStructure.lengthMin;
+    public int corridorMax => (int)corridorStructure.lengthMax;
+    public bool corridorSplit => corridorStructure.allowSplit;
+
+    public bool connectToExisting;
+
+    public FloatRange enemyDensity;
+    public float enemyMin => enemyDensity.lower;
+    public float enemyMax => enemyDensity.upper;
+
+    public FloatRange itemDensity;
+    public float itemMin => itemDensity.lower;
+    public float itemMax => itemDensity.upper;
+}
+
 [CustomEditor(typeof(RandTuning))]
 [CanEditMultipleObjects]
 public class RandTuningEditor : Editor
 {
+    RandTuning targ { get { return target as RandTuning; } }
+    SerializedProperty randOnAwake;
+
     public override void OnInspectorGUI()
     {
         EditorElements.RequiredComponent("Necessary for pre-run randomness tuning");
+        EditorGUILayout.Space(4);
+        EditorElements.SeparatorBar();
+        EditorGUILayout.Space(4);
+        randOnAwake = serializedObject.FindProperty("randOnAwake");
+        randOnAwake.boolValue = EditorGUILayout.ToggleLeft(new GUIContent("Randomise vals when \"Awake()\" is executed"), randOnAwake.boolValue);
+        if (serializedObject.hasModifiedProperties)
+            serializedObject.ApplyModifiedProperties();
     }
 }

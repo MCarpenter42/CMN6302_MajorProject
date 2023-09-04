@@ -212,16 +212,15 @@ public abstract class Modifiers<T> where T : System.IComparable, System.ICompara
 
 	public byte AddToMultiply(byte key, float value, bool suppressCallback = false)
 	{
-		if (key > 0 && !multiply.ContainsKey_Add(key,value))
+		if (key > 0 && multiply.TryAdd(key, value))
 		{
-            multiply.Add(key, value);
             newChanges = true;
+            if (!suppressCallback)
+            {
+                Ext_Callback.InvokeIfValid(onChanges);
+                Ext_Callback.InvokeIfValid(onAdd);
+            }
             return key;
-        }
-        if (!suppressCallback)
-        {
-            Ext_Callback.InvokeIfValid(onChanges);
-            Ext_Callback.InvokeIfValid(onAdd);
         }
         return 0;
     }
@@ -235,7 +234,7 @@ public abstract class Modifiers<T> where T : System.IComparable, System.ICompara
             while (tests < 128)
 			{
 				key = NewKey(false);
-				if (!multiply.ContainsKey_Add(key, value))
+				if (multiply.TryAdd(key, value))
                 {
 					newChanges = true;
                     return key;
@@ -252,16 +251,15 @@ public abstract class Modifiers<T> where T : System.IComparable, System.ICompara
 
     public byte AddToAdd(byte key, T value, bool suppressCallback = false)
     {
-        if (key > 0 && !add.ContainsKey_Add(key, value))
+        if (key > 0 && add.TryAdd(key, value))
         {
-            add.Add(key, value);
             newChanges = true;
+            if (!suppressCallback)
+            {
+                Ext_Callback.InvokeIfValid(onChanges);
+                Ext_Callback.InvokeIfValid(onAdd);
+            }
             return key;
-        }
-        if (!suppressCallback)
-        {
-            Ext_Callback.InvokeIfValid(onChanges);
-            Ext_Callback.InvokeIfValid(onAdd);
         }
         return 0;
     }
@@ -275,7 +273,7 @@ public abstract class Modifiers<T> where T : System.IComparable, System.ICompara
             while (tests < 128)
             {
 				key = NewKey(true);
-                if (!add.ContainsKey_Add(key, value))
+                if (add.TryAdd(key, value))
                 {
                     newChanges = true;
                     return key;
@@ -294,12 +292,12 @@ public abstract class Modifiers<T> where T : System.IComparable, System.ICompara
 	{
 		if (InMultiply(key))
 		{
-			if (multiply.ContainsKey_Remove(key))
+			if (multiply.TryRemove(key))
 				return newChanges = true;
 		}
 		else
         {
-            if (add.ContainsKey_Remove(key))
+            if (add.TryRemove(key))
                 return newChanges = true;
         }
         if (!suppressCallback)

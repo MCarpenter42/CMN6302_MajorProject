@@ -4,53 +4,10 @@ using UnityEngine;
 
 using NeoCambion;
 
+[System.Serializable]
+public enum EnemyClass { Minion = -1, Standard, Elite, Boss }
+
 public class CombatEnemy : CombatantCore
 {
-    #region [ OBJECTS / COMPONENTS ]
-
-
-
-    #endregion
-
-    #region [ PROPERTIES ]
-
-
-
-    #endregion
-
-    #region [ COROUTINES ]
-
-
-
-    #endregion
-
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-    #region [ BUILT-IN UNITY FUNCTIONS ]
-
-    void Awake()
-    {
-
-    }
-
-    void Start()
-    {
-
-    }
-
-    void Update()
-    {
-
-    }
-
-    void FixedUpdate()
-    {
-
-    }
-
-    #endregion
-
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
+    public EnemyClass Class;
 }

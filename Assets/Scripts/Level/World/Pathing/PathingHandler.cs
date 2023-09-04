@@ -8,6 +8,8 @@ public class PathingHandler : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 
+    public PathPoint pathingPointTemplate;
+
     public List<PathPointSet> pointSets = new List<PathPointSet>();
 
     #endregion
@@ -52,5 +54,8 @@ public class PathingHandler : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    public void GeneratePathPoints()
+    {
 
+    }
 }

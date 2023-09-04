@@ -10,13 +10,14 @@ using NeoCambion.Maths;
 using NeoCambion.Unity;
 using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.PersistentUID;
+using UnityEngine.InputSystem.LowLevel;
 
 [CustomEditor(typeof(WorldEntityCore), true)]
 [CanEditMultipleObjects]
 public class WorldEntityCoreEditor : Editor
 {
     WorldEntityCore targ { get { return target as WorldEntityCore; } }
-
+    public Rect rect, toggleRect;
     string[] propertiesInBaseClass;
 
     void OnEnable()
@@ -32,7 +33,14 @@ public class WorldEntityCoreEditor : Editor
     public override void OnInspectorGUI()
     {
         serializedObject.Update();
-        EditorGUILayout.LabelField("World Entity Core");
+        EditorElements.SectionHeader("Entity Core");
+        int w = 16;
+        rect = EditorElements.ControlRect();
+        toggleRect = new Rect(rect) { width = w, x = rect.x + 1 };
+        targ.disabled = EditorGUI.Toggle(toggleRect, targ.disabled);
+        rect.x += w + 2; rect.width -= w;
+        EditorGUI.LabelField(rect, "Disabled");
+        EditorGUILayout.Space(1);
         Transform pivot = EditorGUILayout.ObjectField("Pivot", targ.pivot, typeof(Transform), true) as Transform;
         if (pivot != targ.pivot)
         {
@@ -46,9 +54,8 @@ public class WorldEntityCoreEditor : Editor
             targ.UpdateModelObject(true);
         }
         targ.maxSpeed = EditorGUILayout.FloatField("Maximum Speed", targ.maxSpeed);
-        //Debug.Log(propertiesInBaseClass[0]);
-        serializedObject.ApplyModifiedProperties();
         DrawPropertiesExcluding(serializedObject, propertiesInBaseClass);
+        serializedObject.ApplyModifiedProperties();
     }
 }
 
@@ -74,6 +81,8 @@ public class WorldEntityCore : Core
     #endregion
 
     #region [ PROPERTIES ]
+
+    public bool disabled = false;
 
     private bool hasNavMeshAgent;
 
@@ -110,7 +119,7 @@ public class WorldEntityCore : Core
 
     protected virtual void FixedUpdate()
     {
-        if (!hasNavMeshAgent)
+        if (!disabled && !hasNavMeshAgent)
         {
             if (velScale.magnitude > 0.0f)
                 Move(velScale);
@@ -213,22 +222,27 @@ public class WorldEntityCore : Core
 
     public virtual void Move(Vector3 velocity, bool turnToFace = true)
     {
-        rb.velocity = velocity * maxSpeed;
-        //transform.position += velocity * maxSpeed * Time.fixedDeltaTime;
-        if (turnToFace)
+        if (!disabled)
         {
-            Vector2 vDir = new Vector2(velocity.x, velocity.z);
-            float dir = vDir.Angle2D();
-            RotateTo(dir);
+            rb.velocity = velocity * maxSpeed;
+            if (turnToFace)
+            {
+                Vector2 vDir = new Vector2(velocity.x, velocity.z);
+                float dir = vDir.Angle2D();
+                RotateTo(dir);
+            }
         }
     }
 
     public virtual void SetRot(float orientation)
     {
-        facing = orientation.WrapClamp(0.0f, 360.0f);
-        Vector3 rot = pivot.eulerAngles;
-        rot.y = facing;
-        pivot.eulerAngles = rot;
+        if (!disabled)
+        {
+            facing = orientation.WrapClamp(0.0f, 360.0f);
+            Vector3 rot = pivot.eulerAngles;
+            rot.y = facing;
+            pivot.eulerAngles = rot;
+        }
     }
 
     public virtual void Rotate(float angle)
@@ -238,7 +252,7 @@ public class WorldEntityCore : Core
 
     protected virtual void RotateTo(float angle, float duration = 0.2f)
     {
-        if (facing != angle)
+        if (facing != angle && !disabled)
         {
             float fPrev = facing;
             facing = angle;

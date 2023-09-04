@@ -1,12 +1,37 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEditor;
 
 using NeoCambion;
+using NeoCambion.Collections.Unity;
+using JetBrains.Annotations;
 
+[RequireComponent(typeof(Generation))]
 public class LevelManager : Core
 {
+    #region [ LEVEL GENERATION ]
+
+    public Generation Generator { get { return GetComponent<Generation>(); } }
+    public Generation.Grid TileGrid { get; private set; }
+
+    public List<LevelRoom> Rooms { get; private set; }
+    public List<LevelCorridor> Corridors { get; private set; }
+    public List<LevelArea> AllAreas { get; private set; }
+
+    public List<WorldEnemy> AllEnemies { get; private set; }
+    public List<WorldItem> AllItems { get; private set; }
+
+    #endregion
+
     #region [ OBJECTS / COMPONENTS ]
+
+    [HideInInspector] public Transform tileParent;
+
+    [HideInInspector] public PlayerSpawn spawnPoint;
+
+    [HideInInspector] public Dictionary<(bool, int), WorldEnemySet> worldEnemies = new Dictionary<(bool, int), WorldEnemySet>();
+    [HideInInspector] public Dictionary<(bool, int), WorldItem[]> worldItems = new Dictionary<(bool, int), WorldItem[]>();
 
     [HideInInspector] public CombatManager Combat = null;
     public Camera camWorld;
@@ -16,7 +41,7 @@ public class LevelManager : Core
 
     #region [ PROPERTIES ]
 
-    public bool levelScene = true;
+
 
     #endregion
 
@@ -32,6 +57,7 @@ public class LevelManager : Core
 
     void Awake()
     {
+        SetRef_LevelManager(this);
         Combat = FindObjectOfType<CombatManager>();
         if (Combat == null)
             Debug.LogError("Combat manager not found!");
@@ -39,7 +65,8 @@ public class LevelManager : Core
 
     void Start()
     {
-
+        DoGeneration();
+        OnGenerationComplete();
     }
 
     void Update()
@@ -53,6 +80,70 @@ public class LevelManager : Core
     }
 
     #endregion
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    private void DoGeneration()
+    {
+        TileGrid = new Generation.Grid(Generator);
+        Rooms = new List<LevelRoom>();
+        Corridors = new List<LevelCorridor>();
+        AllAreas = new List<LevelArea>();
+
+        Generator.Generate(RandTuning.GenSettings);
+        CreateMiniMap();
+    }
+
+    public void AddRoom(LevelRoom newRoom) => Rooms.Add(newRoom);
+
+    public void AddCorridor(LevelCorridor newCorridor) => Corridors.Add(newCorridor);
+
+    public void AddEnemy(WorldEnemy enemy)
+    {
+        if (AllEnemies == null)
+            AllEnemies = new List<WorldEnemy>();
+        AllEnemies.Add(enemy);
+    }
+
+    public void AddItem(WorldItem item)
+    {
+        if (AllItems == null)
+            AllItems = new List<WorldItem>();
+        AllItems.Add(item);
+    }
+
+    public void GetAllAreas()
+    {
+        AllAreas.AddRange(Rooms);
+        AllAreas.AddRange(Corridors);
+    }
+
+    public void CreateMiniMap()
+    {
+        TileGrid.GenerateMiniTiles(Generator.miniMapTransform, Generator.MatMiniMap);
+    }
+
+    public void OnGenerationComplete()
+    {
+        List<EnemyData>[] categorised = GameDataStorage.Data.EnemyData.Categorise();
+        foreach (LevelRoom room in Rooms)
+        {
+            if (room.containsEnemy && room.enemies != null)
+            {
+                foreach (WorldEnemy enemy in room.enemies.enemies)
+                {
+                    enemy.SetData(categorised[0].RandFrom());
+                }
+            }
+        }
+
+        spawnPoint.Trigger(GameManager.Instance.playerW);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    public void SetAIPause(bool pause)
+    { foreach (WorldEnemy enemy in AllEnemies) enemy.SetPaused(pause); }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -69,7 +160,7 @@ public class LevelManager : Core
 
     private IEnumerator ICombatTransition(bool entering, float duration)
     {
-        GameManager.controlState = ControlState.None;
+        GameManager.SetControlState(ControlState.None);
         Cursor.lockState = CursorLockMode.Locked;
 
         GameManager.Instance.UI.CombatTransitionOverlay(duration);
@@ -86,7 +177,7 @@ public class LevelManager : Core
 
         yield return new WaitForSeconds(duration * 0.5f);
 
-        GameManager.controlState = entering ? ControlState.Combat : ControlState.World;
+        GameManager.SetControlState(entering ? ControlState.Combat : ControlState.World);
     }
 
     public void INDEV_ExitCombat()

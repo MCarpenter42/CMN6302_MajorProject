@@ -32,59 +32,64 @@ using UnityEngine.UIElements;
 
 public class CombatManager : Core
 {
+    public HUDManager HUDManager { get { return UIManager.HUD; } }
+
     #region [ OBJECTS / COMPONENTS ]
 
+    [SerializeField] PivotArmCamera combatCamera;
+
+    [Header("Parent Transforms")]
     [SerializeField] Transform allyParent;
-    private Vector3 allyAnchor
-    {
-        get
-        {
-            if (allyParent == null)
-                return Vector3.forward * 6.0f;
-            else
-                return allyParent.position;
-        }
-    }
+    [SerializeField] Transform allyViewAnchor;
     [SerializeField] Transform enemyParent;
-    private Vector3 enemyAnchor
-    {
-        get
-        {
-            if (enemyParent == null)
-                return Vector3.forward * -6.0f;
-            else
-                return enemyParent.position;
-        }
-    }
-    [HideInInspector] public List<CombatantCore> playerTeam = new List<CombatantCore>();
-    [HideInInspector] public List<CombatantCore> enemyTeam = new List<CombatantCore>();
-    public List<CombatantCore> combatants
-    {
-        get
-        {
-            List<CombatantCore> combatants = new List<CombatantCore>();
-            combatants.AddRange(playerTeam);
-            combatants.AddRange(enemyTeam);
-            return combatants;
-        }
-    }
+    [SerializeField] Transform enemyViewAnchor;
+
+    [Header("Template Objects")]
+    [SerializeField] GameObject allyPrefab;
+    [SerializeField] GameObject enemyPrefab;
     [SerializeField] GameObject turnIndicator;
+
+    public CombatantsContainer combatants = new CombatantsContainer();
+    public List<CombatPlayer> allyTeam { get { return combatants.allyTeam; } }
+    public List<CombatEnemy> enemyTeam { get { return combatants.enemyTeam; } }
 
     #endregion
 
     #region [ PROPERTIES ]
 
+    public bool disableStart = false;
+
     public static float TimeFactor = 5000;
     public float combatTime { get; private set; }
+    public int turnCounter { get; private set; }
+
+    public float delayBetweenTurns = 1.5f;
 
     [HideInInspector] public int turnOfInd = -1;
-    public CombatantCore turnOf { get { return combatants.InBounds(turnOfInd) ? combatants[turnOfInd] : null; } }
+    public CombatantCore currentlyActing { get { return combatants[turnOfInd]; } }
+
+    [HideInInspector] public int playerSkillPower = 3;
+    public static int maxSkillPower = 6;
+    [HideInInspector] public int playerUltPower = 0;
+    public static int maxUltPower = 25;
+    public static int requiredUltPower = 20;
+
+    public bool selectionActive = false;
+    public TargetSelection currentTargetingType = TargetSelection.None;
+    public bool targetingAllies { get { return currentTargetingType == TargetSelection.Self || currentTargetingType == TargetSelection.Allied || currentTargetingType == TargetSelection.Self; } }
+    public int currentAllyTarget = -1;
+    public int currentEnemyTarget = -1;
+    public int currentBlastWidth = 0;
+
+    public CameraAngle defaultCameraAngle;
+    public CameraAngle defaultCameraAngleFlipped;
 
     #endregion
 
     #region [ COROUTINES ]
 
     private Coroutine c_EventDelay = null;
+    private Coroutine c_RotateOverview = null;
 
     #endregion
 
@@ -94,7 +99,8 @@ public class CombatManager : Core
 
     void Awake()
     {
-
+        defaultCameraAngle = new CameraAngle(combatCamera.position, combatCamera.eulerAngles, combatCamera.camOffset);
+        defaultCameraAngleFlipped = new CameraAngle(defaultCameraAngle, new Vector3(0f, 180f, 0f));
     }
 
     void Start()
@@ -116,91 +122,22 @@ public class CombatManager : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public Vector3[] CombatantPositions(bool enemyPos = true)
-    {
-        Vector3 anchor = enemyPos ? enemyAnchor : allyAnchor;
-        float spacing = 2.0f, totalWidth = 0.0f;
-        int i;
-        float[] offsets;
-        if (enemyPos)
-        {
-            offsets = new float[enemyTeam.Count];
-            for (i = 1; i < offsets.Length; i++)
-            {
-                totalWidth += (enemyTeam[i - 1].size + enemyTeam[i].size) / 2.0f + spacing;
-                offsets[i] = totalWidth;
-            }
-        }
-        else
-        {
-            offsets = new float[playerTeam.Count];
-            for (i = 1; i < offsets.Length; i++)
-            {
-                totalWidth += (playerTeam[i - 1].size + playerTeam[i].size) / 2.0f + spacing;
-                offsets[i] = totalWidth;
-            }
-        }
-        Vector3[] positions = new Vector3[offsets.Length];
-        if (offsets.Length > 0)
-        {
-            positions[0] = anchor - Vector3.right * (totalWidth / 2.0f);
-        }
-        for (i = 1; i < positions.Length; i++)
-        {
-            positions[i] = positions[0] + Vector3.right * offsets[i];
-        }
-        return positions;
-    }
-
-    public bool SpawnCombatant(GameObject template, CombatantData data)
-    {
-        GameObject cmbObj = Instantiate(template);
-        CombatantCore combatant = cmbObj.GetOrAddComponent<CombatantCore>();
-        combatant.GetData(data);
-        if (combatant.gotData)
-        {
-            cmbObj.name = data.displayName;
-            combatants.Add(combatant);
-            return true;
-        }
-        else
-        {
-            Destroy(cmbObj);
-            return false;
-        }
-    }
-
-    private void ReassignIndices()
-    {
-        int i;
-        for (i = 0; i < playerTeam.Count; i++)
-        {
-            playerTeam[i].index = i;
-        }
-        for (i = 0; i < enemyTeam.Count; i++)
-        {
-            enemyTeam[i].index = i;
-        }
-    }
-
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
     public struct TurnOrderRef
     {
-        public bool playerTeam;
+        public bool allyTeam;
         public int index;
         public float nextActionTime;
 
-        public TurnOrderRef(bool playerTeam, int index, float nextActionTime)
+        public TurnOrderRef(bool allyTeam, int index, float nextActionTime)
         {
-            this.playerTeam = playerTeam;
+            this.allyTeam = allyTeam;
             this.index = index;
             this.nextActionTime = nextActionTime;
         }
 
         public TurnOrderRef(TurnOrderRef template, float timeMod)
         {
-            playerTeam = template.playerTeam;
+            allyTeam = template.allyTeam;
             index = template.index;
             nextActionTime = template.nextActionTime + timeMod;
         }
@@ -221,98 +158,101 @@ public class CombatManager : Core
     public TurnOrderRef[] GetActionOrder(ushort forecastMax)
     {
         TurnOrderRef[] order = new TurnOrderRef[forecastMax];
-        TurnOrderRef nxAct;
-        int combatantCount = playerTeam.Count + enemyTeam.Count;
-        int i, j;
+        List<TurnOrderRef> reflist = new List<TurnOrderRef>();
+        float nxTime;
+        bool valueAdded;
+        int i, j, k, checkMax = Mathf.RoundToInt((float)forecastMax / combatants.Count) + 1;
+        reflist.Add(new TurnOrderRef(true, -1, float.MaxValue));
+        for (i = 0; i < checkMax; i++)
+        {
+            valueAdded = false;
+            for (j = 0; j < allyTeam.Count; j++)
+            {
+                nxTime = allyTeam[j].nextActionTime + allyTeam[j].actionInterval * i;
+                for (k = 0; k < forecastMax && k < reflist.Count; k++)
+                {
+                    if (nxTime < reflist[k].nextActionTime)
+                    {
+                        reflist.Insert(k, new TurnOrderRef(true, j, nxTime));
+                        valueAdded = true;
+                        break;
+                    }
+                }
+            }
+            for (j = 0; j < enemyTeam.Count; j++)
+            {
+                nxTime = enemyTeam[j].nextActionTime + enemyTeam[j].actionInterval * i;
+                for (k = 0; k < forecastMax && k < reflist.Count; k++)
+                {
+                    if (nxTime < reflist[k].nextActionTime)
+                    {
+                        reflist.Insert(k, new TurnOrderRef(false, j, nxTime));
+                        valueAdded = true;
+                        break;
+                    }
+                }
+            }
+            if (!valueAdded)
+                break;
+        }
         for (i = 0; i < order.Length; i++)
         {
-            order[i] = new TurnOrderRef(true, 0, playerTeam[0].nextActionTime + playerTeam[0].actionInterval * i);
-        }
-        for (i = 1; i < playerTeam.Count; i++)
-        {
-            nxAct = new TurnOrderRef(true, i, playerTeam[i].nextActionTime);
-            for (j = 0; j < order.Length; j++)
-            {
-                if (nxAct.nextActionTime < order[j].nextActionTime)
-                {
-                    order.Insert(i, nxAct);
-                    nxAct = new TurnOrderRef(nxAct, playerTeam[i].actionInterval);
-                }
-            }
-        }
-        for (i = 0; i < enemyTeam.Count; i++)
-        {
-            nxAct = new TurnOrderRef(true, i, enemyTeam[i].nextActionTime);
-            for (j = 0; j < order.Length; j++)
-            {
-                if (nxAct.nextActionTime < order[j].nextActionTime)
-                {
-                    order.Insert(i, nxAct);
-                    nxAct = new TurnOrderRef(nxAct, enemyTeam[i].actionInterval);
-                }
-            }
+            order[i] = reflist[i];
         }
         return order;
     }
 
     public float TimeToAction(int combatantInd)
     {
-        if (combatants.InBounds(combatantInd) && combatants[combatantInd].alive)
-            return combatants[combatantInd].nextActionTime - combatTime;
+        CombatantCore combantant = combatants[combatantInd];
+        if (combantant.alive)
+            return combantant.nextActionTime - combatTime;
         else
             return float.MaxValue;
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    FloatRange spacing = new FloatRange(3f, 5f);
     public void StartCombat(CombatantData[] allyList, CombatantData[] enemyList)
     {
-        if (combatants.Count > 0)
+        Debug.Log("Combat started with " + allyList.Length + " allies and " + enemyList.Length + " enemies");
+        if (!disableStart)
         {
-            for (int i = combatants.Count - 1; i >= 0; i--)
+            combatants.allyTransform = allyParent;
+            combatants.enemyTransform = enemyParent;
+
+            if (combatants.Count > 0)
+                combatants.Clear();
+
+            combatants.Initialise(allyList, allyPrefab, enemyList, enemyPrefab);
+
+            combatants.ReassignIndices();
+
+            combatants.UpdateTeamPositions(true, spacing);
+            combatants.UpdateTeamPositions(false, spacing);
+
+            ResetCombatValues();
+
+            foreach (CombatPlayer combatant in allyTeam)
             {
-                Destroy(combatants[i].gameObject, 0.001f);
-                combatants.RemoveAt(i);
+                if (combatant.healthBar != null)
+                    combatant.healthBar.rotateTarget = combatCamera.cam.transform;
             }
-        }
-
-        GameObject temp = new GameObject();
-        foreach (CombatantData ally in allyList)
-        {
-            SpawnCombatant(temp, ally);
-        }
-        foreach (CombatantData enemy in enemyList)
-        {
-            SpawnCombatant(temp, enemy);
-        }
-        Destroy(temp);
-        ReassignIndices();
-        Vector3[] allyPos = CombatantPositions(false);
-        Vector3[] enemyPos = CombatantPositions(true);
-        for (int i = 0; i < playerTeam.Count; i++)
-        {
-            playerTeam[i].pos = allyPos[i];
-        }
-        for (int i = 0; i < enemyTeam.Count; i++)
-        {
-            enemyTeam[i].pos = enemyPos[i];
-            enemyTeam[i].rot = Vector3.up * 180.0f;
-        }
-
-        TurnOrderRef[] initActOrd = GetActionOrder(10);
-        int index;
-        for (int i = 0; i < 10; i++)
-        {
-            index = initActOrd[i].index;
-            if (index >= 0)
+            foreach (CombatEnemy combatant in enemyTeam)
             {
-                TurnOrderItem lItem = Instantiate(GameManager.Instance.UI.HUD.turnOrderItem, GameManager.Instance.UI.HUD.turnOrderAnchor.transform);
-                lItem.rTransform.anchoredPosition = Vector3.zero + Vector3.up * -80 * i;
-                lItem.SetName(initActOrd[i].playerTeam ? playerTeam[index].displayName : enemyTeam[index].displayName);
+                if (combatant.healthBar != null)
+                    combatant.healthBar.rotateTarget = combatCamera.cam.transform;
             }
-        }
 
-        OpeningEvents();
+            foreach (CombatEnemy enemy in enemyTeam)
+            {
+                Debug.Log(enemy.pivot == null);
+                enemy.rotation = 180.0f * Vector3.up;
+            }
+
+            OpeningEvents();
+        }
     }
 
     public void StartCombatDelayed(CombatantData[] allyList, CombatantData[] enemyList, float delay)
@@ -328,6 +268,20 @@ public class CombatManager : Core
         StartCombat(allyList, enemyList);
     }
 
+    private void ResetCombatValues()
+    {
+        combatTime = 0f;
+        turnCounter = 0;
+
+        currentTargetingType = TargetSelection.None;
+        currentAllyTarget = GetMiddle(true);
+        currentEnemyTarget = GetMiddle(false);
+
+        HUDManager.SetAbilityButtonsEnabled(false);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
     private void OpeningEvents()
     {
         if (c_EventDelay != null)
@@ -337,12 +291,111 @@ public class CombatManager : Core
 
     private IEnumerator IOpeningEvents()
     {
+        //yield return new WaitForSeconds(RotateOverview());
         yield return null;
+        yield return new WaitForSeconds(0.1f);
         NextTurn();
     }
 
+    private float RotateOverview()
+    {
+        float duration = 5.0f;
+        if (c_RotateOverview != null)
+            StopCoroutine(c_RotateOverview);
+        c_RotateOverview = StartCoroutine(IRotateOverview(duration));
+        return duration;
+    }
+
+    private IEnumerator IRotateOverview(float duration)
+    {
+        Transform pivot = combatCamera.pivot;
+        Vector3 rotStart = pivot.eulerAngles, rotOffset = Vector3.zero;
+        float t = 0f, tMax = duration, delta;
+        while(t < duration)
+        {
+            yield return null;
+            t += Time.deltaTime;
+            delta = t / tMax;
+            rotOffset.y = Mathf.Lerp(0f, 360f, InterpDelta.CosCurve(delta));
+            pivot.eulerAngles = rotStart + rotOffset;
+        }
+        pivot.eulerAngles = rotStart;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    public void OnTurnStarted(CombatantCore combatant, float time)
+    {
+        Debug.Log("Turn started: " + combatant.displayName + " (" + (combatant.brain.friendly ? "Player" : "Enemy") + ")\nCombat time: " + time);
+    }
+    
+    public void OnTurnEnded(CombatantCore combatant, float time)
+    {
+        Debug.Log("Turn ended: " + combatant.displayName + " (" + (combatant.brain.friendly ? "Player" : "Enemy") + ")\nCombat time: " + time);
+    }
+
+    public void OnCombatantDamaged(CombatantCore combatant, int value)
+    {
+        if (value > 0)
+            Debug.Log(combatant.displayName + " was damaged for " + value + ", leaving them on " + (combatant.health.Current - value) + "/" + combatant.health.Scaled + " health (" + combatant.health.CurrentPercentString + ")");
+        else
+            Debug.Log(combatant.displayName + " was attacked but took no damage, leaving them on " + combatant.health.Current + "/" + combatant.health.Scaled + " health (" + combatant.health.CurrentPercentString + ")");
+    }
+
+    public void OnCombatantShieldDamaged(CombatantCore combatant, int value)
+    {
+        Debug.Log(combatant.displayName + "'s shields were damaged for " + value);
+
+    }
+
+    public void OnCombatantHealed(CombatantCore combatant, int value)
+    {
+        Debug.Log(combatant.displayName + " was healed for " + value + ", leaving them on " + (combatant.health.Current + value) + " health (" + combatant.health.CurrentPercentString + ")");
+
+    }
+
+    public void OnCombatantShielded(CombatantCore combatant, int value)
+    {
+        Debug.Log(combatant.displayName + " was killed!");
+
+    }
+
+    public void OnCombatantDied(CombatantCore combatant)
+    {
+        Debug.Log(combatant.displayName + " was killed!");
+    }
+
+    public void OnCombatantRevived(CombatantCore combatant, int healedBy)
+    {
+        Debug.Log(combatant.displayName + " was revived, and healed for " + healedBy + "!");
+    }
+
+    public void RemoveDead()
+    {
+        for (int i = enemyTeam.Count - 1; i >= 0; i--)
+        {
+            if (!enemyTeam[i].alive)
+            {
+                enemyTeam[i].gameObject.DestroyThis();
+                enemyTeam.RemoveAt(i);
+            }
+        }
+        combatants.ReassignIndices();
+        combatants.UpdateTeamPositions(false, spacing);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
     private int NextTurn()
     {
+        RemoveDead();
+
+        if (turnOfInd > -1)
+            OnTurnEnded(currentlyActing, combatTime);
+
+        turnCounter++;
+        HUDManager.DrawActionOrder(GetActionOrder(10));
+
         float lowest = float.MaxValue;
         int cInd = -1;
         for (int i = 0; i < combatants.Count; i++)
@@ -354,8 +407,11 @@ public class CombatManager : Core
             }
         }
         turnOfInd = cInd;
+        OnTurnStarted(currentlyActing, combatTime);
+
         combatTime = combatants[cInd].nextActionTime;
-        turnIndicator.transform.position = combatants[cInd].pos;
+        combatants[cInd].lastActionTime = combatants[cInd].nextActionTime;
+        turnIndicator.transform.position = combatants[cInd].position;
         if (combatants[cInd].brain.autonomous)
         {
             float t = combatants[cInd].NextAction();
@@ -363,26 +419,496 @@ public class CombatManager : Core
         }
         else
         {
-            // ENABLE ACTION SELECTION HERE
+            StartPlayerTurn(cInd);
         }
         return cInd;
     }
 
     public void AdvanceTurnOrder(float delay)
     {
-        if (delay > 0.0f)
-        {
-            StartCoroutine(IAdvanceTurnOrder(delay));
-        }
-        else
-        {
-            NextTurn();
-        }
+        StartCoroutine(IAdvanceTurnOrder(delay + delayBetweenTurns));
     }
 
     private IEnumerator IAdvanceTurnOrder(float delay)
     {
         yield return new WaitForSeconds(delay);
         NextTurn();
+    }
+
+    public void StartPlayerTurn(int characterIndex)
+    {
+        HUDManager.SetAbilityButtonsEnabled(true);
+        StartPlayerTargetSelection(ActionPoolCategory.Standard);
+    }
+    
+    public void EndPlayerTurn(float delay)
+    {
+        HUDManager.SetAbilityButtonsEnabled(false);
+        Debug.Log(delay);
+        AdvanceTurnOrder(delay);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    private int GetMiddle(bool playerTeam)
+    {
+        if (playerTeam)
+            return (allyTeam.Count - 1) / 2;
+        else
+            return (enemyTeam.Count - 1) / 2;
+    }
+
+    private void SetVisibleTargetArrows(bool playerTeam, int index, bool targetAll, int blastWidth = 0)
+    {
+        if (playerTeam)
+        {
+            if (index < 0)
+                index = 0;
+            else if (index >= allyTeam.Count)
+                index = allyTeam.Count - 1;
+            if (targetAll)
+            {
+                foreach (CombatantCore ally in allyTeam)
+                {
+                    ally.SetTargetedState(TargetArrowState.AOE);
+                }
+            }
+            else
+            {
+                allyTeam[index].SetTargetedState(TargetArrowState.Direct);
+                for (int i = index - 1; i >= 0; i--)
+                {
+                    if (i >= index - blastWidth)
+                        allyTeam[i].SetTargetedState(TargetArrowState.Blast);
+                    else
+                        allyTeam[i].SetTargetedState(TargetArrowState.None);
+                }
+                for (int i = index + 1; i < allyTeam.Count; i++)
+                {
+                    if (i <= index + blastWidth)
+                        allyTeam[i].SetTargetedState(TargetArrowState.Blast);
+                    else
+                        allyTeam[i].SetTargetedState(TargetArrowState.None);
+                }
+            }
+            foreach (CombatantCore enemy in enemyTeam)
+            {
+                enemy.SetTargetedState(TargetArrowState.None);
+            }
+        }
+        else
+        {
+            if (index < 0)
+                index = 0;
+            else if (index >= enemyTeam.Count)
+                index = enemyTeam.Count - 1;
+            if (targetAll)
+            {
+                foreach (CombatantCore enemy in enemyTeam)
+                {
+                    enemy.SetTargetedState(TargetArrowState.AOE);
+                }
+            }
+            else
+            {
+                enemyTeam[index].SetTargetedState(TargetArrowState.Direct);
+                for (int i = index - 1; i >= 0; i--)
+                {
+                    if (i >= index - blastWidth)
+                        enemyTeam[i].SetTargetedState(TargetArrowState.Blast);
+                    else
+                        enemyTeam[i].SetTargetedState(TargetArrowState.None);
+                }
+                for (int i = index + 1; i < enemyTeam.Count; i++)
+                {
+                    if (i <= index + blastWidth)
+                        enemyTeam[i].SetTargetedState(TargetArrowState.Blast);
+                    else
+                        enemyTeam[i].SetTargetedState(TargetArrowState.None);
+                }
+            }
+            foreach (CombatantCore ally in allyTeam)
+            {
+                ally.SetTargetedState(TargetArrowState.None);
+            }
+        }
+    }
+    private void ClearVisibleTargetArrows()
+    {
+        foreach (CombatantCore combatant in allyTeam)
+        {
+            combatant.SetTargetedState(TargetArrowState.None);
+        }
+        foreach (CombatantCore combatant in enemyTeam)
+        {
+            combatant.SetTargetedState(TargetArrowState.None);
+        }
+    }
+
+    public void StartPlayerTargetSelection(ActionPoolCategory ability)
+    {
+        selectionActive = true;
+        CombatantCore combatant = currentlyActing;
+        switch (ability)
+        {
+            default:
+                currentTargetingType = TargetSelection.None;
+                currentBlastWidth = 0;
+                break;
+
+            case ActionPoolCategory.Standard:
+                currentTargetingType = combatant.brain.actions.standard[0].targeting.selection;
+                currentBlastWidth = combatant.brain.actions.standard[0].multiTarget.count;
+                break;
+
+            case ActionPoolCategory.Advanced:
+                currentTargetingType = combatant.brain.actions.advanced[0].targeting.selection;
+                currentBlastWidth = combatant.brain.actions.advanced[0].multiTarget.count;
+                break;
+
+            case ActionPoolCategory.Special:
+                currentTargetingType = combatant.brain.actions.special[0].targeting.selection;
+                currentBlastWidth = combatant.brain.actions.special[0].multiTarget.count;
+                break;
+        }
+        Debug.Log("Beginning target selection for " + combatant.displayName + ": " + ability.ToString() + "\nTargeting type: " + currentTargetingType.ToString() + " | Blast width: " + currentBlastWidth);
+
+        if (targetingAllies)
+        {
+            if (currentAllyTarget >= allyTeam.Count)
+                currentAllyTarget = GetMiddle(true);
+            combatCamera.SetViewAngle(defaultCameraAngleFlipped);
+            SetVisibleTargetArrows(true, currentAllyTarget, currentTargetingType == TargetSelection.AlliedAll, currentBlastWidth);
+        }
+        else
+        {
+            if (currentEnemyTarget >= enemyTeam.Count)
+                currentEnemyTarget = GetMiddle(false);
+            combatCamera.SetViewAngle(defaultCameraAngle);
+            SetVisibleTargetArrows(false, currentEnemyTarget, currentTargetingType == TargetSelection.OpposedAll, currentBlastWidth);
+        }
+    }
+
+    public void MoveSelect(bool right)
+    {
+        if (selectionActive)
+        {
+            if (targetingAllies)
+            {
+                currentAllyTarget = (currentAllyTarget + (right ? 1 : -1)).Clamp(0, allyTeam.Count);
+                combatCamera.SetViewAngle(defaultCameraAngleFlipped);
+                SetVisibleTargetArrows(true, currentAllyTarget, currentTargetingType == TargetSelection.AlliedAll, currentBlastWidth);
+            }
+            else
+            {
+                currentEnemyTarget = (currentEnemyTarget + (right ? 1 : -1)).Clamp(0, enemyTeam.Count);
+                combatCamera.SetViewAngle(defaultCameraAngle);
+                SetVisibleTargetArrows(false, currentEnemyTarget, currentTargetingType == TargetSelection.OpposedAll, currentBlastWidth);
+            }
+        }
+    }
+    public void MoveSelectTo(int index)
+    {
+        if (selectionActive)
+        {
+            if (targetingAllies)
+            {
+                currentAllyTarget = index.Clamp(0, allyTeam.Count);
+                combatCamera.SetViewAngle(defaultCameraAngleFlipped);
+                SetVisibleTargetArrows(true, currentAllyTarget, currentTargetingType == TargetSelection.AlliedAll, currentBlastWidth);
+            }
+            else
+            {
+                currentEnemyTarget = index.Clamp(0, enemyTeam.Count);
+                combatCamera.SetViewAngle(defaultCameraAngle);
+                SetVisibleTargetArrows(false, currentEnemyTarget, currentTargetingType == TargetSelection.OpposedAll, currentBlastWidth);
+            }
+        }
+    }
+
+    private CombatantTeamIndex[] GetCurrentTargets()
+    {
+        CombatantTeamIndex[] targets;
+        switch (currentTargetingType)
+        {
+            default:
+            case TargetSelection.None:
+                targets = new CombatantTeamIndex[0];
+                break;
+
+            case TargetSelection.Allied:
+                targets = new CombatantTeamIndex[1] { allyTeam[currentAllyTarget].teamIndex };
+                break;
+                
+            case TargetSelection.AlliedAll:
+                targets = new CombatantTeamIndex[allyTeam.Count];
+                for (int i = 0; i < targets.Length; i++)
+                {
+                    targets[i] = new CombatantTeamIndex(true, i);
+                }
+                break;
+
+            case TargetSelection.Opposed:
+                targets = new CombatantTeamIndex[1] { enemyTeam[currentEnemyTarget].teamIndex };
+                break;
+
+            case TargetSelection.OpposedAll:
+                targets = new CombatantTeamIndex[enemyTeam.Count];
+                for (int i = 0; i < targets.Length; i++)
+                {
+                    targets[i] = new CombatantTeamIndex(false, i);
+                }
+                break;
+        }
+        return targets;
+    }
+
+    public void TriggerPlayerAbility()
+    {
+        ActionPoolCategory type = HUDManager.selectedAbilityType;
+        TriggerPlayerAbility(type);
+    }
+    public void TriggerPlayerAbility(ActionPoolCategory type)
+    {
+        Debug.Log("Used player ability: " + type);
+        if (currentlyActing.brain.friendly)
+        {
+            CombatantTeamIndex[] targets = GetCurrentTargets();
+            selectionActive = false;
+            ClearVisibleTargetArrows();
+            if (type == ActionPoolCategory.Standard)
+            {
+                AdjustSkillPower(+1);
+                AdjustUltPower(+1);
+                if (targets.Length > 0)
+                    EndPlayerTurn(currentlyActing.brain.ExecuteAction(type, targets, 0, false));
+                else
+                    EndPlayerTurn(currentlyActing.brain.ExecuteAction(type, 0, false));
+            }
+            else if (type == ActionPoolCategory.Advanced)
+            {
+                if (playerSkillPower > 0)
+                {
+                    AdjustSkillPower(-1);
+                    AdjustUltPower(+3);
+                    if (targets.Length > 0)
+                        EndPlayerTurn(currentlyActing.brain.ExecuteAction(type, targets, 0, false));
+                    else
+                        EndPlayerTurn(currentlyActing.brain.ExecuteAction(type, 0, false));
+                }
+            }
+            else if (type == ActionPoolCategory.Special)
+            {
+                if (playerUltPower >= requiredUltPower)
+                {
+                    AdjustUltPower(-requiredUltPower);
+                    if (targets.Length > 0)
+                        EndPlayerTurn(currentlyActing.brain.ExecuteAction(type, targets, 0, false));
+                    else
+                        EndPlayerTurn(currentlyActing.brain.ExecuteAction(type, 0, false));
+                }
+            }
+        }
+    }
+
+    public void AdjustSkillPower(int adjustBy)
+    {
+        playerSkillPower += adjustBy;
+        if (playerSkillPower < 0)
+            playerSkillPower = 0;
+        else if (playerSkillPower > maxSkillPower)
+            playerSkillPower = maxSkillPower;
+    }
+    
+    public void AdjustUltPower(int adjustBy)
+    {
+        playerUltPower += adjustBy;
+        if (playerUltPower < 0)
+            playerUltPower = 0;
+        else if (playerUltPower > maxUltPower)
+            playerUltPower = maxUltPower;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void ActionAnim(string actionName, CombatantTeamIndex origin, CombatantTeamIndex target, float delayA, float delayB)
+    {
+        HUDManager.ActionNameDisplay(actionName, delayA + delayB, 0.8f);
+        CameraAngle actorViewAngle, targetViewAngle;
+
+        if (origin.playerTeam)
+            actorViewAngle = new CameraAngle(allyTeam[origin.teamIndex].cameraViewAnchor.position, new Vector3(5f, 190f, 0f), 3f);
+        else
+            actorViewAngle = new CameraAngle(enemyTeam[origin.teamIndex].cameraViewAnchor.position, new Vector3(5f, 010f, 0f), 3f);
+
+        if (target.playerTeam)
+            targetViewAngle = new CameraAngle(allyTeam[target.teamIndex].cameraViewAnchor.position, new Vector3(5f, 190f, 0f), 3f);
+        else
+            targetViewAngle = new CameraAngle(enemyTeam[target.teamIndex].cameraViewAnchor.position, new Vector3(5f, 010f, 0f), 3f);
+
+        StartCoroutine(IActionAnim(actorViewAngle, targetViewAngle, delayA, delayB));
+    }
+    public void ActionAnim(string actionName, CombatantTeamIndex origin, bool targetPlayerTeam, float delayA, float delayB)
+    {
+        HUDManager.ActionNameDisplay(actionName, delayA + delayB, 0.8f);
+        CameraAngle actorViewAngle, targetViewAngle;
+
+        if (origin.playerTeam)
+            actorViewAngle = new CameraAngle(allyTeam[origin.teamIndex].cameraViewAnchor.position, new Vector3(5f, 190f, 0f), 3f);
+        else
+            actorViewAngle = new CameraAngle(enemyTeam[origin.teamIndex].cameraViewAnchor.position, new Vector3(5f, 010f, 0f), 3f);
+
+        if (targetPlayerTeam)
+            targetViewAngle = new CameraAngle(allyViewAnchor.position, new Vector3(15f, 180f, 0f), 9f);
+        else
+            targetViewAngle = new CameraAngle(enemyViewAnchor.position, new Vector3(15f, 000f, 0f), 9f);
+
+        StartCoroutine(IActionAnim(actorViewAngle, targetViewAngle, delayA, delayB));
+    }
+    private IEnumerator IActionAnim(CameraAngle actorViewAngle, CameraAngle targetViewAngle, float actorViewDur, float targetViewDur)
+    {
+        combatCamera.SetViewAngle(actorViewAngle);
+        yield return new WaitForSeconds(actorViewDur);
+        combatCamera.SetViewAngle(targetViewAngle);
+        yield return new WaitForSeconds(targetViewDur);
+        combatCamera.SetViewAngle(defaultCameraAngle);
+    }
+}
+
+public class CombatantsContainer
+{
+    public Transform allyTransform;
+    public Vector3 allyAnchor => allyTransform == null ? -6f * Vector3.forward : allyTransform.position;
+    public List<CombatPlayer> allyTeam;
+
+    public Transform enemyTransform;
+    public Vector3 enemyAnchor => enemyTransform == null ? 6f * Vector3.forward : enemyTransform.position;
+    public List<CombatEnemy> enemyTeam;
+
+    public int Count => (allyTeam == null ? 0 : allyTeam.Count) + (enemyTeam == null ? 0 : enemyTeam.Count);
+
+    public CombatantCore this[bool ally, int index] => ally ? allyTeam[index]: enemyTeam[index];
+
+    public CombatantCore this[int indexOverall] => indexOverall >= allyTeam.Count ? enemyTeam[indexOverall - allyTeam.Count] : allyTeam[indexOverall];
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void Clear()
+    {
+        if (allyTeam.Count > 0)
+            allyTeam.ClearAndDestroy();
+        if (enemyTeam.Count > 0)
+            enemyTeam.ClearAndDestroy();
+    }
+
+    public void Initialise(CombatantData[] allyData, GameObject allyTemplate, CombatantData[] enemyData, GameObject enemyTemplate)
+    {
+        allyTeam = new List<CombatPlayer>();
+        foreach (PlayerData data in allyData)
+        {
+            CombatPlayer ally = allyTeam.AddClone(allyTemplate, allyTransform);
+            ally.GetData(data);
+            if (ally.gotData)
+                ally.gameObject.name = data.displayName;
+            else
+                allyTeam.RemoveLastAndDestroy();
+        }
+
+        enemyTeam = new List<CombatEnemy>();
+        foreach (EnemyData data in enemyData)
+        {
+            CombatEnemy enemy = enemyTeam.AddClone(enemyTemplate, enemyTransform);
+            enemy.GetData(data);
+            if (enemy.gotData)
+                enemy.gameObject.name = data.displayName;
+            else
+                enemyTeam.RemoveLastAndDestroy();
+        }
+    }
+
+    public void ReassignIndices()
+    {
+        int i;
+        for (i = 0; i < allyTeam.Count; i++)
+        {
+            allyTeam[i].index = i;
+        }
+        for (i = 0; i < enemyTeam.Count; i++)
+        {
+            enemyTeam[i].index = i;
+        }
+    }
+
+    public void UpdateTeamPositions(bool allies, FloatRange spacingInfo)
+    {
+        float spacing, w;
+        int indL, indR;
+        Vector3 posL, posR;
+        if (allies && allyTeam.Count > 1)
+        {
+            posL = allyAnchor;
+            posR = allyAnchor;
+            w = allyTeam[0].Size;
+            posL.x -= ((allyTeam.Count - 1) / 2f) * (spacingInfo.upper + w);
+            allyTeam[0].position = posL;
+            for (int i = 1; i < allyTeam.Count; i++)
+            {
+                posL.x += spacingInfo.upper + w;
+                allyTeam[i].position = posL;
+            }
+        }
+        else if (!allies && enemyTeam.Count > 1)
+        {
+            posL = enemyAnchor;
+            posR = enemyAnchor;
+            if (enemyTeam.Count <= 4)
+                spacing = spacingInfo.upper;
+            else
+            {
+                switch (enemyTeam.Count)
+                {
+                    case 5: spacing = spacingInfo.upper - 0.25f * spacingInfo.range; break;
+                    case 6: spacing = spacingInfo.upper - 0.50f * spacingInfo.range; break;
+                    case 7: spacing = spacingInfo.upper - 0.75f * spacingInfo.range; break;
+                    default: spacing = spacingInfo.lower; break;
+                }
+            }
+
+            if (enemyTeam.Count % 2 == 1)
+            {
+                int centreInd = (enemyTeam.Count - 1) / 2;
+                enemyTeam[centreInd].position = enemyAnchor;
+                indR = centreInd + 1;
+                posR.x += enemyTeam[centreInd].Size / 2f;
+                indL = centreInd - 1;
+                posL.x -= enemyTeam[centreInd].Size / 2f;
+            }
+            else
+            {
+                indR = enemyTeam.Count / 2;
+                indL = indR - 1;
+
+                posL.x -= (enemyTeam[indL].Size + spacing) / 2f;
+                enemyTeam[indL].position = posL;
+                posL.x -= enemyTeam[indL].Size / 2f;
+                indL--;
+
+                posR.x += (enemyTeam[indR].Size + spacing) / 2f;
+                enemyTeam[indR].position = posR;
+                posR.x += enemyTeam[indR].Size / 2f;
+                indR++;
+            }
+
+            for (; indL >= 0 && indR < enemyTeam.Count; indL--, indR++)
+            {
+                posL.x -= enemyTeam[indL].Size / 2f + spacing;
+                enemyTeam[indL].position = posL;
+                posL.x -= enemyTeam[indL].Size / 2f;
+
+                posR.x += enemyTeam[indR].Size / 2f + spacing;
+                enemyTeam[indR].position = posR;
+                posR.x += enemyTeam[indR].Size / 2f;
+            }
+        }
     }
 }

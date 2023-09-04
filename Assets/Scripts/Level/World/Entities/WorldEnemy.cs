@@ -1,44 +1,48 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.AI;
 
 using NeoCambion;
+using NeoCambion.Collections;
+using System.Runtime.CompilerServices;
+using Unity.VisualScripting;
+using NeoCambion.Unity.Interpolation;
+using NeoCambion.Maths;
+using UnityEditor;
+using UnityEngine.UIElements;
 
-[RequireComponent(typeof(NavMeshAgent))]
 public class WorldEnemy : WorldEntityCore
 {
     #region [ OBJECTS / COMPONENTS ]
 
-    private NavMeshAgent navAgent;
-    private PathingHandler pathHandler;
+    public WorldEnemySet Set { get; private set; }
 
     #endregion
 
     #region [ PROPERTIES ]
 
+    private bool setupComplete = false;
+
+    public PositionInArea originPoint { get; private set; }
+
     [Header("World Options")]
     [SerializeField] bool roam = true;
-    private float moveDir = 0.0f;
-
-    private Vector3 lastPos = Vector3.zero;
-    private float targetRot = 0.0f;
-
-    private List<int> availableRooms = new List<int>();
-    private int targetRoom = -1, targetPoint = -1;
-    [HideInInspector] public bool navigating = false;
-    private bool gettingDestination = false;
-
+    
     [Header("Combat Options")]
     [Range(1, 30)]
     public int level = 1;
-    public CombatantType[] enemyTypes;
+    public EnemyData enemyData;
+
+    public EnemyClass Class { get { return enemyData.Class; } }
+
+    //public WanderHandler wanderHandler;
+    private List<Vector3> wanderPoints = new List<Vector3>();
 
     #endregion
 
     #region [ COROUTINES ]
 
-
+    Coroutine c_doWander = null;
 
     #endregion
 
@@ -49,21 +53,13 @@ public class WorldEnemy : WorldEntityCore
     protected override void Awake()
     {
         base.Awake();
-        navAgent = GetComponent<NavMeshAgent>();
-        pathHandler = FindObjectOfType<PathingHandler>();
     }
 
     protected override void Start()
     {
         base.Start();
         GameManager.Instance.enemyListW.Add(this);
-        int initialRoom = GetInitialRoom();
-        if (initialRoom > -1)
-        {
-            int startPoint = Random.Range(0, pathHandler.pointSets[initialRoom].pathPoints.Count);
-            transform.position = pathHandler.pointSets[initialRoom].pathPoints[startPoint];
-            availableRooms.Add(initialRoom);
-        }
+
     }
 
     protected override void Update()
@@ -74,81 +70,167 @@ public class WorldEnemy : WorldEntityCore
     protected override void FixedUpdate()
     {
         base.FixedUpdate();
-        if (roam && !navAgent.isStopped)
-        {
-            if (!navAgent.hasPath && !gettingDestination)
-                GetNewTarget();
-            /*else
-                UpdateRotation();*/
-        }
-        lastPos = transform.position;
+
     }
 
     #endregion
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-    private int GetInitialRoom()
+    
+    public void Setup(PositionInArea originPoint, WorldEnemySet set)
     {
-        int initialRoom = -1;
-        Vector3 roomMin, roomMax;
-        if (pathHandler != null && pathHandler.pointSets.Count > 0)
+        this.originPoint = originPoint;
+        transform.position = originPoint.worldPosition;
+        Set = set;
+
+        //wanderHandler = new WanderHandler(transform.position, (LevelRoom)(set.area));
+        wanderPoints.Add(transform.position);
+        LevelRoom room = set.area as LevelRoom;
+        int closestTile = room.ClosestTile(transform.position);
+        for (int i = 0; i < 5; i++)
         {
-            for (int i = 0; i < pathHandler.pointSets.Count; i++)
+            wanderPoints.Add(room.RandInternalPosition(closestTile));
+        }
+
+        LevelManager.AddEnemy(this);
+        if (!disabled)
+        {
+            setupComplete = true;
+            DoWander();
+        }
+    }
+
+    public void SetData(EnemyData data)
+    {
+        if (data != null)
+        {
+            enemyData = data;
+            string modelPath = EntityModel.GetModelPathFromUID(data.modelHexUID);
+            if (modelPath != null)
             {
-                roomMin = pathHandler.pointSets[i].boundaryArea.position - pathHandler.pointSets[i].boundaryArea.localScale / 2.0f;
-                roomMax = roomMin + pathHandler.pointSets[i].boundaryArea.localScale;
-                bool xInRange = transform.position.x >= roomMin.x && transform.position.x <= roomMax.x;
-                bool yInRange = transform.position.y >= roomMin.y && transform.position.y <= roomMax.y;
-                bool zInRange = transform.position.z >= roomMin.z && transform.position.z <= roomMax.z;
-                if (xInRange && yInRange && zInRange)
+                GameObject modelTemplate = Resources.Load<GameObject>(modelPath);
+                if (modelTemplate != null)
                 {
-                    return i;
+                    model = modelTemplate.GetComponent<EntityModel>();
+                    UpdateModelObject(true);
                 }
             }
-            initialRoom = Random.Range(0, pathHandler.pointSets.Count);
         }
-        return initialRoom;
     }
 
-    /*private void UpdateRotation()
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void DoWander(bool resume = false)
     {
-        Vector3 v = transform.position - lastPos;
-        Vector2 vDir = new Vector2(v.x, v.z);
-        float vFacing = vDir.Angle2D();
-        if (Mathf.Abs(vFacing - targetRot.WrapClamp(-180.0f, 180.0f)) > 2.0f && Mathf.Abs(vFacing.WrapClamp(0.0f, 360.0f) - targetRot) > 2.0f)
+        if (c_doWander != null)
+            StopCoroutine(c_doWander);
+        StartCoroutine(IDoWander(resume));
+    }
+
+    public bool halt = false;
+    private Vector3 last, target;
+
+    private IEnumerator IDoWander(bool resume = false)
+    {
+        if (!resume)
         {
-            targetRot = vFacing;
-            RotateTo(vFacing, 0.1f);
+            last = transform.position;
+            target = wanderPoints[Random.Range(0, wanderPoints.Count)];
         }
-    }*/
-
-    private void GetNewTarget()
-    {
-        gettingDestination = true;
-        StartCoroutine(IGetNewTarget());
+        float facing, dist, t, tMax, delta;
+        while (!halt)
+        {
+            facing = (target - transform.position).Angle2D(DualAxis.XZ);
+            RotateTo(facing, 0.4f);
+            dist = (target - transform.position).magnitude;
+            t = 0;
+            tMax = dist / maxSpeed;
+            while (t <= tMax && !halt)
+            {
+                yield return null;
+                t += Time.deltaTime;
+                delta = t / tMax;
+                transform.position = Vector3.Lerp(last, target, delta);
+            }
+            if (!halt)
+            {
+                transform.position = target;
+                yield return new WaitForSeconds(Random.Range(2.0f, 8.0f));
+                last = transform.position;
+                target = wanderPoints[Random.Range(0, wanderPoints.Count)];
+            }
+        }
+        halt = false;
     }
 
-    private IEnumerator IGetNewTarget()
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void TriggerCombat()
     {
-        yield return new WaitForSeconds(Random.Range(0.2f, 3.0f));
-        targetRoom = Random.Range(0, availableRooms.Count);
-        targetPoint = Random.Range(0, pathHandler.pointSets[availableRooms[targetRoom]].pathPoints.Count);
-        //Debug.Log(availableRooms[targetRoom] + ", " + targetPoint);
-        navAgent.SetDestination(pathHandler.pointSets[availableRooms[targetRoom]].pathPoints[targetPoint]);
-        gettingDestination = false;
+        if (!disabled && setupComplete)
+            Set.TriggerCombat();
     }
 
-    public void GoToCombat()
-    {
-        GameManager.Instance.OnCombatStart(gameObject.GetComponent<WorldEnemy>());
-    }
-
-    public void PauseBehaviour(bool pause)
+    public void SetPaused(bool pause)
     {
         if (roam)
         {
-            navAgent.isStopped = pause;
+            if (pause)
+                halt = true;
+            else
+                DoWander(true);
+        }
+    }
+}
+
+public class WorldEnemySet
+{
+    public LevelArea area;
+
+    public WorldEnemy[] enemies;
+    public EnemyData[] enemyData => GetData();
+    public int Size { get { return enemies.Length; } }
+
+    public WorldEnemy this[int index]
+    {
+        get { return enemies.InBounds(index) ? enemies[index] : null; }
+        set { if (enemies.InBounds(index)) { enemies[index] = value; } }
+    }
+
+    public WorldEnemySet(int setSize, LevelArea area)
+    {
+        enemies = new WorldEnemy[setSize];
+        this.area = area;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public EnemyData[] GetData()
+    {
+        EnemyData[] data = new EnemyData[enemies.Length];
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            data[i] = enemies[i].enemyData;
+        }
+        return data;
+    }
+    public void TriggerCombat() => GameManager.Instance.OnCombatStart(this);
+}
+
+[CustomEditor(typeof(WorldEnemy))]
+public class WorldEnemyEditor : Editor
+{
+    WorldEnemy targ { get { return target as WorldEnemy; } }
+
+    public override void OnInspectorGUI()
+    {
+        base.OnInspectorGUI();
+        string text = (targ.enemyData != null).ToString();
+        EditorGUILayout.LabelField("Has data: ", text);
+        if (targ.enemyData != null)
+        {
+            text = targ.enemyData.displayName;
+            EditorGUILayout.LabelField("Display name: ", text);
         }
     }
 }

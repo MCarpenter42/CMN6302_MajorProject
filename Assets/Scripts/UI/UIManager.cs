@@ -13,17 +13,17 @@ public class UIManager : Core
 
 	[SerializeField] UIObject combatTransitionOverlay;
 
-	#endregion
+    #endregion
 
-	#region [ PROPERTIES ]
+    #region [ PROPERTIES ]
 
 
 
-	#endregion
+    #endregion
 
-	#region [ COROUTINES ]
+    #region [ COROUTINES ]
 
-	private Coroutine c_CombatTransitionOverlay = null;
+    private Coroutine c_CombatTransitionOverlay = null;
 
 	#endregion
 
@@ -31,13 +31,13 @@ public class UIManager : Core
 
 	void Awake()
 	{
-
+		SetRef_UIManager(this);
 	}
 
 	void Start()
-	{
-
-	}
+    {
+        
+    }
 
 	void Update()
 	{
@@ -50,8 +50,18 @@ public class UIManager : Core
 	}
 
 	/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+	
+	public void UpdateControlIcons(ControlScheme controlScheme)
+	{
+		switch (controlScheme)
+		{
 
-	public void CombatTransitionOverlay(float duration = 1.0f)
+		}
+	}
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void CombatTransitionOverlay(float duration = 1.0f)
     {
 		if (c_CombatTransitionOverlay != null)
 			StopCoroutine(c_CombatTransitionOverlay);

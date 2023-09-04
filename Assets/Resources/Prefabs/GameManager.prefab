@@ -89,10 +89,12 @@ GameObject:
   - component: {fileID: 2118496997229621892}
   - component: {fileID: 6093536486883756753}
   - component: {fileID: 1983854461434178748}
+  - component: {fileID: 7915951878805030408}
+  - component: {fileID: 2903106753707838277}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
-  m_Icon: {fileID: 0}
+  m_Icon: {fileID: 2800000, guid: 5f3ed895f267bf645a873c8e6483311c, type: 3}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
@@ -124,24 +126,41 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e68c005879ebec409beb47bc14e59b9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dataJSON: {fileID: 4900000, guid: 5f6c3ef78e61722489a1d062b28d85e4, type: 3}
-  ElementDataStorage:
-    loaded: 0
-    enemyList:
-      Data: []
-      label: 'Enemies:'
-    itemList:
-      Data: []
-      label: 'Items:'
-  UI: {fileID: 0}
-  Level: {fileID: 0}
+  dataJSON_enemies: {fileID: 4900000, guid: 1d05cf290bc2d3144a1eef40f49e1cb0, type: 3}
+  dataJSON_items: {fileID: 0}
+  SceneAttributes: {fileID: 0}
   playerW: {fileID: 0}
   cameraW: {fileID: 0}
+  playerData: []
   enemyListW: []
   debugOnAwake: 0
   debugOnStart: 0
   debugOnUpdate: 0
   debugOnFixedUpdate: 0
+  callback_debugOnAwake:
+    m_PersistentCalls:
+      m_Calls: []
+  callback_debugOnStart:
+    m_PersistentCalls:
+      m_Calls: []
+  callback_debugOnUpdate:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 1983854461434178748}
+        m_TargetAssemblyTypeName: ControlsHandler, Assembly-CSharp
+        m_MethodName: LogLastDevice
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+  callback_debugOnFixedUpdate:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!114 &1983854461434178748
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -154,3 +173,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 49f17a674ad83d6499f1a51da3a88604, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  activeControlScheme: 0
+  log_deviceClass: 0
+  log_empty: 0
+  log_interfaceName: 0
+  log_manufacturer: 0
+  log_product: 0
+  log_valueType: 0
+  log_native: 0
+--- !u!114 &7915951878805030408
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7694941838269217774}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1d8315f15eed5042871472d6ac3914d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  randOnAwake: 1
+--- !u!114 &2903106753707838277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7694941838269217774}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a37b41af4241e1a4e9fe40c9ba789874, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  stageReached: 0

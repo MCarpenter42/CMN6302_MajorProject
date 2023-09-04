@@ -28,17 +28,16 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
-using Unity.VisualScripting;
 
 public class ActiveEffects
 {
-    private CombatantCore combatant;
+    public CombatantCore combatant;
 
     [System.Serializable]
     public enum RemovalTarget { First, Last, All }
 
-    private List<StatusEffect> Special = new List<StatusEffect>();
-    private List<StatusEffect> Normal = new List<StatusEffect>();
+    public List<StatusEffect> Special = new List<StatusEffect>();
+    public List<StatusEffect> Normal = new List<StatusEffect>();
     private List<byte> activeUIDs = new List<byte>();
     private List<byte> inactiveUIDs = new List<byte>();
     private static byte[] allUIDs = new byte[]
@@ -632,10 +631,11 @@ public class ActiveEffects
         }
     }
 
-    public void ClearTaunted()
-    {
-        combatant.brain.tauntedBy = -1;
-    }
+    public void ModifyShieldCount(bool increment) => combatant.activeShieldCount += (increment ? 1 : -1);
+
+    public void ClearTaunted() => combatant.brain.tauntedBy = -1;
+
+    public void Interrupt(StatusEffect effect, float baseChance, bool guaranteed = false) => combatant.Interrupt(effect, baseChance, guaranteed);
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -761,7 +761,7 @@ public struct StatusEffectReturnData
         this.special = special;
     }
 
-    public bool Null { get { return internalName == null; } }
+    public bool Null => internalName == null;
 }
 [System.Serializable]
 public class StatusEffect
@@ -860,6 +860,10 @@ public class StatusEffect
     public bool removable = true;
     public bool resistable = true;
     public bool harmful = true;
+
+    public bool interruptOnApply = false;
+    public bool guaranteedInterrupt = false;
+
     public bool noExpiry = false;
 
     public int stacks = 1;
@@ -994,27 +998,32 @@ public class StatusEffect
     public int currentShield = -1;
     public bool expireOnShieldBroken = true;
 
-    public int DamageShield(int damage)
+    public int DamageShield(float damage)
     {
-        int spill = 0;
+        int blocked = 0;
         if (currentShield > 0)
         {
             if (damage > currentShield)
-            {
-                spill = damage - currentShield;
-            }
-            currentShield -= damage;
-            if (expireOnShieldBroken)
-                onDispel.Invoke();
+                blocked = currentShield;
+            else
+                blocked = Mathf.RoundToInt(damage);
         }
-        else
-        {
-            spill = damage;
-        }
-        return spill;
+        currentShield -= blocked;
+        if (currentShield == 0 && expireOnShieldBroken)
+            onDispel.Invoke();
+        return blocked;
     }
 
+    public void IncrementShieldCount() =>  container.ModifyShieldCount(true);
+
+    public void DecrementShieldCount() => container.ModifyShieldCount(false);
+
     public bool clearTauntedOnExpire = false;
+
+    public void Interrupt()
+    {
+        container.Interrupt(this, 0.4f, guaranteedInterrupt);
+    }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -1043,23 +1052,47 @@ public class StatusEffect
     
     public StatusEffect()
     {
+        if (interruptOnApply)
+            onApply.Add(new NamedCallback("Interrupt", Interrupt));
         onExpire.Add(new NamedCallback("Expiry", Expire));
         onDispel.Add(new NamedCallback("Expiry", Expire));
     }
 
     public StatusEffect(bool tickOnTurnStart)
     {
+        if (interruptOnApply)
+            onApply.Add(new NamedCallback("Interrupt", Interrupt));
         onExpire.Add(new NamedCallback("Expiry", Expire));
         onDispel.Add(new NamedCallback("Expiry", Expire));
+        this.tickOnTurnStart = tickOnTurnStart;
         if (!noExpiry)
         {
-            this.tickOnTurnStart = tickOnTurnStart;
             NamedCallback lifetime = new NamedCallback("Lifetime", LifetimeTick);
             if (tickOnTurnStart)
                 onTurnStart.Add(lifetime);
             else
                 onTurnEnd.Add(lifetime);
         }
+    }
+    
+    public StatusEffect(int shieldValue)
+    {
+        onExpire.Add(new NamedCallback("Expiry", Expire));
+        onDispel.Add(new NamedCallback("Expiry", Expire));
+        shielding = shieldValue;
+        currentShield = shieldValue;
+        if (!noExpiry)
+        {
+            tickOnTurnStart = true;
+            NamedCallback lifetime = new NamedCallback("Lifetime", LifetimeTick);
+            if (tickOnTurnStart)
+                onTurnStart.Add(lifetime);
+            else
+                onTurnEnd.Add(lifetime);
+        }
+        onApply.Add(new NamedCallback("ShieldIncrement", IncrementShieldCount));
+        onExpire.Add(new NamedCallback("ShieldDecrement", DecrementShieldCount));
+        onDispel.Add(new NamedCallback("ShieldDecrement", DecrementShieldCount));
     }
 
     public bool Matches(string internalName)
@@ -1079,125 +1112,7 @@ public class StatusEffect
 
     public void UpdateDescription(int roundTo = 2)
     {
-        string str = descriptionRaw, check;
-        float val;
-        description = "";
-        if (descriptionRaw != null)
-        {
-            int[] inds = new int[3] { str.IndexOf(Core.markdownDelimiter), -1, -1 };
-            while (inds[0] > -1 && str.Length > inds[0] + 1)
-            {
-                if (inds[0] > 0)
-                {
-                    description += str.Substring(0, inds[0]);
-                }
-                inds[1] = str.IndexOf(' ', inds[0] + 1);
-                inds[2] = str.IndexOf(Core.markdownDelimiter, inds[0] + 1);
-                if (inds[2] < 0)
-                {
-                    description += str.Substring(inds[1]);
-                    inds[0] = -1;
-                }
-                else if (inds[1] > -1 && inds[1] < inds[2])
-                {
-                    description += str.Substring(0, inds[2]);
-                    str = str.Substring(inds[2]);
-                    inds[0] = 0;
-                    inds[1] = -1;
-                    inds[2] = -1;
-                }
-                else
-                {
-                    check = str.Substring(inds[0] + 1, inds[2] - inds[0] - 1);
-                    bool firstUpper = check.LatinBasicUppercase(0);
-                    switch (check.ToLower())
-                    {
-                        default:
-                            description += "<VALUE>";
-                            break;
-
-                        case "turnstarttick":
-                            description += (firstUpper ? 'A' : 'a') + "t the " + (tickOnTurnStart ? "start" : "end") + " of each turn";
-                            break;
-
-                        case "removable":
-                            description += (firstUpper ? 'C' : 'c') + "an" + (removable ? " " : "'t ") + "be removed";
-                            break;
-
-                        case "dot_type":
-                            description += healthOverTime == null ? "TYPE" : healthOverTime.type.displayName;
-                            break;
-
-                        case "dot_val":
-                            description += healthOverTime.value;
-                            break;
-
-                        case "dmgout_type":
-                            description += dmgOutModifier == null ? "TYPE" : DamageType.Defaults[dmgOutModifier.typeID].displayName;
-                            break;
-
-                        case "dmgout_perc":
-                            if (dmgOutModifier == null)
-                                description += "PERCENT%";
-                            else
-                            {
-                                val = (float)System.Math.Round((dmgOutModifier.value - 1.0f) * 100.0f, roundTo);
-                                description += val + "%";
-                            }
-                            break;
-
-                        case "dmgout_drct":
-                            if (dmgOutModifier == null)
-                                description += "CHANGES";
-                            else
-                            {
-                                if (dmgOutModifier.value >= 1.0f)
-                                    description += (firstUpper ? 'I' : 'i') + "ncreases";
-                                else
-                                    description += (firstUpper ? 'D' : 'd') + "ecreases";
-                            }
-                            break;
-
-                        case "dmgin_type":
-                            description += dmgInModifier == null ? "TYPE" : DamageType.Defaults[dmgInModifier.typeID].displayName;
-                            break;
-
-                        case "dmgin_perc":
-                            if (dmgInModifier == null)
-                                description += "PERCENT%";
-                            else
-                            {
-                                val = (float)System.Math.Round((dmgInModifier.floatValue - 1.0f) * 100.0f, roundTo);
-                                description += val + "%";
-                            }
-                            break;
-
-                        case "dmgin_drct":
-                            if (dmgInModifier == null)
-                                description += "CHANGES";
-                            else
-                            {
-                                if (dmgInModifier.floatValue >= 1.0f)
-                                    description += (firstUpper ? 'I' : 'i') + "ncreases";
-                                else
-                                    description += (firstUpper ? 'D' : 'd') + "ecreases";
-                            }
-                            break;
-                    }
-                    if (str.Length > inds[2] + 1)
-                    {
-                        str = str.Substring(inds[2] + 1);
-                        inds[0] = str.IndexOf(Core.markdownDelimiter);
-                    }
-                    else
-                    {
-                        str = "";
-                        inds[0] = -1;
-                    }
-                }
-            }
-            description += str;
-        }
+        description = Core.DynamicDescription(container.combatant, this, descriptionRaw, roundTo);
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -1287,6 +1202,19 @@ public class StatusEffect
 
         };
         return effect;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    public static StatusEffect Shield(int shieldValue, int duration = 2)
+    {
+        return new StatusEffect(shieldValue)
+        {
+            resistable = false,
+            harmful = false,
+            tickOnTurnStart = true,
+            lifetime = duration
+        };
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */

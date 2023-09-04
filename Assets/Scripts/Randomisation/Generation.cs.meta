@@ -1,0 +1,30 @@
+fileFormatVersion: 2
+guid: 94048b82293d8c34eb3e10e5a7689347
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - roomMarker: {instanceID: 0}
+  - corridorMarker: {instanceID: 0}
+  - rowParentTemplate: {fileID: 1992313145770860916, guid: 38811cb346e740243abfabb770046dd4, type: 3}
+  - tileTemplate: {fileID: 2793016348038543319, guid: a10457613e4edfa4d8be40e831c5b7f9, type: 3}
+  - connectorL: {fileID: 5790916406074895069, guid: aaac18a1fdff47044826304bf8c065f5, type: 3}
+  - connectorR: {fileID: 255655549037975584, guid: 71456ff31e4f34446bd40a3ee76fe7c2, type: 3}
+  - corridorConn120: {fileID: 5676384213848984097, guid: 75cb82a753da3764f9df7878f3128575, type: 3}
+  - corridorConn180: {fileID: 4897453790523214512, guid: 9a888d00d8a9d734aa55d2d049ac5556, type: 3}
+  - corridorConn240: {fileID: 7745164612437069093, guid: e25dfc810070c1d409e6da59252540b4, type: 3}
+  - corridorConn300: {fileID: 1979957849892061103, guid: a292a69138364c04bb7b68a1f270b477, type: 3}
+  - corridorEnd: {fileID: 193422703979557525, guid: 8d3a632697137124a873ad8c6d45b6cf, type: 3}
+  - doorway: {fileID: 451868913893532617, guid: 2ea301b456417a244bd9ae5f4bdd5256, type: 3}
+  - floor: {fileID: 8911567683828354946, guid: eb3bfe67849d1fb48964b06058be54e2, type: 3}
+  - wall: {fileID: 7721249192726421073, guid: cc64b953fa8efa342a51f43ad89b4ae1, type: 3}
+  - wallCorner: {fileID: 3885990577432150255, guid: 9c8ca2f4e3c4885499e2a5420a768fcc, type: 3}
+  - matWallRoom: {fileID: 2100000, guid: 61b845708c16af843ad07a868675c596, type: 2}
+  - matWallCorridor: {fileID: 2100000, guid: 05276b1239d94a741982e182c640be3f, type: 2}
+  - matDoor: {fileID: 2100000, guid: 451920a9ee4f92a40933711199e996c6, type: 2}
+  - matFloor: {fileID: 2100000, guid: 922a14406b8150d4ba6ea30f3a266310, type: 2}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

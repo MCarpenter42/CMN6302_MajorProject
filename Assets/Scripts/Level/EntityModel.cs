@@ -7,9 +7,8 @@ using UnityEditor;
 using NeoCambion;
 using NeoCambion.Collections;
 using NeoCambion.IO;
+using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.PersistentUID;
-using JetBrains.Annotations;
-using System.Reflection;
 
 [CustomEditor(typeof(EntityModel), true)]
 [CanEditMultipleObjects]
@@ -22,8 +21,19 @@ public class EntityModelEditor : Editor
 
     public override void OnInspectorGUI()
     {
-        targ.size = EditorGUILayout.IntSlider("Size", (targ.size <= rangeMax ? (targ.size >= rangeMin ? targ.size : rangeMin) : rangeMax), rangeMin, rangeMax);
-        PersistentUID_Utility.AssignPrefabUIDs(EntityModel.modelFolder);
+        EditorElements.BeginHorizVert(EditorStylesExtras.noMarginsNoPadding, EditorStylesExtras.noMarginsNoPadding);
+        {
+            targ.size = EditorGUILayout.IntSlider("Size", (targ.size <= rangeMax ? (targ.size >= rangeMin ? targ.size : rangeMin) : rangeMax), rangeMin, rangeMax);
+            rect = EditorElements.ControlRect(22);
+            rect.x += 50;
+            rect.width -= 100;
+            if (GUI.Button(rect, new GUIContent("Force Update"), EditorStylesExtras.textButtonRed))
+            {
+                PersistentUID_Utility.AssignPrefabUIDs(EntityModel.modelFolder);
+                EntityModel.CompileModelList();
+            }
+        }
+        EditorElements.EndHorizVert();
     }
 }
 
@@ -79,7 +89,7 @@ public class EntityModel : Core
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #if UNITY_EDITOR
-    private static void CompileModelList()
+    public static void CompileModelList()
     {
         string[] modelPaths = PersistentUID_Utility.GetPrefabPathsWithUID(modelFolder);
         List<ModelRef> data = new List<ModelRef>();

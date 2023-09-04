@@ -28,6 +28,7 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
+using static UnityEngine.UI.Image;
 
 [System.Serializable]
 public enum CombatActionType { Attack, Heal, Shield, ApplyStatus, RemoveStatus, Mark, Taunt, Summon, Dismiss, MultiAction, Charge }
@@ -40,56 +41,29 @@ public class CombatAction
     {
         get
         {
-            if (GameManager.Instance != null)
+            if (Core.LevelManager != null)
             {
-                if (GameManager.Instance.Level != null)
-                {
-                    return GameManager.Instance.Level.Combat;
-                }
+                return Core.LevelManager.Combat;
             }
             return null;
         }
     }
 
-    public struct MultiTargetAttributes
-    {
-        public int count;
-        public MultiTargetType type;
-        public int falloffPercent;
-        public float falloff { get { return (float)falloffPercent / 100.0f; } }
-
-        public MultiTargetAttributes(ushort count, int falloffPercent = 50)
-        {
-            this.count = count;
-            this.type = MultiTargetType.Blast;
-            this.falloffPercent = Mathf.Clamp(falloffPercent, 0, 100);
-        }
-        
-        public MultiTargetAttributes(ushort count, MultiTargetType type, int falloffPercent = 50)
-        {
-            this.count = count;
-            this.type = type;
-            this.falloffPercent = Mathf.Clamp(falloffPercent, 0, 100);
-        }
-
-        public static MultiTargetAttributes None { get { return new MultiTargetAttributes() { count = -1, falloffPercent = 100 }; } }
-        public bool enabled { get { return count > 0; } }
-    }
-
     public struct ExecutionData
     {
         public bool succeeded;
+        public float duration;
 
-        public static ExecutionData Failed
+        public bool empty => duration < -1;
+
+        public ExecutionData(bool succeeded, float duration = -10f)
         {
-            get
-            {
-                return new ExecutionData()
-                {
-                    succeeded = false
-                };
-            }
+            this.succeeded = succeeded;
+            this.duration = duration;
         }
+
+        public static ExecutionData Empty { get { return new ExecutionData(false, -10f); } }
+        public static ExecutionData Failed { get { return new ExecutionData(false, 0f); } }
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -116,6 +90,9 @@ public class CombatAction
     public List<NamedCallback> onSuccess = new List<NamedCallback>();
     public List<NamedCallback> onFailure = new List<NamedCallback>();
 
+    public float animDurWindup = 3.0f;
+    public float animDurCompletion = 2.0f;
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     
     public CombatAction()
@@ -128,15 +105,72 @@ public class CombatAction
         this.targeting = targeting;
     }
 
+    public CombatAction Copy(string newName = null, string newIcon = null)
+    {
+        return new CombatAction()
+        {
+            displayName = newName == null ? displayName : newName,
+            iconPath = newIcon == null ? iconPath : newIcon,
+
+            type = type,
+            damageType = damageType,
+            targeting = targeting,
+            baseAttribute = baseAttribute,
+            multiTarget = multiTarget,
+
+            markForAll = markForAll,
+
+            actionMultiplier = actionMultiplier,
+            selfMultiplier = selfMultiplier,
+            selfMultCondition = selfMultCondition,
+            targMultiplier = targMultiplier,
+            targMultCondition = targMultCondition,
+
+            subActions = subActions,
+
+            onSuccess = onSuccess,
+            onFailure = onFailure,
+        };
+    }
+    
+    public CombatAction Copy(ActionCopyRef copyRef)
+    {
+        return new CombatAction()
+        {
+            displayName = copyRef.newName == null ? displayName : copyRef.newName,
+            iconPath = copyRef.newIcon == null ? iconPath : copyRef.newIcon,
+
+            type = type,
+            damageType = damageType,
+            targeting = targeting,
+            baseAttribute = baseAttribute,
+            multiTarget = multiTarget,
+
+            markForAll = markForAll,
+
+            actionMultiplier = actionMultiplier,
+            selfMultiplier = selfMultiplier,
+            selfMultCondition = selfMultCondition,
+            targMultiplier = targMultiplier,
+            targMultCondition = targMultCondition,
+
+            subActions = subActions,
+
+            onSuccess = onSuccess,
+            onFailure = onFailure,
+        };
+    }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     private bool RollForCrit()
     {
-        return GameManager.Instance.RandTuning.value_damage_critRate < Random.Range(0.0f, 1.0f);
+        return Core.RandTuning.valDmg_critRate < Random.Range(0.0f, 1.0f);
     }
 
     public ExecutionData Execute(CombatantCore actor)
     {
+        Debug.Log("Actor \"" + actor.displayName + "\" executed action " + displayName + " (" + type.ToString() + ")");
         switch (type)
         {
             default:
@@ -173,41 +207,87 @@ public class CombatAction
                 return MultiAction(actor);
         }
     }
+    
+    public ExecutionData Execute(CombatantCore actor, CombatantTeamIndex[] targets)
+    {
+        Debug.Log("Actor \"" + actor.displayName + "\" executed action " + displayName);
+        switch (type)
+        {
+            default:
+                return ExecutionData.Failed;
 
+            case CombatActionType.Attack:
+                return Attack(actor, targets);
+
+            case CombatActionType.Heal:
+                return Heal(actor, targets);
+                
+            case CombatActionType.Shield:
+                return Shield(actor, targets);
+
+            case CombatActionType.ApplyStatus:
+                return ApplyStatus(actor, targets);
+
+            case CombatActionType.RemoveStatus:
+                return RemoveStatus(actor, targets);
+
+            case CombatActionType.Mark:
+                return Mark(actor, targets);
+
+            case CombatActionType.Taunt:
+                return Taunt(actor, targets);
+
+            case CombatActionType.Summon:
+                return Summon(actor);
+
+            case CombatActionType.Dismiss:
+                return Dismiss(actor);
+
+            case CombatActionType.MultiAction:
+                return MultiAction(actor, targets);
+        }
+    }
+
+    // COMPLETE
     public ExecutionData Attack(CombatantCore actor)
     {
         return Attack(actor, targeting.GetTargets(actor));
     }
-    public ExecutionData Attack(CombatantCore actor, KeyValuePair<bool, int>[] targets)
+    public ExecutionData Attack(CombatantCore actor, CombatantTeamIndex[] targets)
     {
         bool selfCondMet = selfMultCondition.MetBy(actor), targCondMet;
         float dmgOut = actor.DamageOut(baseAttribute, actionMultiplier * (selfCondMet ? selfMultiplier : 1.0f), damageType);
-        bool playerTeam = actor.brain.friendly;
-        KeyValuePair<bool, int> actorTeamIndex = actor.teamIndex;
+        bool allyTeam = actor.brain.friendly;
+        CombatantTeamIndex actorTeamIndex = actor.teamIndex;
         if (targets.Length > 1)
         {
-            foreach (KeyValuePair<bool, int> target in targets)
+            CombatManager.ActionAnim(displayName, actorTeamIndex, targets[0].playerTeam, animDurWindup, animDurCompletion);
+            foreach (CombatantTeamIndex target in targets)
             {
-                if (target.Key)
+                if (target.playerTeam)
                 {
-                    targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[target.Value]);
-                    CombatManager.playerTeam[target.Value].DamageTaken(actorTeamIndex, targCondMet ? dmgOut * targMultiplier : dmgOut, damageType);
+                    targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[target.teamIndex]);
+                    CombatManager.allyTeam[target.teamIndex].DamageTaken(animDurWindup, animDurCompletion, actorTeamIndex, targCondMet ? dmgOut * targMultiplier : dmgOut, damageType);
                 }
                 else
                 {
-                    targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.Value]);
-                    CombatManager.enemyTeam[target.Value].DamageTaken(actorTeamIndex, targCondMet ? dmgOut * targMultiplier : dmgOut, damageType, playerTeam && !target.Key && RollForCrit());
+                    targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.teamIndex]);
+                    CombatManager.enemyTeam[target.teamIndex].DamageTaken(animDurWindup, animDurCompletion, actorTeamIndex, targCondMet ? dmgOut * targMultiplier : dmgOut, damageType, allyTeam && !target.playerTeam && RollForCrit());
                 }
             }
             return new ExecutionData() { succeeded = true };
         }
         else if (targets.Length > 0)
         {
-            if (targets[0].Key)
+            if (multiTarget.type == MultiTargetType.Blast)
+                CombatManager.ActionAnim(displayName, actorTeamIndex, targets[0].playerTeam, animDurWindup, animDurCompletion);
+            else
+                CombatManager.ActionAnim(displayName, actorTeamIndex, targets[0], animDurWindup, animDurCompletion);
+            if (targets[0].playerTeam)
             {
-                int tInd = targets[0].Value;
-                targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[tInd]);
-                CombatManager.playerTeam[tInd].DamageTaken(actorTeamIndex, targCondMet ? dmgOut * targMultiplier : dmgOut, damageType);
+                int tInd = targets[0].teamIndex;
+                targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[tInd]);
+                CombatManager.allyTeam[tInd].DamageTaken(animDurWindup, animDurCompletion, actorTeamIndex, targCondMet ? dmgOut * targMultiplier : dmgOut, damageType);
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -218,16 +298,16 @@ public class CombatAction
                         for (int i = 0; i < multiTarget.count; i++, power *= falloffFactor, lInd--, rInd++)
                         {
                             blastL = lInd >= 0;
-                            blastR = rInd < CombatManager.playerTeam.Count;
+                            blastR = rInd < CombatManager.allyTeam.Count;
                             if (blastL)
                             {
-                                targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[lInd]);
-                                CombatManager.playerTeam[lInd].DamageTaken(actorTeamIndex, (targCondMet ? dmgOut * targMultiplier : dmgOut) * power, damageType);
+                                targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[lInd]);
+                                CombatManager.allyTeam[lInd].DamageTaken(animDurWindup, animDurCompletion, actorTeamIndex, (targCondMet ? dmgOut * targMultiplier : dmgOut) * power, damageType);
                             }
                             if (blastR)
                             {
-                                targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[rInd]);
-                                CombatManager.playerTeam[rInd].DamageTaken(actorTeamIndex, (targCondMet ? dmgOut * targMultiplier : dmgOut) * power, damageType);
+                                targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[rInd]);
+                                CombatManager.allyTeam[rInd].DamageTaken(animDurWindup, animDurCompletion, actorTeamIndex, (targCondMet ? dmgOut * targMultiplier : dmgOut) * power, damageType);
                             }
                             if (!blastL && !blastR)
                                 break;
@@ -236,10 +316,10 @@ public class CombatAction
                     else if (multiTarget.type == MultiTargetType.Bounce)
                     {
                         float falloffFactor = 1.0f - multiTarget.falloff;
-                        KeyValuePair<bool, int>[] bounceTargets = new KeyValuePair<bool, int>[multiTarget.count];
+                        CombatantTeamIndex[] bounceTargets = new CombatantTeamIndex[multiTarget.count];
                         for (int i = 0; i < bounceTargets.Length; i++)
                         {
-                            bounceTargets[i] = new KeyValuePair<bool, int>(true, Random.Range(0, CombatManager.playerTeam.Count));
+                            bounceTargets[i] = new CombatantTeamIndex(true, Random.Range(0, CombatManager.allyTeam.Count));
                         }
                         AttackBounceSequence(actor, bounceTargets, dmgOut, falloffFactor);
                     }
@@ -247,8 +327,8 @@ public class CombatAction
             }
             else
             {
-                int tInd = targets[0].Value;
-                CombatManager.enemyTeam[tInd].DamageTaken(actorTeamIndex, dmgOut, damageType, playerTeam && RollForCrit());
+                int tInd = targets[0].teamIndex;
+                CombatManager.enemyTeam[tInd].DamageTaken(animDurWindup, animDurCompletion, actorTeamIndex, dmgOut, damageType, allyTeam && RollForCrit());
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -261,9 +341,9 @@ public class CombatAction
                             blastL = lInd >= 0;
                             blastR = rInd < CombatManager.enemyTeam.Count;
                             if (blastL)
-                                CombatManager.enemyTeam[lInd].DamageTaken(actorTeamIndex, dmgOut * power, damageType, playerTeam && RollForCrit());
+                                CombatManager.enemyTeam[lInd].DamageTaken(animDurWindup, animDurCompletion, actorTeamIndex, dmgOut * power, damageType, allyTeam && RollForCrit());
                             if (blastR)
-                                CombatManager.enemyTeam[rInd].DamageTaken(actorTeamIndex, dmgOut * power, damageType, playerTeam && RollForCrit());
+                                CombatManager.enemyTeam[rInd].DamageTaken(animDurWindup, animDurCompletion, actorTeamIndex, dmgOut * power, damageType, allyTeam && RollForCrit());
                             if (!blastL && !blastR)
                                 break;
                         }
@@ -271,77 +351,83 @@ public class CombatAction
                     else if (multiTarget.type == MultiTargetType.Bounce)
                     {
                         float falloffFactor = 1.0f - multiTarget.falloff;
-                        KeyValuePair<bool, int>[] bounceTargets = new KeyValuePair<bool, int>[multiTarget.count];
+                        CombatantTeamIndex[] bounceTargets = new CombatantTeamIndex[multiTarget.count];
                         for (int i = 0; i < bounceTargets.Length; i++)
                         {
-                            bounceTargets[i] = new KeyValuePair<bool, int>(false, Random.Range(0, CombatManager.enemyTeam.Count));
+                            bounceTargets[i] = new CombatantTeamIndex(false, Random.Range(0, CombatManager.enemyTeam.Count));
                         }
                         AttackBounceSequence(actor, bounceTargets, dmgOut, falloffFactor);
                     }
                 }
             }
-            return new ExecutionData() { succeeded = true };
+            return new ExecutionData() { succeeded = true, duration = (animDurWindup + animDurCompletion) };
         }
         onFailure.Invoke();
         return ExecutionData.Failed;
     }
-    private void AttackBounceSequence(CombatantCore actor, KeyValuePair<bool, int>[] targets, float baseValue, float falloffFactor)
+    private void AttackBounceSequence(CombatantCore actor, CombatantTeamIndex[] targets, float baseValue, float falloffFactor)
     {
         actor.StartCoroutine(IAttackBounceSequence(actor.teamIndex, targets, baseValue, falloffFactor, 0.4f));
     }
-    private IEnumerator IAttackBounceSequence(KeyValuePair<bool, int> actorTeamIndex, KeyValuePair<bool, int>[] targets, float baseValue, float falloffFactor, float bounceTime)
+    private IEnumerator IAttackBounceSequence(CombatantTeamIndex actorTeamIndex, CombatantTeamIndex[] targets, float baseValue, float falloffFactor, float bounceTime)
     {
         float power = falloffFactor;
         bool targCondMet;
         for (int i = 0; i < targets.Length; i++, power *= falloffFactor)
         {
-            if (targets[i].Key)
+            if (targets[i].playerTeam)
             {
-                targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[targets[i].Value]);
-                CombatManager.playerTeam[targets[i].Value].DamageTaken(actorTeamIndex, baseValue * power, damageType);
+                targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[targets[i].teamIndex]);
+                CombatManager.allyTeam[targets[i].teamIndex].DamageTaken(animDurWindup, animDurCompletion, actorTeamIndex, baseValue * power, damageType);
             }
             else
             {
-                targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[targets[i].Value]);
-                CombatManager.enemyTeam[targets[i].Value].DamageTaken(actorTeamIndex, baseValue * power, damageType, actorTeamIndex.Key && RollForCrit());
+                targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[targets[i].teamIndex]);
+                CombatManager.enemyTeam[targets[i].teamIndex].DamageTaken(animDurWindup, animDurCompletion, actorTeamIndex, baseValue * power, damageType, actorTeamIndex.playerTeam && RollForCrit());
             }
             yield return new WaitForSeconds(bounceTime);
         }
     }
 
+    // COMPLETE
     public ExecutionData Heal(CombatantCore actor)
     {
         return Heal(actor, targeting.GetTargets(actor));
     }
-    public ExecutionData Heal(CombatantCore actor, KeyValuePair<bool, int>[] targets)
+    public ExecutionData Heal(CombatantCore actor, CombatantTeamIndex[] targets)
     {
         bool selfCondMet = selfMultCondition.MetBy(actor), targCondMet;
         float healOut = actor.HealingOut(baseAttribute, actionMultiplier * (selfCondMet ? selfMultiplier : 1.0f));
-        bool playerTeam = actor.brain.friendly;
-        KeyValuePair<bool, int> actorTeamIndex = actor.teamIndex;
+        bool allyTeam = actor.brain.friendly;
+        CombatantTeamIndex actorTeamIndex = actor.teamIndex;
         if (targets.Length > 1)
         {
-            foreach (KeyValuePair<bool, int> target in targets)
+            CombatManager.ActionAnim(displayName, actorTeamIndex, targets[0].playerTeam, animDurWindup, animDurCompletion);
+            foreach (CombatantTeamIndex target in targets)
             {
-                if (target.Key)
+                if (target.playerTeam)
                 {
-                    targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[target.Value]);
-                    CombatManager.playerTeam[target.Value].Healed(actorTeamIndex, healOut);
+                    targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[target.teamIndex]);
+                    CombatManager.allyTeam[target.teamIndex].Healed(animDurWindup, animDurCompletion, actorTeamIndex, healOut);
                 }
                 else
                 {
-                    targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.Value]);
-                    CombatManager.enemyTeam[target.Value].Healed(actorTeamIndex, healOut);
+                    targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.teamIndex]);
+                    CombatManager.enemyTeam[target.teamIndex].Healed(animDurWindup, animDurCompletion, actorTeamIndex, healOut);
                 }
             }
             return new ExecutionData() { succeeded = true };
         }
         else if (targets.Length > 0)
         {
-            if (targets[0].Key)
+            if (multiTarget.type == MultiTargetType.Blast)
+                CombatManager.ActionAnim(displayName, actorTeamIndex, targets[0].playerTeam, animDurWindup, animDurCompletion);
+            else
+                CombatManager.ActionAnim(displayName, actorTeamIndex, targets[0], animDurWindup, animDurCompletion);
+            if (targets[0].playerTeam)
             {
-                int tInd = targets[0].Value;
-                targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[targets[0].Value]);
+                int tInd = targets[0].teamIndex;
+                targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[targets[0].teamIndex]);
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -352,11 +438,11 @@ public class CombatAction
                         for (int i = 0; i < multiTarget.count; i++, power *= falloffFactor, lInd--, rInd++)
                         {
                             blastL = lInd >= 0;
-                            blastR = rInd < CombatManager.playerTeam.Count;
+                            blastR = rInd < CombatManager.allyTeam.Count;
                             if (blastL)
-                                CombatManager.playerTeam[lInd].Healed(actorTeamIndex, healOut * power);
+                                CombatManager.allyTeam[lInd].Healed(animDurWindup, animDurCompletion, actorTeamIndex, healOut * power);
                             if (blastR)
-                                CombatManager.playerTeam[rInd].Healed(actorTeamIndex, healOut * power);
+                                CombatManager.allyTeam[rInd].Healed(animDurWindup, animDurCompletion, actorTeamIndex, healOut * power);
                             if (!blastL && !blastR)
                                 break;
                         }
@@ -364,10 +450,10 @@ public class CombatAction
                     else if (multiTarget.type == MultiTargetType.Bounce)
                     {
                         float falloffFactor = 1.0f - multiTarget.falloff;
-                        KeyValuePair<bool, int>[] bounceTargets = new KeyValuePair<bool, int>[multiTarget.count];
+                        CombatantTeamIndex[] bounceTargets = new CombatantTeamIndex[multiTarget.count];
                         for (int i = 0; i < bounceTargets.Length; i++)
                         {
-                            bounceTargets[i] = new KeyValuePair<bool, int>(false, Random.Range(0, CombatManager.playerTeam.Count));
+                            bounceTargets[i] = new CombatantTeamIndex(false, Random.Range(0, CombatManager.allyTeam.Count));
                         }
                         HealBounceSequence(actor, bounceTargets, healOut, falloffFactor);
                     }
@@ -375,8 +461,8 @@ public class CombatAction
             }
             else
             {
-                int tInd = targets[0].Value;
-                targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[targets[0].Value]);
+                int tInd = targets[0].teamIndex;
+                targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[targets[0].teamIndex]);
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -399,10 +485,10 @@ public class CombatAction
                     else if (multiTarget.type == MultiTargetType.Bounce)
                     {
                         float falloffFactor = 1.0f - multiTarget.falloff;
-                        KeyValuePair<bool, int>[] bounceTargets = new KeyValuePair<bool, int>[multiTarget.count];
+                        CombatantTeamIndex[] bounceTargets = new CombatantTeamIndex[multiTarget.count];
                         for (int i = 0; i < bounceTargets.Length; i++)
                         {
-                            bounceTargets[i] = new KeyValuePair<bool, int>(false, Random.Range(0, CombatManager.enemyTeam.Count));
+                            bounceTargets[i] = new CombatantTeamIndex(false, Random.Range(0, CombatManager.enemyTeam.Count));
                         }
                         HealBounceSequence(actor, bounceTargets, healOut, falloffFactor);
                     }
@@ -413,56 +499,62 @@ public class CombatAction
         onFailure.Invoke();
         return ExecutionData.Failed;
     }
-    private void HealBounceSequence(CombatantCore actor, KeyValuePair<bool, int>[] targets, float baseValue, float falloffFactor)
+    private void HealBounceSequence(CombatantCore actor, CombatantTeamIndex[] targets, float baseValue, float falloffFactor)
     {
         actor.StartCoroutine(IHealBounceSequence(actor.teamIndex, targets, baseValue, falloffFactor, 0.4f));
     }
-    private IEnumerator IHealBounceSequence(KeyValuePair<bool, int> actorTeamIndex, KeyValuePair<bool, int>[] targets, float baseValue, float falloffFactor, float bounceTime)
+    private IEnumerator IHealBounceSequence(CombatantTeamIndex actorTeamIndex, CombatantTeamIndex[] targets, float baseValue, float falloffFactor, float bounceTime)
     {
         float power = falloffFactor;
         for (int i = 0; i < targets.Length; i++, power *= falloffFactor)
         {
-            if (targets[i].Key)
-                CombatManager.playerTeam[targets[i].Value].Healed(actorTeamIndex, baseValue * power);
+            if (targets[i].playerTeam)
+                CombatManager.allyTeam[targets[i].teamIndex].Healed(animDurWindup, animDurCompletion, actorTeamIndex, baseValue * power);
             else
-                CombatManager.enemyTeam[targets[i].Value].Healed(actorTeamIndex, baseValue * power);
+                CombatManager.enemyTeam[targets[i].teamIndex].Healed(animDurWindup, animDurCompletion, actorTeamIndex, baseValue * power);
             yield return new WaitForSeconds(bounceTime);
         }
     }
 
+    // COMPLETE
     public ExecutionData Shield(CombatantCore actor)
     {
         return Shield(actor, targeting.GetTargets(actor));
     }
-    public ExecutionData Shield(CombatantCore actor, KeyValuePair<bool, int>[] targets)
+    public ExecutionData Shield(CombatantCore actor, CombatantTeamIndex[] targets)
     {
         bool selfCondMet = selfMultCondition.MetBy(actor), targCondMet;
         float shieldOut = actor.HealingOut(baseAttribute, actionMultiplier * (selfCondMet ? selfMultiplier : 1.0f));
-        bool playerTeam = actor.brain.friendly;
-        KeyValuePair<bool, int> actorTeamIndex = actor.teamIndex;
+        bool allyTeam = actor.brain.friendly;
+        CombatantTeamIndex actorTeamIndex = actor.teamIndex;
         if (targets.Length > 1)
         {
-            foreach (KeyValuePair<bool, int> target in targets)
+            CombatManager.ActionAnim(displayName, actorTeamIndex, targets[0].playerTeam, animDurWindup, animDurCompletion);
+            foreach (CombatantTeamIndex target in targets)
             {
-                if (target.Key)
+                if (target.playerTeam)
                 {
-                    targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[target.Value]);
-                    CombatManager.playerTeam[target.Value].Healed(actorTeamIndex, shieldOut);
+                    targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[target.teamIndex]);
+                    CombatManager.allyTeam[target.teamIndex].Shielded(animDurWindup, animDurCompletion, actorTeamIndex, shieldOut);
                 }
                 else
                 {
-                    targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.Value]);
-                    CombatManager.enemyTeam[target.Value].Healed(actorTeamIndex, shieldOut);
+                    targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.teamIndex]);
+                    CombatManager.enemyTeam[target.teamIndex].Shielded(animDurWindup, animDurCompletion, actorTeamIndex, shieldOut);
                 }
             }
             return new ExecutionData() { succeeded = true };
         }
         else if (targets.Length > 0)
         {
-            if (targets[0].Key)
+            if (multiTarget.type == MultiTargetType.Blast)
+                CombatManager.ActionAnim(displayName, actorTeamIndex, targets[0].playerTeam, animDurWindup, animDurCompletion);
+            else
+                CombatManager.ActionAnim(displayName, actorTeamIndex, targets[0], animDurWindup, animDurCompletion);
+            if (targets[0].playerTeam)
             {
-                int tInd = targets[0].Value;
-                targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[targets[0].Value]);
+                int tInd = targets[0].teamIndex;
+                targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[targets[0].teamIndex]);
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -473,11 +565,11 @@ public class CombatAction
                         for (int i = 0; i < multiTarget.count; i++, power *= falloffFactor, lInd--, rInd++)
                         {
                             blastL = lInd >= 0;
-                            blastR = rInd < CombatManager.playerTeam.Count;
+                            blastR = rInd < CombatManager.allyTeam.Count;
                             if (blastL)
-                                CombatManager.playerTeam[lInd].Healed(actorTeamIndex, shieldOut * power);
+                                CombatManager.allyTeam[lInd].Shielded(animDurWindup, animDurCompletion, actorTeamIndex, shieldOut * power);
                             if (blastR)
-                                CombatManager.playerTeam[rInd].Healed(actorTeamIndex, shieldOut * power);
+                                CombatManager.allyTeam[rInd].Shielded(animDurWindup, animDurCompletion, actorTeamIndex, shieldOut * power);
                             if (!blastL && !blastR)
                                 break;
                         }
@@ -486,8 +578,8 @@ public class CombatAction
             }
             else
             {
-                int tInd = targets[0].Value;
-                targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[targets[0].Value]);
+                int tInd = targets[0].teamIndex;
+                targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[targets[0].teamIndex]);
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -500,9 +592,9 @@ public class CombatAction
                             blastL = lInd >= 0;
                             blastR = rInd < CombatManager.enemyTeam.Count;
                             if (blastL)
-                                CombatManager.enemyTeam[lInd].Healed(actorTeamIndex, shieldOut * power);
+                                CombatManager.enemyTeam[lInd].Shielded(animDurWindup, animDurCompletion, actorTeamIndex, shieldOut * power);
                             if (blastR)
-                                CombatManager.enemyTeam[rInd].Healed(actorTeamIndex, shieldOut * power);
+                                CombatManager.enemyTeam[rInd].Shielded(animDurWindup, animDurCompletion, actorTeamIndex, shieldOut * power);
                             if (!blastL && !blastR)
                                 break;
                         }
@@ -515,27 +607,28 @@ public class CombatAction
         return ExecutionData.Failed;
     }
 
+    // INCOMPLETE
     public ExecutionData ApplyStatus(CombatantCore actor)
     {
         return ApplyStatus(actor, targeting.GetTargets(actor));
     }
-    public ExecutionData ApplyStatus(CombatantCore actor, KeyValuePair<bool, int>[] targets)
+    public ExecutionData ApplyStatus(CombatantCore actor, CombatantTeamIndex[] targets)
     {
         bool selfCondMet = selfMultCondition.MetBy(actor), targCondMet;
         float effectScaleOut;
-        bool playerTeam = actor.brain.friendly;
+        bool allyTeam = actor.brain.friendly;
         if (targets.Length > 1)
         {
-            foreach (KeyValuePair<bool, int> target in targets)
+            foreach (CombatantTeamIndex target in targets)
             {
-                if (target.Key)
+                if (target.playerTeam)
                 {
-                    targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[target.Value]);
+                    targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[target.teamIndex]);
                     /* SINGLE-TARGET FUNCTION */
                 }
                 else
                 {
-                    targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.Value]);
+                    targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.teamIndex]);
                     /* SINGLE-TARGET FUNCTION */
                 }
             }
@@ -543,10 +636,10 @@ public class CombatAction
         }
         else if (targets.Length > 0)
         {
-            if (targets[0].Key)
+            if (targets[0].playerTeam)
             {
-                int tInd = targets[0].Value;
-                targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[targets[0].Value]);
+                int tInd = targets[0].teamIndex;
+                targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[targets[0].teamIndex]);
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -557,7 +650,7 @@ public class CombatAction
                         for (int i = 0; i < multiTarget.count; i++, power *= falloffFactor, lInd--, rInd++)
                         {
                             blastL = lInd >= 0;
-                            blastR = rInd < CombatManager.playerTeam.Count;
+                            blastR = rInd < CombatManager.allyTeam.Count;
                             if (blastL)
                                 /* SINGLE-TARGET FUNCTION ACCOUNTING FOR FALLOFF */
                                 ;
@@ -571,10 +664,10 @@ public class CombatAction
                     else if (multiTarget.type == MultiTargetType.Bounce)
                     {
                         float falloffFactor = 1.0f - multiTarget.falloff;
-                        KeyValuePair<bool, int>[] bounceTargets = new KeyValuePair<bool, int>[multiTarget.count];
+                        CombatantTeamIndex[] bounceTargets = new CombatantTeamIndex[multiTarget.count];
                         for (int i = 0; i < bounceTargets.Length; i++)
                         {
-                            bounceTargets[i] = new KeyValuePair<bool, int>(false, Random.Range(0, CombatManager.playerTeam.Count));
+                            bounceTargets[i] = new CombatantTeamIndex(false, Random.Range(0, CombatManager.allyTeam.Count));
                         }
                         /* START BOUNCE SEQUENCE COROUTINE */
                     }
@@ -582,8 +675,8 @@ public class CombatAction
             }
             else
             {
-                int tInd = targets[0].Value;
-                targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[targets[0].Value]);
+                int tInd = targets[0].teamIndex;
+                targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[targets[0].teamIndex]);
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -608,10 +701,10 @@ public class CombatAction
                     else if (multiTarget.type == MultiTargetType.Bounce)
                     {
                         float falloffFactor = 1.0f - multiTarget.falloff;
-                        KeyValuePair<bool, int>[] bounceTargets = new KeyValuePair<bool, int>[multiTarget.count];
+                        CombatantTeamIndex[] bounceTargets = new CombatantTeamIndex[multiTarget.count];
                         for (int i = 0; i < bounceTargets.Length; i++)
                         {
-                            bounceTargets[i] = new KeyValuePair<bool, int>(false, Random.Range(0, CombatManager.enemyTeam.Count));
+                            bounceTargets[i] = new CombatantTeamIndex(false, Random.Range(0, CombatManager.enemyTeam.Count));
                         }
                         /* START BOUNCE SEQUENCE COROUTINE */
                     }
@@ -623,26 +716,27 @@ public class CombatAction
         return ExecutionData.Failed;
     }
 
+    // INCOMPLETE
     public ExecutionData RemoveStatus(CombatantCore actor)
     {
         return RemoveStatus(actor, targeting.GetTargets(actor));
     }
-    public ExecutionData RemoveStatus(CombatantCore actor, KeyValuePair<bool, int>[] targets)
+    public ExecutionData RemoveStatus(CombatantCore actor, CombatantTeamIndex[] targets)
     {
         bool selfCondMet = selfMultCondition.MetBy(actor), targCondMet;
-        bool playerTeam = actor.brain.friendly;
+        bool allyTeam = actor.brain.friendly;
         if (targets.Length > 1)
         {
-            foreach (KeyValuePair<bool, int> target in targets)
+            foreach (CombatantTeamIndex target in targets)
             {
-                if (target.Key)
+                if (target.playerTeam)
                 {
-                    targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[target.Value]);
+                    targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[target.teamIndex]);
                     /* SINGLE-TARGET FUNCTION */
                 }
                 else
                 {
-                    targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.Value]);
+                    targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[target.teamIndex]);
                     /* SINGLE-TARGET FUNCTION */
                 }
             }
@@ -650,10 +744,10 @@ public class CombatAction
         }
         else if (targets.Length > 0)
         {
-            if (targets[0].Key)
+            if (targets[0].playerTeam)
             {
-                int tInd = targets[0].Value;
-                targCondMet = targMultCondition.MetBy(CombatManager.playerTeam[targets[0].Value]);
+                int tInd = targets[0].teamIndex;
+                targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[targets[0].teamIndex]);
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -664,7 +758,7 @@ public class CombatAction
                         for (int i = 0; i < multiTarget.count; i++, power *= falloffFactor, lInd--, rInd++)
                         {
                             blastL = lInd >= 0;
-                            blastR = rInd < CombatManager.playerTeam.Count;
+                            blastR = rInd < CombatManager.allyTeam.Count;
                             if (blastL)
                                 /* SINGLE-TARGET FUNCTION ACCOUNTING FOR FALLOFF */
                                 ;
@@ -678,10 +772,10 @@ public class CombatAction
                     else if (multiTarget.type == MultiTargetType.Bounce)
                     {
                         float falloffFactor = 1.0f - multiTarget.falloff;
-                        KeyValuePair<bool, int>[] bounceTargets = new KeyValuePair<bool, int>[multiTarget.count];
+                        CombatantTeamIndex[] bounceTargets = new CombatantTeamIndex[multiTarget.count];
                         for (int i = 0; i < bounceTargets.Length; i++)
                         {
-                            bounceTargets[i] = new KeyValuePair<bool, int>(false, Random.Range(0, CombatManager.playerTeam.Count));
+                            bounceTargets[i] = new CombatantTeamIndex(false, Random.Range(0, CombatManager.allyTeam.Count));
                         }
                         /* START BOUNCE SEQUENCE COROUTINE */
                     }
@@ -689,8 +783,8 @@ public class CombatAction
             }
             else
             {
-                int tInd = targets[0].Value;
-                targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[targets[0].Value]);
+                int tInd = targets[0].teamIndex;
+                targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[targets[0].teamIndex]);
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -715,10 +809,10 @@ public class CombatAction
                     else if (multiTarget.type == MultiTargetType.Bounce)
                     {
                         float falloffFactor = 1.0f - multiTarget.falloff;
-                        KeyValuePair<bool, int>[] bounceTargets = new KeyValuePair<bool, int>[multiTarget.count];
+                        CombatantTeamIndex[] bounceTargets = new CombatantTeamIndex[multiTarget.count];
                         for (int i = 0; i < bounceTargets.Length; i++)
                         {
-                            bounceTargets[i] = new KeyValuePair<bool, int>(false, Random.Range(0, CombatManager.enemyTeam.Count));
+                            bounceTargets[i] = new CombatantTeamIndex(false, Random.Range(0, CombatManager.enemyTeam.Count));
                         }
                         /* START BOUNCE SEQUENCE COROUTINE */
                     }
@@ -730,35 +824,36 @@ public class CombatAction
         return ExecutionData.Failed;
     }
 
+    // INCOMPLETE
     public ExecutionData Mark(CombatantCore actor)
     {
         return Mark(actor, targeting.GetTargets(actor));
     }
-    public ExecutionData Mark(CombatantCore actor, KeyValuePair<bool, int>[] targets)
+    public ExecutionData Mark(CombatantCore actor, CombatantTeamIndex[] targets)
     {
-        if (targets.Length > 0 && targets[0].Key != actor.brain.friendly)
+        if (targets.Length > 0 && targets[0].playerTeam != actor.brain.friendly)
         {
             /* APPLY "MARKED" STATUS EFFECT HERE */
             if (markForAll)
             {
                 if (actor.brain.friendly)
                 {
-                    foreach (CombatantCore combatant in CombatManager.playerTeam)
+                    foreach (CombatantCore combatant in CombatManager.allyTeam)
                     {
-                        combatant.brain.markedTarget = targets[0].Value;
+                        combatant.brain.markedTarget = targets[0].teamIndex;
                     }
                 }
                 else
                 {
                     foreach (CombatantCore combatant in CombatManager.enemyTeam)
                     {
-                        combatant.brain.markedTarget = targets[0].Value;
+                        combatant.brain.markedTarget = targets[0].teamIndex;
                     }
                 }
             }
             else
             {
-                actor.brain.markedTarget = targets[0].Value;
+                actor.brain.markedTarget = targets[0].teamIndex;
             }
             return new ExecutionData() { succeeded = true };
         }
@@ -766,11 +861,12 @@ public class CombatAction
         return ExecutionData.Failed;
     }
 
+    // INCOMPLETE
     public ExecutionData Taunt(CombatantCore actor)
     {
         return Taunt(actor, targeting.GetTargets(actor));
     }
-    public ExecutionData Taunt(CombatantCore actor, KeyValuePair<bool, int>[] targets)
+    public ExecutionData Taunt(CombatantCore actor, CombatantTeamIndex[] targets)
     {
         if (targets.Length > 1)
         {
@@ -784,10 +880,7 @@ public class CombatAction
         return ExecutionData.Failed;
     }
 
-    /*public ExecutionData Summon(CombatantCore actor)
-    {
-        return Summon(actor);
-    }*/
+    // INCOMPLETE
     public ExecutionData Summon(CombatantCore actor)
     {
         
@@ -795,6 +888,7 @@ public class CombatAction
         return ExecutionData.Failed;
     }
 
+    // INCOMPLETE
     public ExecutionData Dismiss(CombatantCore actor)
     {
         if (actor.brain.summons.Count > 0)
@@ -809,11 +903,12 @@ public class CombatAction
         return ExecutionData.Failed;
     }
 
+    // INCOMPLETE
     public ExecutionData MultiAction(CombatantCore actor)
     {
         return MultiAction(actor, targeting.GetTargets(actor));
     }
-    public ExecutionData MultiAction(CombatantCore actor, KeyValuePair<bool, int>[] targets)
+    public ExecutionData MultiAction(CombatantCore actor, CombatantTeamIndex[] targets)
     {
         if (targets.Length > 1)
         {
@@ -826,12 +921,13 @@ public class CombatAction
         onFailure.Invoke();
         return ExecutionData.Failed;
     }
-    
+
+    // INCOMPLETE
     public ExecutionData Charge(CombatantCore actor)
     {
         return MultiAction(actor, targeting.GetTargets(actor));
     }
-    public ExecutionData Charge(CombatantCore actor, KeyValuePair<bool, int>[] targets)
+    public ExecutionData Charge(CombatantCore actor, CombatantTeamIndex[] targets)
     {
         if (targets.Length > 1)
         {
@@ -844,23 +940,47 @@ public class CombatAction
         onFailure.Invoke();
         return ExecutionData.Failed;
     }
+}
 
-    // Action effects:
-    //  - Attack
-    //      - Damage type
-    //      - Actor ATK
-    //      - Damage modifiers
-    //      - Status effect
-    //      - ApplyStatus chance
-    //  - Heal
-    //      - 
-    //  - Apply status effect
-    //  - Remove status effect
-    //  - Secondary effect
-    //  - Summon
-    //  - 
-    //  - 
-    //  - 
+public struct MultiTargetAttributes
+{
+    public int count;
+    public MultiTargetType type;
+    public int falloffPercent;
+    public float falloff { get { return falloffPercent / 100f; } }
+
+    public MultiTargetAttributes(ushort count, int falloffPercent = 50)
+    {
+        this.count = count;
+        this.type = MultiTargetType.Blast;
+        this.falloffPercent = Mathf.Clamp(falloffPercent, 0, 100);
+    }
+
+    public MultiTargetAttributes(ushort count, MultiTargetType type, int falloffPercent = 50)
+    {
+        this.count = count;
+        this.type = type;
+        this.falloffPercent = Mathf.Clamp(falloffPercent, 0, 100);
+    }
+
+    public static MultiTargetAttributes None { get { return new MultiTargetAttributes() { count = -1, falloffPercent = 100 }; } }
+    public bool enabled { get { return count > 0; } }
+
+    public static MultiTargetAttributes Basic { get { return new MultiTargetAttributes() { count = 1, falloffPercent = 40 }; } }
+}
+
+public struct ActionCopyRef
+{
+    public int index;
+    public string newName;
+    public string newIcon;
+
+    public ActionCopyRef(int index, string newName, string newIcon = null)
+    {
+        this.index = index;
+        this.newName = newName;
+        this.newIcon = newIcon;
+    }
 }
 
 [System.Serializable]
@@ -883,10 +1003,10 @@ public class ActionTarget
         }
     }
 
-    private TargetSelection selection;
-    private TargetCondition condition;
-    private bool tauntable;
-    private bool ignoreMarked;
+    public TargetSelection selection;
+    public TargetCondition condition;
+    public bool tauntable;
+    public bool ignoreMarked;
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -996,31 +1116,31 @@ public class ActionTarget
         }
     }
 
-    public KeyValuePair<bool, int>[] GetTargets(CombatantCore actor)
+    public CombatantTeamIndex[] GetTargets(CombatantCore actor)
     {
-        bool playerAlly = actor.brain.friendly;
+        bool actorIsAlly = actor.brain.friendly;
         int i, tauntedBy = actor.brain.tauntedBy, markedTarget = actor.brain.markedTarget;
-        int maxTargStr = GameManager.Instance.RandTuning.value_behaviour_targeting;
+        int maxTargStr = Core.RandTuning.valBhv_targeting;
         TargConStrength strength = (int)condition.strength > maxTargStr ? (TargConStrength)maxTargStr : condition.strength;
 
         if (selection == TargetSelection.Self)
         {
-            return new KeyValuePair<bool, int>[] { actor.teamIndex };
+            return new CombatantTeamIndex[] { actor.teamIndex };
         }
         else if (selection == TargetSelection.AlliedAll)
         {
-            KeyValuePair<bool, int>[] output;
-            if (playerAlly)
+            CombatantTeamIndex[] output;
+            if (actorIsAlly)
             {
-                output = new KeyValuePair<bool, int>[CombatManager.playerTeam.Count];
+                output = new CombatantTeamIndex[CombatManager.allyTeam.Count];
                 for (i = 0; i < output.GetLength(0); i++)
                 {
-                    output[i] = CombatManager.playerTeam[i].teamIndex;
+                    output[i] = CombatManager.allyTeam[i].teamIndex;
                 }
             }
             else
             {
-                output = new KeyValuePair<bool, int>[CombatManager.enemyTeam.Count];
+                output = new CombatantTeamIndex[CombatManager.enemyTeam.Count];
                 for (i = 0; i < output.GetLength(0); i++)
                 {
                     output[i] = CombatManager.enemyTeam[i].teamIndex;
@@ -1030,10 +1150,10 @@ public class ActionTarget
         }
         else if (selection == TargetSelection.OpposedAll)
         {
-            KeyValuePair<bool, int>[] output;
-            if (playerAlly)
+            CombatantTeamIndex[] output;
+            if (actorIsAlly)
             {
-                output = new KeyValuePair<bool, int>[CombatManager.enemyTeam.Count];
+                output = new CombatantTeamIndex[CombatManager.enemyTeam.Count];
                 for (i = 0; i < output.GetLength(0); i++)
                 {
                     output[i] = CombatManager.enemyTeam[i].teamIndex;
@@ -1041,25 +1161,25 @@ public class ActionTarget
             }
             else
             {
-                output = new KeyValuePair<bool, int>[CombatManager.playerTeam.Count];
+                output = new CombatantTeamIndex[CombatManager.allyTeam.Count];
                 for (i = 0; i < output.GetLength(0); i++)
                 {
-                    output[i] = CombatManager.playerTeam[i].teamIndex;
+                    output[i] = CombatManager.allyTeam[i].teamIndex;
                 }
             }
             return output;
         }
         else if (selection == TargetSelection.AnyAll)
         {
-            int a = CombatManager.playerTeam.Count, b = a + CombatManager.enemyTeam.Count;
-            KeyValuePair<bool, int>[] output = new KeyValuePair<bool, int>[b];
+            int a = CombatManager.allyTeam.Count, b = a + CombatManager.enemyTeam.Count;
+            CombatantTeamIndex[] output = new CombatantTeamIndex[b];
             for (i = 0; i < a; i++)
             {
-                output[i] = new KeyValuePair<bool, int>(true, i);
+                output[i] = new CombatantTeamIndex(true, i);
             }
             for (i = a; i < b; i++)
             {
-                output[i] = new KeyValuePair<bool, int>(false, i - a);
+                output[i] = new CombatantTeamIndex(false, i - a);
             }
             return output;
         }
@@ -1067,20 +1187,36 @@ public class ActionTarget
         {
             if (tauntable && tauntedBy >= 0)
             {
-                return new KeyValuePair<bool, int>[] { new KeyValuePair<bool, int>(!playerAlly, tauntedBy) };
+                return new CombatantTeamIndex[] { new CombatantTeamIndex(!actorIsAlly, tauntedBy) };
             }
             else if (!ignoreMarked && markedTarget >= 0)
             {
-                return new KeyValuePair<bool, int>[] { new KeyValuePair<bool, int>(!playerAlly, markedTarget) };
+                return new CombatantTeamIndex[] { new CombatantTeamIndex(!actorIsAlly, markedTarget) };
             }
             else
             {
                 List<CombatantCore> targs = new List<CombatantCore>();
                 List<CombatantReturnData> sortedTargs = new List<CombatantReturnData>();
-                if (TargetTeam(playerAlly, true))
-                    targs.AddRange(CombatManager.playerTeam);
-                if (TargetTeam(playerAlly, false))
-                    targs.AddRange(CombatManager.playerTeam);
+                if (selection == TargetSelection.Allied)
+                {
+                    if (actorIsAlly)
+                        targs.AddRange(CombatManager.allyTeam);
+                    else
+                        targs.AddRange(CombatManager.enemyTeam);
+
+                }
+                else if (selection == TargetSelection.Opposed)
+                {
+                    if (actorIsAlly)
+                        targs.AddRange(CombatManager.enemyTeam);
+                    else
+                        targs.AddRange(CombatManager.allyTeam);
+                }
+                else
+                {
+                    targs.AddRange(CombatManager.allyTeam);
+                    targs.AddRange(CombatManager.enemyTeam);
+                }
                 switch (condition.type)
                 {
                     default:
@@ -1113,18 +1249,18 @@ public class ActionTarget
                 if (strength == TargConStrength.None)
                 {
                     int r = Random.Range(0, sortedTargs.Count);
-                    return new KeyValuePair<bool, int>[] { sortedTargs[r].teamIndex };
+                    return new CombatantTeamIndex[] { sortedTargs[r].teamIndex };
                 }
                 else if (strength == TargConStrength.Full)
                 {
                     if (condition.type == TargConType.None)
                     {
                         int r = Random.Range(0, sortedTargs.Count);
-                        return new KeyValuePair<bool, int>[] { sortedTargs[r].teamIndex };
+                        return new CombatantTeamIndex[] { sortedTargs[r].teamIndex };
                     }
                     else
                     {
-                        return new KeyValuePair<bool, int>[] { sortedTargs[0].teamIndex };
+                        return new CombatantTeamIndex[] { sortedTargs[0].teamIndex };
                     }
                 }
                 else if (strength == TargConStrength.Strong)
@@ -1138,7 +1274,7 @@ public class ActionTarget
                         {
                             threshold += sortedTargs[i].floatValue / total;
                             if (r <= threshold)
-                                return new KeyValuePair<bool, int>[] { sortedTargs[i].teamIndex };
+                                return new CombatantTeamIndex[] { sortedTargs[i].teamIndex };
                         }
                     }
                     else
@@ -1149,7 +1285,7 @@ public class ActionTarget
                         {
                             threshold += (float)sortedTargs[i].intValue / total;
                             if (r <= threshold)
-                                return new KeyValuePair<bool, int>[] { sortedTargs[i].teamIndex };
+                                return new CombatantTeamIndex[] { sortedTargs[i].teamIndex };
                         }
                     }
                 }
@@ -1165,7 +1301,7 @@ public class ActionTarget
                         {
                             threshold += f + (sortedTargs[i].floatValue / (total * 2.0f));
                             if (r <= threshold)
-                                return new KeyValuePair<bool, int>[] { sortedTargs[i].teamIndex };
+                                return new CombatantTeamIndex[] { sortedTargs[i].teamIndex };
                         }
                     }
                     else
@@ -1177,13 +1313,13 @@ public class ActionTarget
                         {
                             threshold += f + (sortedTargs[i].floatValue / (total * 2.0f));
                             if (r <= threshold)
-                                return new KeyValuePair<bool, int>[] { sortedTargs[i].teamIndex };
+                                return new CombatantTeamIndex[] { sortedTargs[i].teamIndex };
                         }
                     }
                 }
             }
 
-            return new KeyValuePair<bool, int>[0];
+            return new CombatantTeamIndex[0];
         }
     }
 }
@@ -1201,16 +1337,16 @@ public struct TargetCondition
     public int threshold;
     public bool invert;
 
-    public TargetCondition(TargConType type = TargConType.None)
+    public TargetCondition(TargConType type, bool invert = false)
     {
         this.type = type;
         strength = TargConStrength.None;
         statusEffect = new StatusEffectReturnData();
         threshold = int.MinValue;
-        invert = false;
+        this.invert = invert;
     }
 
-    public TargetCondition(TargConType type, TargConStrength strength = TargConStrength.Full, bool invert = false)
+    public TargetCondition(TargConType type, TargConStrength strength, bool invert = false)
     {
         this.type = type;
         this.strength = strength;
@@ -1219,7 +1355,7 @@ public struct TargetCondition
         this.invert = invert;
     }
     
-    public TargetCondition(TargConType type, int threshold, TargConStrength strength = TargConStrength.Full, bool invert = false)
+    public TargetCondition(TargConType type, int threshold, TargConStrength strength, bool invert = false)
     {
         this.type = type;
         this.strength = strength;
@@ -1228,7 +1364,7 @@ public struct TargetCondition
         this.invert = invert;
     }
     
-    public TargetCondition(TargConType type, string effectInternalName, int threshold, TargConStrength strength = TargConStrength.Full, bool invert = false)
+    public TargetCondition(TargConType type, string effectInternalName, int threshold, TargConStrength strength, bool invert = false)
     {
         this.type = type;
         this.strength = strength;
@@ -1237,7 +1373,7 @@ public struct TargetCondition
         this.invert = invert;
     }
     
-    public TargetCondition(TargConType type, string effectInternalName, bool effectSpecial, int threshold, TargConStrength strength = TargConStrength.Full, bool invert = false)
+    public TargetCondition(TargConType type, string effectInternalName, bool effectSpecial, int threshold, TargConStrength strength, bool invert = false)
     {
         this.type = type;
         this.strength = strength;
@@ -1246,7 +1382,7 @@ public struct TargetCondition
         this.invert = invert;
     }
     
-    public TargetCondition(TargConType type, StatusEffectReturnData statusEffect, int threshold, TargConStrength strength = TargConStrength.Full, bool invert = false)
+    public TargetCondition(TargConType type, StatusEffectReturnData statusEffect, int threshold, TargConStrength strength, bool invert = false)
     {
         this.type = type;
         this.strength = strength;

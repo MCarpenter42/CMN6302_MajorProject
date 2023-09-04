@@ -28,9 +28,6 @@ using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
 using NeoCambion.Unity.Interpolation;
-using System.Runtime.CompilerServices;
-using UnityEngine.UIElements;
-using System.Threading;
 
 // BASIC THREAT AND TAUNT SYSTEMS NEEDED
 // MEMORY (ATTACKED BY + ETC) NEEDED
@@ -38,31 +35,41 @@ using System.Threading;
 public enum CombatantAttribute { Health, Attack, Defence, Speed, InflictChance, InflictResist }
 public class CombatantCore : Core
 {
-    private RandTuning RandTuning { get { return GameManager.Instance.RandTuning; } }
+    public CombatManager CombatManager { get { return LevelManager.Combat; } }
 
     #region [ OBJECTS / COMPONENTS ]
 
+    [System.NonSerialized]
     public CombatantData baseData;
     public EntityModel modelObj;
+
+    public Transform pivot;
+
+    public HealthBar healthBar;
+    public TargetingArrow targetingArrow;
+    public Transform cameraViewAnchor;
 
     #endregion
 
     #region [ PROPERTIES ]
 
-    public Vector3 pos { get { return gameObject.transform.position; } set { gameObject.transform.position = value; } }
-    public Vector3 rot { get { return gameObject.transform.eulerAngles; } set { gameObject.transform.eulerAngles = value; } }
-    public int size { get { return modelObj == null ? 0 : modelObj.size; } }
+    public Vector3 position { get { return gameObject.transform.position; } set { gameObject.transform.position = value; } }
+    public Vector3 rotation { get { return pivot.eulerAngles; } set { pivot.eulerAngles = value; } }
+    public int Size { get { return modelObj == null ? 0 : modelObj.size; } }
 
     public bool gotData;
     public int index = -1;
 
     public string displayName;
-    public ushort level;
+    public int level;
 
     public CombatValue health = null;
     public CombatValue attack = null;
     public CombatValue defence = null;
     public CombatSpeed speed = null;
+
+    public int activeShieldCount;
+    public int totalShieldValue;
 
     public float inflictChance = 40.0f;
     public float inflictResist = 0.0f;
@@ -82,7 +89,7 @@ public class CombatantCore : Core
     public List<StatusModifier> statusInMods = new List<StatusModifier>();
 
     public CombatantBrain brain;
-    public KeyValuePair<bool, int> teamIndex { get { return new KeyValuePair<bool, int>(brain.friendly, index); } }
+    public CombatantTeamIndex teamIndex { get { return new CombatantTeamIndex(brain.friendly, index); } }
 
     public CombatEquipment equipment;
 
@@ -108,6 +115,8 @@ public class CombatantCore : Core
 
     public ActiveEffects statusEffects;
 
+    public static float animTimeOffset = 0.3f;
+
     #endregion
 
     #region [ COROUTINES ]
@@ -123,6 +132,8 @@ public class CombatantCore : Core
     void Awake()
     {
         statusEffects = new ActiveEffects(this);
+        if (targetingArrow != null)
+            targetingArrow.ClearState();
     }
 
     void Start()
@@ -154,39 +165,41 @@ public class CombatantCore : Core
                 break;
 
             case CombatantAttribute.Health:
-                v = RandTuning.value_stats_health;
+                v = RandTuning.valSts_health;
                 break;
 
             case CombatantAttribute.Defence:
-                v = RandTuning.value_stats_defence;
+                v = RandTuning.valSts_defence;
                 break;
         }
 
         return Mathf.RoundToInt(value * (1.0f + Random.Range(-v, v)));
     }
 
-    public void GetData(CombatantData data)
+    public virtual void GetData(CombatantData data, int level = 1)
     {
         gotData = data != null;
         if (gotData)
         {
             baseData = data;
+            this.level = level;
 
             string modelPath = EntityModel.GetModelPathFromUID(data.modelHexUID);
             if (modelPath != null)
             {
                 GameObject modelTemplate = Resources.Load<GameObject>(modelPath);
-                modelObj = modelTemplate == null ? null : Instantiate(modelTemplate, transform).GetComponent<EntityModel>();
+                modelObj = modelTemplate == null ? null : Instantiate(modelTemplate, pivot ?? transform).GetComponent<EntityModel>();
             }
 
             displayName = data.displayName;
 
             health = new CombatValue(this, BaseStatVariance(baseData.baseHealth, CombatantAttribute.Health), baseData.healthScaling);
+            health.Current = health.Scaled;
             attack = new CombatValue(this, baseData.baseAttack, baseData.attackScaling);
             defence = new CombatValue(this, BaseStatVariance(baseData.baseDefence, CombatantAttribute.Defence), baseData.defenceScaling);
-            speed = new CombatSpeed(this, baseData.speeds, RandTuning.value_stats_speed ? 10.0f : -1.0f);
+            speed = new CombatSpeed(this, baseData.speeds, RandTuning.valSts_speed ? 10.0f : -1.0f);
 
-            if (GameManager.Instance.RandTuning.value_stats_types)
+            /*if (RandTuning.valSts_types)
             {
                 attackType = (DamageType.Type)Random.Range(1, DamageType.TypeCount);
                 weakAgainst = new bool[data.weakAgainst.Length];
@@ -205,31 +218,67 @@ public class CombatantCore : Core
                 }
             }
             else
-            {
+            {*/
                 attackType = data.attackType;
                 weakAgainst = data.weakAgainst;
-            }
+            //}
 
             brain = new CombatantBrain(this, !data.playerControlled, data.friendly);
             brain.actions = ActionSet.GetSet(data.actionSet);
-            brain.actions.GetActions(attackType, !brain.friendly && GameManager.Instance.RandTuning.value_behaviour_available);
+            brain.actions.GetActions(attackType);
         }
+        else
+            Debug.Log("Empty data object!");
     }
 
     public void ModifyHealth(int value)
     {
-        int newValue = health.Current += value;
-        if (newValue <= 0)
+        if (alive)
         {
-            health.Current = 0;
+            if (value < 0)
+            {
+                if (-value > health.Current)
+                    value = -health.Current;
+            }
+            else
+            {
+                if (value > health.Scaled)
+                    value = health.Scaled - health.Current;
+            }
+
+            health.Current += value;
+
+            if (health.Current == 0)
+            {
+                OnDied();
+            }
         }
-        else if (newValue >= health.Scaled)
+
+        if (healthBar != null)
         {
-            health.Current = health.Scaled;
+            float healthPercent = (float)health.Current / health.Scaled;
+            if (value > 0)
+                healthBar.SetValueWithFlash(healthPercent, false, 0.6f);
+            else if (value < 0)
+                healthBar.SetValueWithFlash(healthPercent, true, 0.6f);
         }
-        else
+    }
+
+    public void OnDied()
+    {
+        if (alive)
         {
-            health.Current = newValue;
+            alive = false;
+            CombatManager.OnCombatantDied(this);
+        }
+    }
+
+    public void OnRevived(int healBy = 1)
+    {
+        if (!alive)
+        {
+            alive = true;
+            ModifyHealth(healBy);
         }
     }
 
@@ -246,7 +295,6 @@ public class CombatantCore : Core
     {
         return DamageOut(CombatantAttribute.Attack, actionMultiplier, typeID);
     }
-
     public float DamageOut(CombatantAttribute baseAttribute, float actionMultiplier, int typeID)
     {
         float dmgMult = 1.0f;
@@ -255,28 +303,34 @@ public class CombatantCore : Core
             if (modifier.typeID == typeID)
                 dmgMult += modifier.mod;
         }
+        float dmgOut;
         switch (baseAttribute)
         {
             default:
             case CombatantAttribute.Attack:
-                return attack.ScaledAsFloat * actionMultiplier * dmgMult;
+                dmgOut = attack.ScaledAsFloat * actionMultiplier * dmgMult;
+                break;
 
             case CombatantAttribute.Health:
-                return health.ScaledAsFloat * actionMultiplier * dmgMult;
+                dmgOut = health.ScaledAsFloat * actionMultiplier * dmgMult;
+                break;
 
             case CombatantAttribute.Defence:
-                return defence.ScaledAsFloat * actionMultiplier * dmgMult;
+                dmgOut = defence.ScaledAsFloat * actionMultiplier * dmgMult;
+                break;
 
             case CombatantAttribute.Speed:
-                return (float)speed.Current * actionMultiplier * dmgMult;
+                dmgOut = (float)speed.Current * actionMultiplier * dmgMult;
+                break;
         }
+        //Debug.Log("Damage out for " + displayName + ": " + dmgOut);
+        return dmgOut;
     }
     
     public float HealingOut(float actionMultiplier)
     {
         return HealingOut(CombatantAttribute.Health, actionMultiplier);
     }
-
     public float HealingOut(CombatantAttribute baseAttribute, float actionMultiplier)
     {
         float healMult = 1.0f;
@@ -305,7 +359,6 @@ public class CombatantCore : Core
     {
         return ShieldOut(CombatantAttribute.Health, actionMultiplier);
     }
-
     public float ShieldOut(CombatantAttribute baseAttribute, float actionMultiplier)
     {
         float healMult = 1.0f;
@@ -332,41 +385,105 @@ public class CombatantCore : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public int DamageTaken(KeyValuePair<bool, int> origin, float baseDamage, int typeID, bool crit = false)
+    public void DamageTaken(float delayA, float delayB, CombatantTeamIndex origin, float baseDamage, int typeID, bool crit = false)
     {
-        float dmgVar = GameManager.Instance.RandTuning.value_damage_base;
+        StartCoroutine(IDamageTaken(delayA, delayB, origin, baseDamage, typeID, crit));
+    }
+    private IEnumerator IDamageTaken(float delayA, float delayB, CombatantTeamIndex origin, float baseDamage, int typeID, bool crit = false)
+    {
+        yield return new WaitForSeconds(delayA + animTimeOffset);
+        DamageTaken(origin, baseDamage, typeID, crit);
+        yield return new WaitForSeconds(delayB - animTimeOffset);
+    }
+    public int DamageTaken(CombatantTeamIndex origin, float baseDamage, int typeID, bool crit = false)
+    {
+        float dmgVar = RandTuning.valDmg_base;
         if (dmgVar > 0.0f)
             baseDamage *= 1.0f + Random.Range(-dmgVar, dmgVar);
         if (crit)
-            baseDamage *= GameManager.Instance.RandTuning.value_damage_critScale;
+            baseDamage *= RandTuning.valDmg_critScale;
 
-        float defValue = defence.ScaledAsFloat, defMult = 1 - (defValue / (100 + defValue)), rcvMult = 1.0f;
-        if (weakAgainst.InBounds(typeID) && weakAgainst[typeID])
-            rcvMult *= 2.0f;
-        else if (typeID == (int)attackType)
-            rcvMult *= 0.5f;
-        foreach (DamageTakenModifier modifier in damageInMods)
+        if (activeShieldCount > 0)
+            baseDamage = SubtractShielding(baseDamage);
+            
+        if (baseDamage > 0f)
         {
-            if (modifier.typeID == typeID)
-                rcvMult *= modifier.mod;
+            float defValue = defence.ScaledAsFloat, defMult = 1 - (defValue / (100 + defValue)), rcvMult = 1.0f;
+
+            // DAMAGE TYPE CALCULATION DISABLED
+            /*if (weakAgainst.InBounds(typeID) && weakAgainst[typeID])
+                rcvMult *= 2.0f;
+            else if (typeID == (int)attackType)
+                rcvMult *= 0.5f;*/
+
+            foreach (DamageTakenModifier modifier in damageInMods)
+            {
+                if (modifier.typeID == typeID)
+                    rcvMult *= modifier.mod;
+            }
+
+            float f_preDef = baseDamage * rcvMult;
+            float f_postDef = f_preDef * defMult;
+            int preDef = Mathf.RoundToInt(f_preDef), postDef = Mathf.RoundToInt(f_postDef), dmgOut;
+
+            if (origin.playerTeam != brain.friendly)
+                brain.lastAttackedBy = origin.teamIndex;
+
+            if (preDef - postDef < 1)
+                dmgOut = preDef - 1;
+            else
+                dmgOut = postDef;
+            CombatManager.OnCombatantDamaged(this, dmgOut);
+            ModifyHealth(-dmgOut);
+            return dmgOut;
         }
-
-        float f_preDef = baseDamage * rcvMult;
-        float f_postDef = f_preDef * defMult;
-        int preDef = Mathf.RoundToInt(f_preDef), postDef = Mathf.RoundToInt(f_postDef), dmgOut;
-
-        if (origin.Key != brain.friendly)
-            brain.lastAttackedBy = origin.Value;
-
-        if (preDef - postDef < 1)
-            dmgOut = preDef - 1;
         else
-            dmgOut = postDef;
-        ModifyHealth(-dmgOut);
-        return postDef;
+        {
+            CombatManager.OnCombatantDamaged(this, 0);
+            return 0;
+        }
     }
 
-    public int Healed(KeyValuePair<bool, int> origin, float baseHealing)
+    public float SubtractShielding(float damage)
+    {
+        int blocked, totalBlocked = 0;
+        foreach (StatusEffect effect in statusEffects.Special)
+        {
+            if (effect.shielding > 0)
+            {
+                blocked = effect.DamageShield(damage);
+                damage -= blocked;
+                totalBlocked += blocked;
+            }
+            if (damage <= 0)
+                return 0f;
+        }
+        foreach (StatusEffect effect in statusEffects.Normal)
+        {
+            if (effect.shielding > 0)
+            {
+                blocked = effect.DamageShield(damage);
+                damage -= blocked;
+                totalBlocked += blocked;
+            }
+            if (damage <= 0)
+                return 0f;
+        }
+
+        return damage;
+    }
+
+    public void Healed(float delayA, float delayB, CombatantTeamIndex origin, float baseHealing)
+    {
+        StartCoroutine(IHealed(delayA, delayB, origin, baseHealing));
+    }
+    private IEnumerator IHealed(float delayA, float delayB, CombatantTeamIndex origin, float baseHealing)
+    {
+        yield return new WaitForSeconds(delayA + animTimeOffset);
+        Healed(origin, baseHealing);
+        yield return new WaitForSeconds(delayB - animTimeOffset);
+    }
+    public int Healed(CombatantTeamIndex origin, float baseHealing)
     {
         float healedFloat = baseHealing;
         foreach (HealingModifier modifier in healingInMods)
@@ -374,8 +491,31 @@ public class CombatantCore : Core
             healedFloat *= modifier.mod;
         }
         int healedBy = Mathf.RoundToInt(healedFloat);
+        CombatManager.OnCombatantHealed(this, healedBy);
         ModifyHealth(healedBy);
         return healedBy;
+    }
+
+    public void Shielded(float delayA, float delayB, CombatantTeamIndex origin, float baseShielding, int duration = 2)
+    {
+        StartCoroutine(IShielded(delayA, delayB, origin, baseShielding, duration));
+    }
+    private IEnumerator IShielded(float delayA, float delayB, CombatantTeamIndex origin, float baseShielding, int duration = 2)
+    {
+        yield return new WaitForSeconds(delayA + animTimeOffset);
+        Shielded(origin, baseShielding, duration);
+        yield return new WaitForSeconds(delayB - animTimeOffset);
+    }
+    public int Shielded(CombatantTeamIndex origin, float baseShielding, int duration = 2)
+    {
+        float shieldFloat = baseShielding;
+        foreach (ShieldModifier modifier in shieldInMods)
+        {
+            shieldFloat *= modifier.mod;
+        }
+        int shieldInt = Mathf.RoundToInt(shieldFloat);
+        statusEffects.Add(StatusEffect.Shield(shieldInt, duration));
+        return shieldInt;
     }
 
     /*public float StatusApplyChance(float actionModifier)
@@ -383,11 +523,46 @@ public class CombatantCore : Core
 
     }*/
 
-    public bool StatusApplication(KeyValuePair<bool, int> origin, StatusEffect effect, float baseChance, bool guaranteed = false)
+    public void StatusApplication(float delayA, float delayB, StatusEffect effect, float baseChance, bool guaranteed = false)
+    {
+        StartCoroutine(IStatusApplication(delayA, delayB, effect, baseChance, guaranteed));
+    }
+    private IEnumerator IStatusApplication(float delayA, float delayB, StatusEffect effect, float baseChance, bool guaranteed = false)
+    {
+        yield return new WaitForSeconds(delayA);
+        StatusApplication(effect, baseChance, guaranteed);
+        yield return new WaitForSeconds(delayB);
+    }
+    public void StatusApplication(StatusEffect effect, float baseChance, bool guaranteed = false)
+    {
+
+    }
+
+    public bool Interrupt(StatusEffect effect, float baseChance, bool guaranteed = false)
     {
 
         return false;
     }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void SetTargetedState(TargetArrowState state) => targetingArrow.SetState(state);
+}
+
+public struct CombatantTeamIndex
+{
+    public bool playerTeam;
+    public int teamIndex;
+
+    public readonly bool isNull => teamIndex == int.MinValue;
+
+    public CombatantTeamIndex(bool playerTeam, int teamIndex)
+    {
+        this.playerTeam = playerTeam;
+        this.teamIndex = teamIndex;
+    }
+
+    public static CombatantTeamIndex Null => new CombatantTeamIndex(false, int.MinValue);
 }
 
 public struct CombatantReturnData
@@ -397,13 +572,13 @@ public struct CombatantReturnData
     public int index;
     public int intValue;
     public float floatValue;
-    public KeyValuePair<bool, int> teamIndex { get { return new KeyValuePair<bool, int>(isFriendly, index); } }
+    public CombatantTeamIndex teamIndex { get { return new CombatantTeamIndex(isFriendly, index); } }
 
-    public CombatantReturnData(KeyValuePair<bool, int> teamAndIndex, int intValue = int.MinValue)
+    public CombatantReturnData(CombatantTeamIndex teamAndIndex, int intValue = int.MinValue)
     {
         isNull = intValue == int.MinValue;
-        this.isFriendly = teamAndIndex.Key;
-        this.index = teamAndIndex.Value;
+        this.isFriendly = teamAndIndex.playerTeam;
+        this.index = teamAndIndex.teamIndex;
         this.intValue = intValue;
         this.floatValue = float.MinValue;
     }
@@ -417,11 +592,11 @@ public struct CombatantReturnData
         this.floatValue = float.MinValue;
     }
 
-    public CombatantReturnData(KeyValuePair<bool, int> teamAndIndex, float floatValue = float.MinValue)
+    public CombatantReturnData(CombatantTeamIndex teamAndIndex, float floatValue = float.MinValue)
     {
         isNull = floatValue == float.MinValue;
-        this.isFriendly = teamAndIndex.Key;
-        this.index = teamAndIndex.Value;
+        this.isFriendly = teamAndIndex.playerTeam;
+        this.index = teamAndIndex.teamIndex;
         this.intValue = int.MinValue;
         this.floatValue = floatValue;
     }
@@ -461,7 +636,7 @@ public static class CombatantUtility
     public static List<CombatantReturnData> SortedByThreat(this List<CombatantCore> combatants, bool ascending = false, int includeThreshold = int.MinValue)
     {
         List<CombatantReturnData> lOut = new List<CombatantReturnData>();
-        int i, j, threat;
+        int i, j, n, threat;
         lOut.Add(new CombatantReturnData(combatants[0].brain.friendly, combatants[0].index, combatants[0] == null ? 0 : combatants[0].threat));
         if (!ascending)
         {
@@ -470,9 +645,10 @@ public static class CombatantUtility
                 threat = combatants[i] == null ? 0 : combatants[i].threat;
                 if (threat >= includeThreshold)
                 {
-                    for (j = 0; j <= lOut.Count; j++)
+                    n = lOut.Count;
+                    for (j = 0; j <= n; j++)
                     {
-                        if (j == lOut.Count)
+                        if (j == n)
                             lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, threat));
                         else if (threat >= lOut[j].intValue)
                         {
@@ -492,9 +668,10 @@ public static class CombatantUtility
                 threat = combatants[1] == null ? 0 : combatants[1].threat;
                 if (threat <= includeThreshold)
                 {
-                    for (j = 0; j <= lOut.Count; j++)
+                    n = lOut.Count;
+                    for (j = 0; j <= n; j++)
                     {
-                        if (j == lOut.Count)
+                        if (j == n)
                             lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, combatants[i].threat));
                         else if (threat <= lOut[j].intValue)
                         {
@@ -511,7 +688,7 @@ public static class CombatantUtility
     public static List<CombatantReturnData> SortedByCurrentHealth(this List<CombatantCore> combatants, bool ascending = false, int includeThreshold = int.MinValue)
     {
         List<CombatantReturnData> lOut = new List<CombatantReturnData>();
-        int i, j, health;
+        int i, j, n, health;
         lOut.Add(new CombatantReturnData(combatants[0].brain.friendly, combatants[0].index, combatants[0] == null ? 0 : combatants[0].health.Current));
         if (!ascending)
         {
@@ -520,9 +697,10 @@ public static class CombatantUtility
                 health = combatants[i] == null ? 0 : combatants[i].health.Current;
                 if (health >= includeThreshold)
                 {
-                    for (j = 0; j <= lOut.Count; j++)
+                    n = lOut.Count;
+                    for (j = 0; j <= n; j++)
                     {
-                        if (j == lOut.Count)
+                        if (j == n)
                             lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                         else if (health >= lOut[j].intValue)
                         {
@@ -542,9 +720,10 @@ public static class CombatantUtility
                 health = combatants[1] == null ? 0 : combatants[1].health.Current;
                 if (health <= includeThreshold)
                 {
-                    for (j = 0; j <= lOut.Count; j++)
+                    n = lOut.Count;
+                    for (j = 0; j <= n; j++)
                     {
-                        if (j == lOut.Count)
+                        if (j == n)
                             lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                         else if (health <= lOut[j].intValue)
                         {
@@ -561,7 +740,7 @@ public static class CombatantUtility
     public static List<CombatantReturnData> SortedByPercentHealth(this List<CombatantCore> combatants, bool ascending = false, float includeThreshold = float.MinValue)
     {
         List<CombatantReturnData> lOut = new List<CombatantReturnData>();
-        int i, j;
+        int i, j, n;
         float health;
         if (includeThreshold == float.MinValue && !ascending)
             includeThreshold = float.MaxValue;
@@ -574,9 +753,10 @@ public static class CombatantUtility
                 health = combatants[i] == null ? 0 : (float)combatants[i].health.Current / combatants[i].health.ScaledAsFloat;
                 if (health >= includeThreshold)
                 {
-                    for (j = 0; j <= lOut.Count; j++)
+                    n = lOut.Count;
+                    for (j = 0; j <= n; j++)
                     {
-                        if (j == lOut.Count)
+                        if (j == n)
                             lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                         else if (health >= lOut[j].floatValue)
                         {
@@ -594,9 +774,10 @@ public static class CombatantUtility
                 health = combatants[1] == null ? 0 : combatants[1].health.Current;
                 if (health <= includeThreshold)
                 {
-                    for (j = 0; j <= lOut.Count; j++)
+                    n = lOut.Count;
+                    for (j = 0; j <= n; j++)
                     {
-                        if (j == lOut.Count)
+                        if (j == n)
                             lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                         else if (health <= lOut[j].floatValue)
                         {
@@ -613,7 +794,7 @@ public static class CombatantUtility
     public static List<CombatantReturnData> SortedByMaxHealth(this List<CombatantCore> combatants, bool ascending = false, int includeThreshold = int.MinValue)
     {
         List<CombatantReturnData> lOut = new List<CombatantReturnData>();
-        int i, j, health;
+        int i, j, n, health;
         lOut.Add(new CombatantReturnData(combatants[0].brain.friendly, combatants[0].index, combatants[0] == null ? 0 : combatants[0].health.Scaled));
         if (!ascending)
         {
@@ -622,9 +803,10 @@ public static class CombatantUtility
                 health = combatants[i] == null ? 0 : combatants[i].health.Scaled;
                 if (health >= includeThreshold)
                 {
-                    for (j = 0; j <= lOut.Count; j++)
+                    n = lOut.Count;
+                    for (j = 0; j <= n; j++)
                     {
-                        if (j == lOut.Count)
+                        if (j == n)
                             lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                         else if (health >= lOut[j].intValue)
                         {
@@ -644,9 +826,10 @@ public static class CombatantUtility
                 health = combatants[1] == null ? 0 : combatants[1].health.Scaled;
                 if (health <= includeThreshold)
                 {
-                    for (j = 0; j <= lOut.Count; j++)
+                    n = lOut.Count;
+                    for (j = 0; j <= n; j++)
                     {
-                        if (j == lOut.Count)
+                        if (j == n)
                             lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, health));
                         else if (health <= lOut[j].intValue)
                         {
@@ -669,7 +852,7 @@ public static class CombatantUtility
     {
         List<CombatantReturnData> lOut = new List<CombatantReturnData>();
         int[] stacks = new int[combatants.Count];
-        int i, j;
+        int i, j, n;
         for (i = 0; i < stacks.Length; i++)
         {
             stacks[i] = combatants[i] == null ? 0 : combatants[i].statusEffects.Stacks(effectName, special, !ascending);
@@ -681,9 +864,10 @@ public static class CombatantUtility
             {
                 if (stacks[i] >= includeThreshold && stacks[i] >= 0)
                 {
-                    for (j = 0; j <= lOut.Count; j++)
+                    n = lOut.Count;
+                    for (j = 0; j <= n; j++)
                     {
-                        if (j == lOut.Count)
+                        if (j == n)
                             lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, stacks[i]));
                         else if (stacks[i] >= lOut[j].intValue)
                         {
@@ -702,9 +886,10 @@ public static class CombatantUtility
             {
                 if (stacks[i] <= includeThreshold && stacks[i] >= 0)
                 {
-                    for (j = 0; j <= lOut.Count; j++)
+                    n = lOut.Count;
+                    for (j = 0; j <= n; j++)
                     {
-                        if (j == lOut.Count)
+                        if (j == n)
                             lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, stacks[i]));
                         else if (stacks[i] <= lOut[j].intValue)
                         {
@@ -732,7 +917,7 @@ public static class CombatantUtility
     {
         List<CombatantReturnData> lOut = new List<CombatantReturnData>();
         int[] lifetime = new int[combatants.Count];
-        int i, j;
+        int i, j, n;
         for (i = 0; i < lifetime.Length; i++)
         {
             lifetime[i] = combatants[i] == null ? 0 : combatants[i].statusEffects.Lifetime(effectName, special, !ascending);
@@ -744,9 +929,10 @@ public static class CombatantUtility
             {
                 if (lifetime[i] >= includeThreshold && lifetime[i] >= 0)
                 {
-                    for (j = 0; j <= lOut.Count; j++)
+                    n = lOut.Count;
+                    for (j = 0; j <= n; j++)
                     {
-                        if (j == lOut.Count)
+                        if (j == n)
                             lOut.Add(new CombatantReturnData(combatants[i].brain.friendly, combatants[i].index, lifetime[i]));
                         else if (lifetime[i] >= lOut[j].intValue)
                         {
@@ -789,14 +975,14 @@ public static class CombatantUtility
 
 public class CombatValue
 {
-    public static float ScaledFloat(int baseValue, ushort level, float scalingPercent)
+    public static float ScaledFloat(int baseValue, int level, float scalingPercent)
     {
         float scaling = Mathf.Clamp(scalingPercent, 0.0f, 1.0f) * 0.06f;
         level -= (ushort)(level > 0 ? 1 : 0);
         return (float)baseValue * Mathf.Exp(scaling * (float)level);
     }
 
-    public static int ScaledInt(int baseValue, ushort level, float scalingPercent)
+    public static int ScaledInt(int baseValue, int level, float scalingPercent)
     {
         level -= (ushort)(level > 0 ? 1 : 0);
         return Mathf.RoundToInt(ScaledFloat(baseValue, level, scalingPercent));
@@ -805,8 +991,8 @@ public class CombatValue
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public CombatantCore combatant;
-    private ushort _level;
-    public ushort level
+    private int _level;
+    public int level
     {
         get { return combatant == null ? _level : combatant.level; }
         set { _level = value; }
@@ -861,6 +1047,8 @@ public class CombatValue
         set { _scaling = value < 0 ? 0 : (value > 100 ? 100 : value); }
     }
 
+    public string CurrentPercentString { get { return ((float)Current / Scaled * 100f).ToString() + "%"; } }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public CombatValue(CombatantCore combatant, int Base = 1, int Scaling = 0)
@@ -910,14 +1098,14 @@ public class SpeedAtLevel
         this.value = value;
     }
 
-    public static SpeedAtLevel Default { get { return new SpeedAtLevel(0, 1); } }
+    public static SpeedAtLevel Default { get { return new SpeedAtLevel(0, 80); } }
 }
 
 public class CombatSpeed
 {
     public CombatantCore combatant = null;
-    private ushort _level;
-    public ushort level
+    private int _level;
+    public int level
     {
         get { return combatant == null ? _level : combatant.level; }
         set { _level = value; }
@@ -1132,7 +1320,7 @@ public class CombatSpeed
         }
     }
 
-    public int GetAtLevel(ushort level)
+    public int GetAtLevel(int level)
     {
         for (int i = 0; i < speeds.Count; i++)
         {
@@ -1237,7 +1425,7 @@ public class CombatantBrain
             }
             else
             {
-                if (CombatManager.playerTeam.InBounds(_lastAttackedBy) && CombatManager.playerTeam[_lastAttackedBy].alive)
+                if (CombatManager.allyTeam.InBounds(_lastAttackedBy) && CombatManager.allyTeam[_lastAttackedBy].alive)
                     return _lastAttackedBy;
                 else
                     return -1;
@@ -1256,7 +1444,7 @@ public class CombatantBrain
 
     public SummonPool[] summonPools = null;
     public List<CombatantCore> summons = new List<CombatantCore>();
-    public KeyValuePair<bool, int> summonedBy = new KeyValuePair<bool, int>(true, -1);
+    public CombatantTeamIndex summonedBy = new CombatantTeamIndex(true, -1);
 
     public CombatantBrain(CombatantCore combatant, bool autonomous, bool friendly)
     {
@@ -1266,6 +1454,10 @@ public class CombatantBrain
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public float ExecuteAction(ActionPoolCategory cat, int index, bool allowVariance = true) => actions.ExecuteAction(combatant, cat, index, allowVariance);
+    public float ExecuteAction(ActionPoolCategory cat, CombatantTeamIndex[] targets, int index, bool allowVariance = true) => actions.ExecuteAction(combatant, targets, cat, index, allowVariance);
+    public float ExecuteAction(int sequenceIndex, bool allowVariance = true) => actions.ExecuteAction(combatant, sequenceIndex, allowVariance);
 
     public float ExecuteNextAction()
     {
