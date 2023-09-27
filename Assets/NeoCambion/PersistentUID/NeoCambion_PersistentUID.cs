@@ -24,6 +24,7 @@ namespace NeoCambion.Unity.PersistentUID
             }
         }
 
+#if UNITY_EDITOR
         public void ForceUpdateUID()
         {
             PrefabUID[] uidComponents = PersistentUID_Utility.GetPrefabsWithUID("");
@@ -44,6 +45,7 @@ namespace NeoCambion.Unity.PersistentUID
             }
             PrefabUtility.SavePrefabAsset(gameObject);
         }
+#endif
     }
 
     public static class PersistentUID_Utility
@@ -107,6 +109,6 @@ namespace NeoCambion.Unity.PersistentUID
             }
             return paths;
         }
-    }
 #endif
+    }
 }

@@ -4,16 +4,13 @@ using UnityEngine;
 
 using NeoCambion;
 using NeoCambion.Maths;
-using UnityEngine.InputSystem.HID;
+using NeoCambion.Unity;
 
-public class PlayerCam : Core
+public class PlayerCam : PivotArmCamera
 {
     #region [ OBJECTS / COMPONENTS ]
 
     [SerializeField] GameObject toFollow;
-    [SerializeField] Transform pivot;
-    public Camera cam;
-    public Transform camTransform { get { return cam.transform; } }
 
     #endregion
 
@@ -23,8 +20,6 @@ public class PlayerCam : Core
     private Vector3 rotSpeed = Vector3.zero;
     public Vector3 facingVector { get { return GetFacingVector(); } }
 
-    private Vector3 defaultDisp;
-    private Vector3 defaultDir;
     private float defaultDist;
 
     [Range(0.0f, 10.0f)]
@@ -35,50 +30,36 @@ public class PlayerCam : Core
 
     #endregion
 
-    #region [ COROUTINES ]
-
-    private Coroutine c_returnToDefault = null;
-
-    #endregion
-
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     #region [ BUILT-IN UNITY FUNCTIONS ]
 
-    void Awake()
+    protected override void Awake()
     {
-        defaultDisp = camTransform.localPosition;
-        defaultDir = camTransform.localPosition.normalized;
-        defaultDist = camTransform.localPosition.magnitude;
-        currentDist = camTransform.localPosition.magnitude;
+        base.Awake();
+        defaultDist = camOffset;
+        currentDist = camOffset;
     }
 
-    void Start()
+    protected override void Update()
     {
-
-    }
-
-    void Update()
-    {
-        if (toFollow != null)
-            transform.position = toFollow.transform.position;
-        if (Cursor.lockState == CursorLockMode.Locked)
-            Rotate(rotSpeed);
-
-        Collision(pivot.TransformDirection(defaultDir));
-        if (maxDist < currentDist)
-            currentDist = maxDist;
-        else if (maxDist > currentDist)
+        base.Update();
+        if (Application.isPlaying)
         {
-            targetDist = currentDist + Time.deltaTime * returnEasing;
-            currentDist = targetDist > maxDist ? maxDist : targetDist;
+            if (toFollow != null)
+                transform.position = toFollow.transform.position;
+            if (Cursor.lockState == CursorLockMode.Locked)
+                Rotate(rotSpeed);
+
+            Collision(pivot.TransformDirection(cameraTransform.localPosition));
+            if (maxDist < currentDist)
+                camOffset = maxDist;
+            else if (maxDist > camOffset)
+            {
+                targetDist = camOffset + Time.deltaTime * returnEasing;
+                camOffset = targetDist > maxDist ? maxDist : targetDist;
+            }
         }
-        camTransform.localPosition = defaultDir * currentDist;
-    }
-
-    void FixedUpdate()
-    {
-
     }
 
     #endregion
@@ -87,14 +68,14 @@ public class PlayerCam : Core
 
     public Vector3 GetFacingVector()
     {
-        return pivot.transform.forward;
+        return pivot.TransformDirection(Vector3.forward);
     }
 
     public void Rotate(Vector3 angle)
     {
-        rot.x = Mathf.Clamp(rot.x + angle.x, -20.0f, 70.0f);
+        rot.x = Mathf.Clamp(rot.x + angle.x, -40.0f, 80.0f);
         rot.y = (rot.y + angle.y).WrapClamp(0.0f, 360.0f);
-        pivot.transform.eulerAngles = rot;
+        eulerAngles = rot;
     }
 
     public void SetRotSpeed(Vector3 rotation)
@@ -106,7 +87,6 @@ public class PlayerCam : Core
     {
         RaycastHit hit;
         Physics.SphereCast(pivot.position, 0.3f, raycastDir, out hit, 30.0f);
-        //Vector3 hitDisp = pivot.InverseTransformPoint(hit.point);
         if (hit.collider != null && hit.distance <= defaultDist)
             maxDist = hit.distance;
         else

@@ -1,10 +1,11 @@
 using UnityEngine;
+
 using NeoCambion.Maths;
+
+#if UNITY_EDITOR
 using UnityEditor;
-using NeoCambion.Unity;
-using static UnityEngine.GraphicsBuffer;
 using NeoCambion.Unity.Editor;
-using NeoCambion;
+#endif
 
 [System.Serializable]
 [RequireComponent(typeof(RectTransform))]
@@ -31,6 +32,7 @@ public class UIConstRotate : MonoBehaviour
     }
 }
 
+#if UNITY_EDITOR
 [CustomEditor(typeof(UIConstRotate))]
 [CanEditMultipleObjects]
 public class UIConstRotateEditor : Editor
@@ -52,6 +54,7 @@ public class UIConstRotateEditor : Editor
         }
     }
 }
+#endif
 
 [System.Serializable]
 public class RotationTarget
@@ -77,6 +80,7 @@ public class RotationTarget
     }
 }
 
+#if UNITY_EDITOR
 [CustomPropertyDrawer(typeof(RotationTarget))]
 public class RotationTargetDrawer : PropertyDrawer
 {
@@ -118,3 +122,4 @@ public class RotationTargetDrawer : PropertyDrawer
         EditorGUI.EndProperty();
     }
 }
+#endif

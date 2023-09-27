@@ -1,19 +1,77 @@
-using NeoCambion.Unity.Editor;
-
+#if UNITY_EDITOR
 namespace NeoCambion.Unity.Editor
 {
     using System.Collections.Generic;
     using System.Linq;
+    using System.Reflection;
     using UnityEngine;
     using UnityEditor;
 
     using NeoCambion.Collections;
     using NeoCambion.Collections.Unity;
-    using UnityEngine.UIElements;
-    using TMPro;
-    using static UnityEngine.GridBrushBase;
 
     public delegate void MenuReturn<T>(T returnVal);
+
+    public class InheritEditor : Editor
+    {
+        protected int inheritLayer = -1;
+        protected List<System.Type> inheritTree = new List<System.Type>();
+        protected void GetInheritTree()
+        {
+            System.Type derived = GetType();
+            while (derived != typeof(InheritEditor))
+            {
+                inheritLayer++;
+                inheritTree.Insert(0, derived);
+                derived = derived.BaseType;
+            }
+        }
+
+        public override void OnInspectorGUI()
+        {
+            EditorElements.BeginHorizVert(EditorStylesExtras.noMarginsNoPadding, EditorStyles.inspectorFullWidthMargins);
+            {
+                if (inheritLayer < 0)
+                    GetInheritTree();
+                object[] drawParam = new object[] { this };
+                MethodInfo headerMethod, mainMethod;
+
+                EditorGUILayout.Space();
+                for (int i = 0; i < inheritTree.Count; i++)
+                {
+                    headerMethod = inheritTree[i].GetMethod("Header");
+                    mainMethod = inheritTree[i].GetMethod("DrawInspector");
+                    if (!(headerMethod == null && mainMethod == null) && i > 0)
+                        TypeSeparator();
+                    headerMethod?.Invoke(null, null);
+                    mainMethod?.Invoke(null, drawParam);
+                }
+                EditorGUILayout.Space();
+            }
+            EditorElements.EndHorizVert();
+            serializedObject.ApplyModifiedProperties();
+        }
+
+        protected static void TypeHeader(string text, int size, TextAnchor alignment = TextAnchor.MiddleLeft, Font font = null)
+        {
+            if (font == null)
+                font = GUI.skin.label.font;
+            Rect headerRect = EditorElements.ControlRect(EditorElements.ExpandingLineHeight(size + 4));
+            headerRect.x -= 8;
+            EditorElements.Header(headerRect, new GUIContent(text), alignment, size, FontStyle.Bold, font);
+            EditorGUILayout.Space(4f);
+        }
+        protected static void TypeSeparator()
+        {
+            Rect sepRect = EditorElements.ControlRect(20);
+            sepRect.position += new Vector2(-14, 12);
+            sepRect.size += new Vector2(14, -18);
+            EditorElements.GreyRect(sepRect);
+        }
+
+        public static void Header() { }
+        public static void DrawInspector(InheritEditor editor) { }
+    }
 
     public struct DropdownMenuItem
     {
@@ -148,32 +206,29 @@ namespace NeoCambion.Unity.Editor
         public static Font Fallback { get { return GUI.skin.label.font; } }
 
         private Font _font;
-        public Font font { get { return _font; } set { _font = (value ?? Fallback); } }
+        public Font font { get { return _font ?? (_font = Fallback); } set { _font = value; } }
         private int _fontSize;
-        public int fontSize { get { return _fontSize; } set { if (value > 0) _fontSize = value; } }
+        public int fontSize { get { return _fontSize > 0 ? _fontSize : (_fontSize = GUI.skin.label.fontSize); } set { _fontSize = value; } }
         public FontStyle fontStyle;
 
         public FontSettings(FontStyle fontStyle = FontStyle.Normal) : this()
         {
-            font = GUI.skin.label.font;
-            fontSize = GUI.skin.label.fontSize;
+            font = null;
+            fontSize = 0;
             this.fontStyle = fontStyle;
         }
-        
         public FontSettings(int fontSize, FontStyle fontStyle = FontStyle.Normal) : this()
         {
-            font = GUI.skin.label.font;
+            font = null;
             this.fontSize = fontSize;
             this.fontStyle = fontStyle;
         }
-
         public FontSettings(Font font, int fontSize, FontStyle fontStyle = FontStyle.Normal) : this()
         {
             this.font = font;
             this.fontSize = fontSize > 0 ? fontSize : GUI.skin.label.fontSize;
             this.fontStyle = fontStyle;
         }
-
         public FontSettings(GUIStyle template) : this()
         {
             font = template.font;
@@ -181,7 +236,8 @@ namespace NeoCambion.Unity.Editor
             fontStyle = template.fontStyle;
         }
 
-        public static FontSettings Default { get { return new FontSettings(GUI.skin.label); } }
+        public static FontSettings Default => new FontSettings(GUI.skin.label);
+        public static FontSettings Header => new FontSettings(15, FontStyle.Bold);
     }
 
     public static class OSFonts
@@ -1344,13 +1400,13 @@ namespace NeoCambion.Unity.Editor
 
         /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-        public static Rect Header(string text, TextAnchor alignment = TextAnchor.MiddleCenter, int fontSize = 15, FontStyle fontStyle = FontStyle.Normal, Font font = null)
+        public static Rect Header(string text, TextAnchor alignment = TextAnchor.MiddleCenter, int fontSize = 15, FontStyle fontStyle = FontStyle.Bold, Font font = null)
         {
             Rect rect = ControlRect(ExpandingLineHeight(fontSize));
             Header(rect, new GUIContent(text), alignment, fontSize, fontStyle, font);
             return rect;
         }
-        public static Rect Header(string text, int fontSize = 15, FontStyle fontStyle = FontStyle.Normal, Font font = null)
+        public static Rect Header(string text, int fontSize = 15, FontStyle fontStyle = FontStyle.Bold, Font font = null)
         {
             Rect rect = ControlRect(ExpandingLineHeight(fontSize));
             Header(rect, new GUIContent(text), TextAnchor.MiddleCenter, fontSize, fontStyle, font);
@@ -1368,11 +1424,11 @@ namespace NeoCambion.Unity.Editor
             Header(rect, new GUIContent(text), TextAnchor.MiddleCenter, fontSettings.fontSize, fontSettings.fontStyle, fontSettings.font);
             return rect;
         }
-        public static void Header(Rect position, string text, TextAnchor alignment = TextAnchor.MiddleCenter, int fontSize = 15, FontStyle fontStyle = FontStyle.Normal, Font font = null)
+        public static void Header(Rect position, string text, TextAnchor alignment = TextAnchor.MiddleCenter, int fontSize = 15, FontStyle fontStyle = FontStyle.Bold, Font font = null)
         {
             Header(position, new GUIContent(text), alignment, fontSize, fontStyle, font);
         }
-        public static void Header(Rect position, string text, int fontSize = 15, FontStyle fontStyle = FontStyle.Normal, Font font = null)
+        public static void Header(Rect position, string text, int fontSize = 15, FontStyle fontStyle = FontStyle.Bold, Font font = null)
         {
             Header(position, new GUIContent(text), fontSize, fontStyle, font);
         }
@@ -1385,13 +1441,13 @@ namespace NeoCambion.Unity.Editor
             Header(position, text, fontSettings);
         }
 
-        public static Rect Header(GUIContent content, TextAnchor alignment = TextAnchor.MiddleCenter, int fontSize = 15, FontStyle fontStyle = FontStyle.Normal, Font font = null)
+        public static Rect Header(GUIContent content, TextAnchor alignment = TextAnchor.MiddleCenter, int fontSize = 15, FontStyle fontStyle = FontStyle.Bold, Font font = null)
         {
             Rect rect = ControlRect(ExpandingLineHeight(fontSize));
             Header(rect, content, alignment, fontSize, fontStyle, font);
             return rect;
         }
-        public static Rect Header(GUIContent content, int fontSize = 15, FontStyle fontStyle = FontStyle.Normal, Font font = null)
+        public static Rect Header(GUIContent content, int fontSize = 15, FontStyle fontStyle = FontStyle.Bold, Font font = null)
         {
             Rect rect = ControlRect(ExpandingLineHeight(fontSize));
             Header(content, TextAnchor.MiddleCenter, fontSize, fontStyle, font);
@@ -1409,7 +1465,7 @@ namespace NeoCambion.Unity.Editor
             Header(content, TextAnchor.MiddleCenter, fontSettings);
             return rect;
         }
-        public static void Header(Rect position, GUIContent content, TextAnchor alignment = TextAnchor.MiddleCenter, int fontSize = 15, FontStyle fontStyle = FontStyle.Normal, Font font = null)
+        public static void Header(Rect position, GUIContent content, TextAnchor alignment = TextAnchor.MiddleCenter, int fontSize = 15, FontStyle fontStyle = FontStyle.Bold, Font font = null)
         {
             GUIStyle headerStyle = new GUIStyle()
             {
@@ -1424,7 +1480,7 @@ namespace NeoCambion.Unity.Editor
             };
             EditorGUI.LabelField(position, content, headerStyle);
         }
-        public static void Header(Rect position, GUIContent content, int fontSize = 15, FontStyle fontStyle = FontStyle.Normal, Font font = null)
+        public static void Header(Rect position, GUIContent content, int fontSize = 15, FontStyle fontStyle = FontStyle.Bold, Font font = null)
         {
             Header(position, content, TextAnchor.MiddleCenter, fontSize, fontStyle, font);
         }
@@ -1457,11 +1513,11 @@ namespace NeoCambion.Unity.Editor
             Header(rect, new GUIContent(text), TextAnchor.MiddleLeft, fontSettings);
             return rect;
         }
-        public static void SectionHeader(Rect position, string text, FontStyle fontStyle = FontStyle.Normal)
+        public static void SectionHeader(Rect position, string text, FontStyle fontStyle = FontStyle.Bold)
         {
             Header(position, new GUIContent(text), TextAnchor.MiddleLeft, GUI.skin.label.fontSize, fontStyle);
         }
-        public static void SectionHeader(Rect position, string text, int fontSize, FontStyle fontStyle = FontStyle.Normal)
+        public static void SectionHeader(Rect position, string text, int fontSize, FontStyle fontStyle = FontStyle.Bold)
         {
             if (fontSize < 1)
                 fontSize = GUI.skin.label.fontSize;
@@ -1492,11 +1548,11 @@ namespace NeoCambion.Unity.Editor
             Header(rect, content, TextAnchor.MiddleLeft, fontSettings);
             return rect;
         }
-        public static void SectionHeader(Rect position, GUIContent content, FontStyle fontStyle = FontStyle.Normal)
+        public static void SectionHeader(Rect position, GUIContent content, FontStyle fontStyle = FontStyle.Bold)
         {
             Header(position, content, TextAnchor.MiddleLeft, GUI.skin.label.fontSize, fontStyle);
         }
-        public static void SectionHeader(Rect position, GUIContent content, int fontSize, FontStyle fontStyle = FontStyle.Normal)
+        public static void SectionHeader(Rect position, GUIContent content, int fontSize, FontStyle fontStyle = FontStyle.Bold)
         {
             if (fontSize < 1)
                 fontSize = GUI.skin.label.fontSize;
@@ -1505,6 +1561,19 @@ namespace NeoCambion.Unity.Editor
         public static void SectionHeader(Rect position, GUIContent content, FontSettings fontSettings)
         {
             Header(position, content, TextAnchor.MiddleLeft, fontSettings);
+        }
+
+        public static bool FoldoutHeader(bool folout, string text, float offset = 13f)
+        {
+            Rect rect = ControlRect();
+            rect.x += offset; rect.width -= offset;
+            return EditorGUI.Foldout(rect, folout, text, EditorStylesExtras.foldoutLabel);
+        }
+        public static bool FoldoutHeader(bool folout, GUIContent content, float offset = 13f)
+        {
+            Rect rect = ControlRect();
+            rect.x += offset; rect.width -= offset;
+            return EditorGUI.Foldout(rect, folout, content, EditorStylesExtras.foldoutLabel);
         }
 
         public static ParagraphRect ParaRect(string text, float spacing = 3.0f, float maxWidth = 0.0f)
@@ -2673,6 +2742,7 @@ namespace NeoCambion.Unity.Editor
         }
     }
 }
+#endif
 
 // CUSTOM EDITOR WINDOW CLASS TEMPLATE
 /*public class PH_CLASS_NAME : EditorWindow

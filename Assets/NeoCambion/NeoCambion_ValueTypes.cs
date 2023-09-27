@@ -4,7 +4,7 @@ namespace NeoCambion
     using System.Collections;
     using System.Collections.Generic;
 
-    [System.Serializable]
+    [Serializable]
     public struct HexByte
     {
         public readonly byte byteValue;
@@ -22,64 +22,67 @@ namespace NeoCambion
         }
     }
 
-    [System.Serializable]
-    public struct FloatRange
+    public interface NumericRange<T>
     {
-        private float _lower;
-        public float lower
-        {
-            get { return _lower; }
-            set
-            {
-                if (value > _upper)
-                {
-                    _lower = _upper;
-                    _upper = value;
-                }
-                else
-                {
-                    _lower = value;
-                }
-                range = _upper - _lower;
-            }
-        }
-        private float _upper;
-        public float upper
-        {
-            get { return _lower; }
-            set
-            {
-                if (value < _lower)
-                {
-                    _upper = _lower;
-                    _lower = value;
-                }
-                else
-                {
-                    _upper = value;
-                }
-                range = _upper - _lower;
-            }
-        }
+        public T Lower { get; set; }
+        public T Upper { get; set; }
+        public T Range { get; }
+    }
 
-        public float range { get; private set; }
+    [Serializable]
+    public struct FloatRange : NumericRange<float>
+    {
+        public float lower;
+        public float Lower { get { return lower; } set { lower = value; } }
+        public float upper;
+        public float Upper { get { return upper; } set { upper = value; } }
+
+        public float Range => Upper - Lower;
 
         public FloatRange(float lower, float upper)
         {
             if (lower > upper)
             {
-                _upper = lower;
-                _lower = upper;
+                this.upper = lower;
+                this.lower = upper;
             }
             else
             {
-                _lower = lower;
-                _upper = upper;
+                this.lower = lower;
+                this.upper = upper;
             }
-            range = _upper - _lower;
         }
 
-        public static FloatRange Nil { get { return new FloatRange(0, 0); } }
+        public static FloatRange Nil => new FloatRange(0, 0);
+        public static FloatRange Max => new FloatRange(float.MinValue, float.MaxValue);
+    }
+    
+    [Serializable]
+    public struct IntRange : NumericRange<int>
+    {
+        public int lower;
+        public int Lower { get { return lower; } set { lower = value; } }
+        public int upper;
+        public int Upper { get { return upper; } set { upper = value; } }
+
+        public int Range => Upper - Lower;
+
+        public IntRange(int lower, int upper)
+        {
+            if (lower > upper)
+            {
+                this.upper = lower;
+                this.lower = upper;
+            }
+            else
+            {
+                this.lower = lower;
+                this.upper = upper;
+            }
+        }
+
+        public static IntRange Nil => new IntRange(0, 0);
+        public static IntRange Max => new IntRange(int.MinValue, int.MaxValue);
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -129,7 +132,7 @@ namespace NeoCambion
     {
         using UnityEngine;
 
-        [System.Serializable]
+        [Serializable]
         public struct CameraState
         {
             public CameraClearFlags clearFlags;
@@ -237,9 +240,9 @@ namespace NeoCambion
             }
         }
 
-        [System.Serializable]
+        [Serializable]
         public enum CameraProjection { Custom = -1, Perspective, Orthographic }
-        [System.Serializable]
+        [Serializable]
         public struct CameraViewState
         {
             private Matrix4x4 projection;
@@ -363,5 +366,50 @@ namespace NeoCambion
 
             }
         }
+
+#if UNITY_EDITOR
+        namespace Editor
+        {
+            using UnityEditor;
+
+            [CustomPropertyDrawer(typeof(FloatRange))]
+            public class FloatRangeDrawer : PropertyDrawer
+            {
+                float wArrow = 28f, wFloatField;
+                Rect minRect, arrowRect, maxRect;
+                public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+                {
+                    EditorGUI.BeginProperty(position, label, property);
+                    {
+                        position = EditorElements.PrefixLabel(position, label);
+                        position.x += 2;
+                        if ((position.width -= 2) > 120)
+                            position.width = 120;
+                        wFloatField = (position.width - wArrow) / 2f;
+
+                        minRect = new Rect(position);
+                        minRect.width = wFloatField;
+
+                        EditorGUI.PropertyField(minRect, property.FindPropertyRelative("lower"), GUIContent.none);
+
+                        arrowRect = new Rect(position);
+                        arrowRect.width = wArrow;
+                        arrowRect.x += wFloatField;
+                        arrowRect.height -= 2f;
+
+                        EditorGUI.LabelField(arrowRect, new GUIContent("-->"), new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter }); ;
+
+                        maxRect = new Rect(position);
+                        maxRect.width = wFloatField;
+                        maxRect.x += wFloatField + wArrow;
+
+                        EditorGUI.PropertyField(maxRect, property.FindPropertyRelative("upper"), GUIContent.none);
+
+                    }
+                    EditorGUI.EndProperty();
+                }
+            }
+        }
+#endif
     }
 }

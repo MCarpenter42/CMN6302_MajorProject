@@ -5,32 +5,41 @@ using UnityEngine;
 using NeoCambion;
 using NeoCambion.Maths;
 using NeoCambion.Unity;
-using System;
+
+#if UNITY_EDITOR
+using UnityEditor;
+using NeoCambion.Unity.Editor;
+#endif
 
 public class WorldPlayer : WorldEntityCore
 {
     #region [ OBJECTS / COMPONENTS ]
 
-    private List<InteractPoint> interactions = new List<InteractPoint>();
-    public InteractPoint targetInteract { get { return targetInteractInd > -1 ? interactions[targetInteractInd] : null; } }
+    [HideInInspector] public InteractPoint[] interactions = new InteractPoint[0];
+    [HideInInspector] public bool[] inRange = new bool[0];
+    public InteractPoint targetInteract => targetInteractInd > -1 ? interactions[targetInteractInd] : null;
 
     #endregion
 
     #region [ PROPERTIES ]
 
-    private Vector3 camDir { get { return UnityExt_Vector3.Flatten(GameManager.Instance.cameraW.facingVector); } }
+    private Camera cam => GameManager.Instance.WorldCam;
+    private Vector3 camDir => new Vector3(cam.transform.forward.x, 0f, cam.transform.forward.z).normalized;
 
     [Header("Player")]
     [SerializeField] Vector3 interactCentre;
 
     public Vector3 posInteract => transform.position + interactCentre;
 
+    public Vector3 flatPosition { get { return new Vector3(transform.position.x, 0f, transform.position.z); } }
+
     public float sprintMultiplier = 2.0f;
     [HideInInspector] public bool sprintActive = false;
 
+    public bool posLocked { get { return GameManager.lockPlayerPosition; } }
+
     [SerializeField] float interactionRange = 3.0f;
     [SerializeField] float maxInteractAngle = 40.0f;
-    private List<int> inRangeInteracts = new List<int>();
     private int targetInteractInd = int.MaxValue;
 
     [HideInInspector] public CombatantData[] playerCharacters = null;
@@ -47,27 +56,11 @@ public class WorldPlayer : WorldEntityCore
 
     #region [ BUILT-IN UNITY FUNCTIONS ]
 
-    protected override void Awake()
-    {
-        base.Awake();
-        //playerCharacters = INDEV_PlayerCharacters();
-    }
-
-    protected override void Start()
-    {
-        base.Start();
-        GetInRangeInteracts();
-    }
-
-    protected override void Update()
-    {
-        base.Update();
-    }
-
     protected override void FixedUpdate()
     {
         base.FixedUpdate();
-        HandleInteractions();
+        if (interactions.Length > 0)
+            HandleInteractions();
     }
 
     #endregion
@@ -76,14 +69,16 @@ public class WorldPlayer : WorldEntityCore
 
     public override void Move(Vector3 velocity, bool turnToFace = true)
     {
-        velocity = VelCamTransform(velocity * maxSpeed * (sprintActive ? sprintMultiplier : 1.0f));
-        //transform.position += velocity;
-        rb.velocity = velocity;
-        if (turnToFace)
+        if (!posLocked)
         {
-            Vector2 vDir = new Vector2(velocity.x, velocity.z);
-            float dir = vDir.Angle2D();
-            RotateTo(dir, 0.1f);
+            velocity = VelCamTransform(velocity * maxSpeed * (sprintActive ? sprintMultiplier : 1.0f));
+            rb.velocity = velocity;
+            if (turnToFace)
+            {
+                Vector2 vDir = new Vector2(velocity.x, velocity.z);
+                float dir = vDir.Angle2D();
+                RotateTo(dir, 0.1f);
+            }
         }
     }
 
@@ -98,41 +93,8 @@ public class WorldPlayer : WorldEntityCore
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public void HandleInteractions()
-    {
-        GetInRangeInteracts();
-        int newTarget = GetTargetInteract();
-        if (newTarget != targetInteractInd)
-            UpdateTargetInteract(newTarget);
-    }
-
-    public void AddInteraction(InteractPoint interaction)
-    {
-        interactions.Add(interaction);
-    }
-
-    public void RemoveInteraction(InteractPoint interaction)
-    {
-        if (interactions.Contains(interaction))
-            interactions.Remove(interaction);
-    }
-
-    private void GetInRangeInteracts()
-    {
-        for (int i = 0; i < interactions.Count; i++)
-        {
-            if (interactions[i].inRange && interactions[i].distanceToPlayer > interactionRange)
-            {
-                inRangeInteracts.Remove(i);
-                interactions[i].inRange = false;
-            }
-            else if (!interactions[i].inRange && interactions[i].distanceToPlayer <= interactionRange)
-            {
-                inRangeInteracts.Add(i);
-                interactions[i].inRange = true;
-            }
-        }
-    }
+    private Vector3 DirectionTo(InteractPoint interact) => interact.flatPosition - flatPosition;
+    public float DistanceTo(InteractPoint interact) => (interact.flatPosition - flatPosition).magnitude;
 
     private bool IsInteractVisible(InteractPoint interact)
     {
@@ -140,21 +102,74 @@ public class WorldPlayer : WorldEntityCore
         return !Physics.Raycast(transform.position, rayDir.normalized, rayDir.magnitude);
     }
 
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void FindInteractions()
+    {
+        StartCoroutine(IFindInteractions());
+    }
+    private IEnumerator IFindInteractions()
+    {
+        yield return null;
+        interactions = FindObjectsOfType<InteractPoint>(false);
+        inRange = new bool[interactions.Length];
+    }
+    public void FindInteractions(float delay)
+    {
+        StartCoroutine(IFindInteractions(delay));
+    }
+    private IEnumerator IFindInteractions(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        interactions = FindObjectsOfType<InteractPoint>(false);
+        inRange = new bool[interactions.Length];
+    }
+
+    public void ClearInteractions()
+    {
+        interactions = new InteractPoint[0];
+        targetInteractInd = -1;
+        UIManager.HUD.SetInteractHightlightVis(false);
+    }
+
+    public void HandleInteractions()
+    {
+        GetInRangeInteracts();
+        int newTarget = GetTargetInteract();
+        if (newTarget != targetInteractInd)
+        {
+            /*if (newTarget > -1)
+                Debug.Log("Target interact: " + newTarget + " | Distance to target: " + DistanceTo(interactions[newTarget]));*/
+            UpdateTargetInteract(newTarget);
+        }
+    }
+
+    private void GetInRangeInteracts()
+    {
+        for (int i = 0; i < interactions.Length; i++)
+        {
+            inRange[i] = DistanceTo(interactions[i]) <= interactionRange;
+        }
+    }
+
     private int GetTargetInteract()
     {
         float targetAngle = maxInteractAngle, angle;
         int targetIndex = -1;
         Vector3 dir;
-        for (int i = 0; i < inRangeInteracts.Count; i++)
+        for (int i = 0; i < interactions.Length; i++)
         {
-            if (IsInteractVisible(interactions[inRangeInteracts[i]]))
+            if (inRange[i])
             {
-                dir = (interactions[inRangeInteracts[i]].transform.position - posInteract).Flatten();
-                angle = Vector3.Angle(dir, camDir);
-                if (angle < targetAngle)
+                if (IsInteractVisible(interactions[i]))
                 {
-                    targetAngle = angle;
-                    targetIndex = inRangeInteracts[i];
+                    dir = DirectionTo(interactions[i]);
+                    angle = Vector3.Angle(dir, camDir);
+                    if (angle < targetAngle)
+                    {
+                        targetAngle = angle;
+                        targetIndex = i;
+                    }
                 }
             }
         }
@@ -166,6 +181,8 @@ public class WorldPlayer : WorldEntityCore
         UIManager.HUD.SetInteractHightlightVis(index > -1 ? true : false);
         targetInteractInd = index;
     }
+
+    public void TriggerTargetInteract() { if (targetInteract != null) targetInteract.Trigger(); }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -226,3 +243,33 @@ public class WorldPlayer : WorldEntityCore
         return data;
     }
 }
+
+#if UNITY_EDITOR
+[CustomEditor(typeof(WorldPlayer))]
+public class WorldPlayerEditor : Editor
+{
+    private WorldPlayer targ { get { return target as WorldPlayer; } }
+    private Rect rect;
+
+    private string entityName;
+    private float distance;
+
+    public override void OnInspectorGUI()
+    {
+        if (Application.isPlaying)
+        {
+            for (int i = 0; i < targ.interactions.Length; i++)
+            {
+                entityName = targ.interactions[i].transform.parent.gameObject.name;
+                rect = EditorElements.PrefixLabel(EditorElements.ControlRect(), entityName, 160, EditorStylesExtras.LabelStyle(TextAnchor.MiddleRight));
+                rect.x += 8;
+                rect.width -= 8;
+                rect = EditorElements.PrefixLabel(rect, targ.inRange[i].ToString(), 40);
+                EditorGUI.LabelField(rect, targ.DistanceTo(targ.interactions[i]).ToString());
+            }
+            EditorGUILayout.Space(10);
+        }
+        base.OnInspectorGUI();
+    }
+}
+#endif

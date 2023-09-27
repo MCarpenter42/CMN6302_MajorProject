@@ -4,7 +4,134 @@ namespace NeoCambion.Collections
     using System.Collections;
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
+    using System.ComponentModel;
     using System.Linq;
+
+    public class KeyValueList<Tkey, Tvalue> : IEnumerable<KeyValuePair<Tkey, Tvalue>>
+    {
+        private List<KeyValuePair<Tkey, Tvalue>> contents;
+        public int Count => contents.Count;
+
+        public KeyValueList()
+        {
+            contents = new List<KeyValuePair<Tkey, Tvalue>>();
+        }
+
+        private sealed class KeyValueListEnumerator<Tk, Tv> : IEnumerator<KeyValuePair<Tk, Tv>>
+        {
+            private List<KeyValuePair<Tk, Tv>> contents;
+            private int position = -1;
+
+            public KeyValueListEnumerator(List<KeyValuePair<Tk, Tv>> contents)
+            {
+                this.contents = contents;
+            }
+
+            public bool MoveNext() => ++position < contents.Count;
+            public void Reset() => position = -1;
+            object IEnumerator.Current
+            {
+                get
+                {
+                    try { return contents[position] as object; }
+                    catch (IndexOutOfRangeException) { throw new InvalidOperationException(); }
+                }
+            }
+            KeyValuePair<Tk, Tv> IEnumerator<KeyValuePair<Tk, Tv>>.Current
+            {
+                get
+                {
+                    try { return contents[position]; }
+                    catch (IndexOutOfRangeException) { throw new InvalidOperationException(); }
+                }
+            }
+            public void Dispose() => GC.SuppressFinalize(this);
+        }
+        IEnumerator IEnumerable.GetEnumerator() => new KeyValueListEnumerator<Tkey, Tvalue>(contents);
+        IEnumerator<KeyValuePair<Tkey, Tvalue>> IEnumerable<KeyValuePair<Tkey, Tvalue>>.GetEnumerator() => new KeyValueListEnumerator<Tkey, Tvalue>(contents);
+
+        public Tkey[] Keys => contents.Keys();
+        public Tvalue[] Values => contents.Values();
+
+        public Tvalue[] this[Tkey key] => contents.ValuesMatching(key);
+        public KeyValuePair<Tkey, Tvalue> GetAt(int index)
+        {
+            if (contents.InBounds(index))
+                return contents[index];
+            else
+                throw new IndexOutOfRangeException();
+        }
+        public Tkey GetKeyAt(int index)
+        {
+            if (contents.InBounds(index))
+                return contents[index].Key;
+            else
+                throw new IndexOutOfRangeException();
+        }
+        public Tvalue GetValueAt(int index)
+        {
+            if (contents.InBounds(index))
+                return contents[index].Value;
+            else
+                throw new IndexOutOfRangeException();
+        }
+
+        public void Add(Tkey key, Tvalue value) => contents.Add(new KeyValuePair<Tkey, Tvalue>(key, value));
+        public void AddRange(Tkey key, IList<Tvalue> values)
+        {
+            for (int i = 0; i < values.Count; i++)
+            {
+                contents.Add(new KeyValuePair<Tkey, Tvalue>(key, values[i]));
+            }
+        }
+
+        public void Remove(Tkey key)
+        {
+            for (int i = contents.Count - 1; i >= 0; i--)
+            {
+                if (contents[i].Key.Equals(key))
+                    contents.RemoveAt(i);
+            }
+        }
+        public List<Tvalue> ReturnRemove(Tkey key)
+        {
+            List<Tvalue> removed = new List<Tvalue>();
+            for (int i = contents.Count - 1; i >= 0; i--)
+            {
+                if (contents[i].Key.Equals(key))
+                {
+                    removed.Insert(0, contents[i].Value);
+                    contents.RemoveAt(i);
+                }
+            }
+            return removed;
+        }
+        public void RemoveAt(int index) => contents.RemoveAt(index);
+
+        public bool Contains(Tkey key)
+        {
+            foreach (KeyValuePair<Tkey, Tvalue> kvp in contents)
+            {
+                if (key.Equals(kvp.Key))
+                    return true;
+            }
+            return false;
+        }
+        public int CountOf(Tkey key)
+        {
+            int n = 0;
+            foreach (KeyValuePair<Tkey, Tvalue> kvp in contents)
+            {
+                if (key.Equals(kvp.Key))
+                    n++;
+            }
+            return n;
+        }
+
+        public bool InBounds(int index) => contents.InBounds(index);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public enum SquareGridDirection
     {
@@ -1039,6 +1166,7 @@ namespace NeoCambion.Collections
     Containers
      - [U] Hashtable
      - [U] SortedList
+     - [R] Lookup (Linq)
      - [R] SortedList
      - [R] Dictionary
      - [R] ConcurrentDictionary
@@ -1293,7 +1421,7 @@ namespace NeoCambion.Collections
             return listOut;
         }
 
-        public static T[] ToArray<T>(this List<T> list)
+        public static T[] ToArray<T>(this IList<T> list)
         {
             T[] arrayOut = new T[list.Count];
             for (int i = 0; i < list.Count; i++)
@@ -1342,7 +1470,7 @@ namespace NeoCambion.Collections
                 destination.Add(source[i]);
             }
         }
-
+        
         public static T[] CopyTo<T>(this T[] source, T[] destination, bool overwrite = false)
         {
             if (overwrite)
@@ -1378,7 +1506,7 @@ namespace NeoCambion.Collections
                 destination.Add(source[i]);
             }
         }
-
+        
         public static T[] CopyFrom<T>(this T[] destination, T[] source, bool overwrite = false)
         {
             if (overwrite)
@@ -1410,6 +1538,114 @@ namespace NeoCambion.Collections
             if (overwrite)
                 destination.Clear();
             for (int i = 0; i < source.Count; i++)
+            {
+                destination.Add(source[i]);
+            }
+        }
+        
+        public static T[] ReverseCopy<T>(T[] source, T[] destination, bool overwrite = false)
+        {
+            if (overwrite)
+            {
+                destination = new T[source.Length];
+                for (int i = 0, i2 = source.Length - 1; i < source.Length; i++, i2--)
+                {
+                    destination[i] = source[i2];
+                }
+                return destination;
+            }
+            else
+            {
+                T[] result = new T[source.Length + destination.Length];
+                for (int i = 0; i < destination.Length; i++)
+                {
+                    result[i] = destination[i];
+                }
+                for (int i = 0, i2 = result.Length - 1; i < source.Length; i++, i2--)
+                {
+                    result[i2] = destination[i];
+                }
+                destination = result;
+                return result;
+            }
+        }
+        public static void ReverseCopy<T>(IList<T> source, IList<T> destination, bool overwrite = false)
+        {
+            if (overwrite)
+                destination.Clear();
+            for (int i = source.Count - 1; i >= 0; i--)
+            {
+                destination.Add(source[i]);
+            }
+        }
+
+        public static T[] ReverseCopyTo<T>(this T[] source, T[] destination, bool overwrite = false)
+        {
+            if (overwrite)
+            {
+                destination = new T[source.Length];
+                for (int i = 0, i2 = source.Length - 1; i < source.Length; i++, i2--)
+                {
+                    destination[i] = source[i2];
+                }
+                return destination;
+            }
+            else
+            {
+                T[] result = new T[source.Length + destination.Length];
+                for (int i = 0; i < destination.Length; i++)
+                {
+                    result[i] = destination[i];
+                }
+                for (int i = 0, i2 = result.Length - 1; i < source.Length; i++, i2--)
+                {
+                    result[i2] = destination[i];
+                }
+                destination = result;
+                return result;
+            }
+        }
+        public static void ReverseCopyTo<T>(this IList<T> source, IList<T> destination, bool overwrite = false)
+        {
+            if (overwrite)
+                destination.Clear();
+            for (int i = source.Count - 1; i >= 0; i--)
+            {
+                destination.Add(source[i]);
+            }
+        }
+
+        public static T[] ReverseCopyFrom<T>(this T[] destination, T[] source, bool overwrite = false)
+        {
+            if (overwrite)
+            {
+                destination = new T[source.Length];
+                for (int i = 0; i < source.Length; i++)
+                {
+                    destination[i] = source[i];
+                }
+                return destination;
+            }
+            else
+            {
+                T[] result = new T[source.Length + destination.Length];
+                for (int i = 0; i < destination.Length; i++)
+                {
+                    result[i] = destination[i];
+                }
+                for (int i = 0, i2 = result.Length - 1; i < source.Length; i++, i2--)
+                {
+                    result[i2] = destination[i];
+                }
+                destination = result;
+                return result;
+            }
+        }
+        public static void ReverseCopyFrom<T>(this IList<T> destination, IList<T> source, bool overwrite = false)
+        {
+            if (overwrite)
+                destination.Clear();
+            for (int i = source.Count - 1; i >= 0; i--)
             {
                 destination.Add(source[i]);
             }
@@ -1830,10 +2066,10 @@ namespace NeoCambion.Collections
 
         public static bool AddUnlessNull<T>(this IList<T> collection, T value)
         {
-            if (value != null)
+            if (collection != null && value != null)
             {
-                collection?.Add(value);
-                return collection != null;
+                collection.Add(value);
+                return true;
             }
             return false;
         }
@@ -1847,7 +2083,6 @@ namespace NeoCambion.Collections
             }
             return false;
         }
-        
         public static bool RemoveIfNull<Tkey, Tvalue>(this IDictionary<Tkey, Tvalue> collection, Tkey key)
         {
             if (collection.ContainsKey(key) && typeof(Tvalue).IsNullable() && collection[key] == null)
@@ -1869,7 +2104,6 @@ namespace NeoCambion.Collections
                 }
             }
         }
-
         public static void RemoveAllNull<Tkey, Tvalue>(this IDictionary<Tkey, Tvalue> collection)
         {
             if (typeof(Tvalue).IsNullable())
@@ -1945,7 +2179,9 @@ namespace NeoCambion.Collections
             return null;
         }
 
-        public static void Transfer<T>(this List<T> source, int sourceIndex, List<T> destination)
+        public static void AddIfUnique<T>(this IList<T> collection, T item) { if (!collection.Contains(item)) collection.Add(item); }
+
+        public static void Transfer<T>(this IList<T> source, int sourceIndex, IList<T> destination)
         {
             if (source.InBounds(sourceIndex))
             {
@@ -1953,49 +2189,108 @@ namespace NeoCambion.Collections
                 source.RemoveAt(sourceIndex);
             }
         }
-        public static void Transfer<T>(this List<T> source, int sourceIndex, List<T> destination, int destinationIndex)
+        public static void Transfer<T>(this IList<T> source, int sourceIndex, IList<T> destination, int destinationIndex)
         {
             if (source.InBounds(sourceIndex))
             {
-                if (destination.InBounds(destinationIndex))
-                {
-                    destination.Insert(destinationIndex, source[sourceIndex]);
-                    source.RemoveAt(sourceIndex);
-                }
-                else
-                {
+                if (destinationIndex < 0)
+                    destinationIndex = 0;
+                if (destinationIndex >= destination.Count)
                     destination.Add(source[sourceIndex]);
-                    source.RemoveAt(sourceIndex);
-                }
+                else
+                    destination.Insert(destinationIndex, source[sourceIndex]);
+                source.RemoveAt(sourceIndex);
             }
         }
 
-        public static void TransferAll<T>(this List<T> source, List<T> destination)
+        public static void TransferAll<T>(this IList<T> source, IList<T> destination)
         {
-            int i = 0, x = source.Count;
-            for (; i < x; i++)
+            while (source.Count > 0)
             {
                 destination.Add(source[0]);
                 source.RemoveAt(0);
             }
         }
-        public static void TransferAll<T>(this List<T> source, List<T> destination, int insertFrom)
+        public static void TransferAll<T>(this IList<T> source, IList<T> destination, int insertFrom)
         {
-            if (destination.InBounds(insertFrom))
+            if (insertFrom < 0)
+                insertFrom = 0;
+            if (insertFrom < destination.Count)
             {
-                int i = insertFrom, x = insertFrom + source.Count;
-                for (; i < x; i++)
+                while (source.Count > 0)
                 {
-                    destination.Insert(i, source[0]);
+                    destination.Insert(insertFrom, source[0]);
+                    source.RemoveAt(0);
+                    insertFrom++;
+                }
+            }
+            else
+            {
+                while (source.Count > 0)
+                {
+                    destination.Add(source[0]);
+                    source.RemoveAt(0);
+                }
+            }
+        }
+
+        public static void TransferUnique<T>(this IList<T> source, int sourceIndex, IList<T> destination)
+        {
+            if (source.InBounds(sourceIndex))
+            {
+                if (!destination.Contains(source[sourceIndex]))
+                    destination.Add(source[sourceIndex]);
+                source.RemoveAt(sourceIndex);
+            }
+        }
+        public static void TransferUnique<T>(this IList<T> source, int sourceIndex, IList<T> destination, int destinationIndex)
+        {
+            if (source.InBounds(sourceIndex))
+            {
+                if (!destination.Contains(source[sourceIndex]))
+                {
+                    if (destinationIndex < 0)
+                        destinationIndex = 0;
+                    if (destinationIndex >= destination.Count)
+                        destination.Add(source[sourceIndex]);
+                    else
+                        destination.Insert(destinationIndex, source[sourceIndex]);
+                }
+                source.RemoveAt(sourceIndex);
+            }
+        }
+
+        public static void TransferAllUnique<T>(this IList<T> source, IList<T> destination)
+        {
+            while (source.Count > 0)
+            {
+                if (!destination.Contains(source[0]))
+                    destination.Add(source[0]);
+                source.RemoveAt(0);
+            }
+        }
+        public static void TransferAllUnique<T>(this IList<T> source, IList<T> destination, int insertFrom)
+        {
+            if (insertFrom < 0)
+                insertFrom = 0;
+            if (insertFrom < destination.Count)
+            {
+                while (source.Count > 0)
+                {
+                    if (!destination.Contains(source[0]))
+                    {
+                        destination.Insert(insertFrom, source[0]);
+                        insertFrom++;
+                    }
                     source.RemoveAt(0);
                 }
             }
             else
             {
-                int i = 0, x = source.Count;
-                for (; i < x; i++)
+                while (source.Count > 0)
                 {
-                    destination.Add(source[0]);
+                    if (!destination.Contains(source[0]))
+                        destination.Add(source[0]);
                     source.RemoveAt(0);
                 }
             }
@@ -2087,6 +2382,92 @@ namespace NeoCambion.Collections
                 indices[i] = i;
             }
             return indices;
+        }
+
+        public static bool ContainsAny<T>(this ICollection<T> collection, ICollection<T> toCheck)
+        {
+            foreach (T item in toCheck)
+            {
+                if (collection.Contains(item))
+                    return true;
+            }
+            return false;
+        }
+
+        public static T[] Combine<T>(this T[] firstArray, T[] secondArray)
+        {
+            int n = firstArray.Length + secondArray.Length;
+            T[] result = new T[n];
+            for (int i = 0, i2 = 0; i < n; i++, i2++)
+            {
+                if (i2 == firstArray.Length)
+                    i2 -= firstArray.Length;
+                result[i] = i < n ? firstArray[i] : secondArray[i2];
+            }
+            return result;
+        }
+        public static T[] Combine<T>(this T[] firstArray, params T[][] toMerge)
+        {
+            int i, i2 = 0, n = firstArray.Length;
+            foreach (T[] arr in toMerge)
+                n += arr.Length;
+            T[] result = new T[n];
+            for (i = 0; i < firstArray.Length; i++, i2++)
+            {
+                result[i2] = firstArray[i];
+            }
+            foreach (T[] arr in toMerge)
+            {
+                for (i = 0; i < arr.Length; i++, i2++)
+                {
+                    result[i2] = arr[i];
+                }
+            }
+            return result;
+        }
+    }
+
+    public static class Ext_BoolCollection
+    {
+        public static bool AND(this ICollection<bool> collection)
+        {
+            foreach (bool b in collection)
+                if (!b)
+                    return false;
+            return true;
+        }
+        public static bool NAND(this ICollection<bool> collection)
+        {
+            foreach (bool b in collection)
+                if (!b)
+                    return true;
+            return false;
+        }
+
+        public static bool OR(this ICollection<bool> collection)
+        {
+            foreach (bool b in collection)
+                if (b)
+                    return true;
+            return false;
+        }
+        public static bool NOR(this ICollection<bool> collection)
+        {
+            foreach (bool b in collection)
+                if (b)
+                    return false;
+            return true;
+        }
+
+        public static bool[] NOT(this ICollection<bool> collection)
+        {
+            bool[] result = new bool[collection.Count];
+            int i = 0;
+            foreach (bool b in collection)
+            {
+                result[i++] = !b;
+            }
+            return result;
         }
     }
 
@@ -2339,44 +2720,63 @@ namespace NeoCambion.Collections
 
     public static class Ext_KVPCollection
     {
-        public static Tkey[] Keys<Tkey, Tvalue>(this KeyValuePair<Tkey, Tvalue>[] array)
+        public static Tkey[] Keys<Tkey, Tvalue>(this KeyValuePair<Tkey, Tvalue>[] collection)
         {
-            Tkey[] keys = new Tkey[array.Length];
-            for (int i = 0; i < array.Length; i++)
+            Tkey[] keys = new Tkey[collection.Length];
+            for (int i = 0; i < collection.Length; i++)
             {
-                keys[i] = array[i].Key;
+                keys[i] = collection[i].Key;
+            }
+            return keys;
+        }
+        public static Tkey[] Keys<Tkey, Tvalue>(this IList<KeyValuePair<Tkey, Tvalue>> collection)
+        {
+            Tkey[] keys = new Tkey[collection.Count];
+            for (int i = 0; i < collection.Count; i++)
+            {
+                keys[i] = collection[i].Key;
             }
             return keys;
         }
 
-        public static List<Tkey> Keys<Tkey, Tvalue>(this List<KeyValuePair<Tkey, Tvalue>> list)
+        public static Tvalue[] Values<Tkey, Tvalue>(this KeyValuePair<Tkey, Tvalue>[] collection)
         {
-            List<Tkey> keys = new List<Tkey>();
-            for (int i = 0; i < list.Count; i++)
+            Tvalue[] values = new Tvalue[collection.Length];
+            for (int i = 0; i < collection.Length; i++)
             {
-                keys.Add(list[i].Key);
+                values[i] = collection[i].Value;
             }
-            return keys;
+            return values;
+        }
+        public static Tvalue[] Values<Tkey, Tvalue>(this IList<KeyValuePair<Tkey, Tvalue>> collection)
+        {
+            Tvalue[] values = new Tvalue[collection.Count];
+            for (int i = 0; i < collection.Count; i++)
+            {
+                values[i] = collection[i].Value;
+            }
+            return values;
         }
 
-        public static Tvalue[] Values<Tkey, Tvalue>(this KeyValuePair<Tkey, Tvalue>[] array)
+        public static Tvalue[] ValuesMatching<Tkey, Tvalue>(this KeyValuePair<Tkey, Tvalue>[] collection, Tkey key)
         {
-            Tvalue[] keys = new Tvalue[array.Length];
-            for (int i = 0; i < array.Length; i++)
+            List<Tvalue> values = new List<Tvalue>();
+            for (int i = 0; i < collection.Length; i++)
             {
-                keys[i] = array[i].Value;
+                if (collection[i].Key.Equals(key))
+                    values.Add(collection[i].Value);
             }
-            return keys;
+            return values.ToArray();
         }
-
-        public static List<Tvalue> Values<Tkey, Tvalue>(this List<KeyValuePair<Tkey, Tvalue>> list)
+        public static Tvalue[] ValuesMatching<Tkey, Tvalue>(this IList<KeyValuePair<Tkey, Tvalue>> collection, Tkey key)
         {
-            List<Tvalue> keys = new List<Tvalue>();
-            for (int i = 0; i < list.Count; i++)
+            List<Tvalue> values = new List<Tvalue>();
+            for (int i = 0; i < collection.Count; i++)
             {
-                keys.Add(list[i].Value);
+                if (collection[i].Key.Equals(key))
+                    values.Add(collection[i].Value);
             }
-            return keys;
+            return values.ToArray();
         }
     }
 
@@ -3059,7 +3459,7 @@ namespace NeoCambion.Collections
                 => collection.ReturnAdd(original.Clone());
             public static T AddClone<T>(this IList<T> collection, T original, Transform parent) where T : Object 
                 => collection.ReturnAdd(original.Clone(parent));
-            public static T T<T>(this IList<T> collection, T original, Transform parent, bool instantiateInWorldSpace) where T : Object 
+            public static T AddClone<T>(this IList<T> collection, T original, Transform parent, bool instantiateInWorldSpace) where T : Object 
                 => collection.ReturnAdd(original.Clone(parent, instantiateInWorldSpace));
             public static T AddClone<T>(this IList<T> collection, T original, Vector3 position, Quaternion rotation) where T : Object 
                 => collection.ReturnAdd(original.Clone(position, rotation));

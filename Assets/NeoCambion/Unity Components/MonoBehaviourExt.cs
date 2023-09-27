@@ -1,8 +1,11 @@
 namespace NeoCambion.Unity
 {
     using UnityEngine;
-    using NeoCambion.Unity;
+    using UnityEditor;
 
+#if UNITY_EDITOR
+    [CanEditMultipleObjects]
+#endif
     public class MonoBehaviourExt : MonoBehaviour
     {
         public static GameObject NewObject(Vector3 position, params System.Type[] components) => NewGameObject.Get(position, components);

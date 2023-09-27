@@ -3,14 +3,10 @@ namespace NeoCambion.Unity.PersistentUID
     using System.Collections.Generic;
     using System.Linq;
     using UnityEngine;
+
+#if UNITY_EDITOR
     using UnityEditor;
-
     using NeoCambion.Unity.Editor;
-
-    public class PrefabUID : PersistentUID
-    {
-
-    }
 
     [CustomEditor(typeof(PrefabUID))]
     public class PrefabUIDEditor : Editor
@@ -41,5 +37,11 @@ namespace NeoCambion.Unity.PersistentUID
             }
             serializedObject.ApplyModifiedProperties();
         }
+    }
+#endif
+
+    public class PrefabUID : PersistentUID
+    {
+
     }
 }

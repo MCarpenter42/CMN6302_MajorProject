@@ -3,14 +3,16 @@ namespace NeoCambion.Unity
     using System.Collections;
     using System.Collections.Generic;
     using UnityEngine;
-    using UnityEditor;
 
     using NeoCambion;
-    using NeoCambion.Unity.Editor;
     using NeoCambion.Maths;
-    using static CombatManager;
+
+#if UNITY_EDITOR
+    using UnityEditor;
+    using NeoCambion.Unity.Editor;
 
     [ExecuteInEditMode]
+#endif
     public class PivotArmCamera : MonoBehaviourExt
     {
         public Transform pivot;
@@ -39,7 +41,7 @@ namespace NeoCambion.Unity
 
         public CameraAngle currentViewAngle => new CameraAngle(position, eulerAngles, camOffset);
 
-        void Awake()
+        protected virtual void Awake()
         {
             if (pivot == null)
             {
@@ -85,7 +87,7 @@ namespace NeoCambion.Unity
             }
         }
 
-        void Update()
+        protected virtual void Update()
         {
 #if UNITY_EDITOR
             if (!Application.isPlaying)
@@ -117,6 +119,7 @@ namespace NeoCambion.Unity
         }
     }
 
+    [System.Serializable]
     public struct CameraAngle
     {
         public Vector3 position;
@@ -141,6 +144,7 @@ namespace NeoCambion.Unity
         }
     }
 
+#if UNITY_EDITOR
     [CustomEditor(typeof(PivotArmCamera))]
     [CanEditMultipleObjects]
     public class PivotArmCameraEditor : UnityEditor.Editor
@@ -167,7 +171,9 @@ namespace NeoCambion.Unity
                 EditorGUILayout.Space(1);
             }
             EditorElements.EndHorizVert();
+            serializedObject.ApplyModifiedProperties();
         }
     }
+#endif
 }
 

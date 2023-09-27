@@ -8,7 +8,7 @@ using NeoCambion;
 
 public enum IconState { Normal, Hovered, Selected }
 public enum IconResolution { Unknown, x32, x64, x128, x256, x512 };
-
+/*
 [System.Serializable]
 public struct ControlIconRef
 {
@@ -39,19 +39,7 @@ public struct ControlIconRef
 
 public class _ControlIconHandler
 {
-    private static string _IconFolder = null;
-    public static string IconFolder
-    {
-        get
-        {
-            if (_IconFolder == null || !AssetDatabase.IsValidFolder(_IconFolder))
-            {
-                _IconFolder = GetIconFolder();
-            }
-            return _IconFolder;
-        }
-    }
-
+    public static string IconFolder = "/Resources/Images/Control Icons";
     public static string IconFolder_KeyboardAndMouse { get { return IconFolder + "/KeyboardAndMouse"; } }
     public static string IconFolder_Gamepad_Generic { get { return IconFolder + "/Gamepad_Generic"; } }
     public static string IconFolder_Gamepad_Xbox { get { return IconFolder + "/Gamepad_Xbox"; } }
@@ -147,7 +135,7 @@ public class _ControlIconHandler
         }
     }
 
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    *//* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - *//*
 
     public static string GetIconFolder()
     {
@@ -329,12 +317,12 @@ public class _ControlIconHandler
         Dictionary<string, ControlIconRef[]> dict = GetDict(ctrlSchemeInd);
         if (dict.ContainsKey(controlName))
         {
-
-            return AssetDatabase.LoadAssetAtPath<Sprite>("Assets" + IconFolder);
+            return Resources.Load<Sprite>("Assets" + );
+            //return AssetDatabase.LoadAssetAtPath<Sprite>("Assets" + IconFolder);
         }
         else
         {
             return null;
         }
     }
-}
+}*/

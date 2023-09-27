@@ -12,6 +12,7 @@ namespace NeoCambion.Unity
         public Sprite sprite { get { return GetComponent<SpriteMask>().sprite; } set { GetComponent<SpriteMask>().sprite = value; } }
     }
 
+#if UNITY_EDITOR
     [CustomEditor(typeof(WorldSpaceMask))]
     public class WorldSpaceMaskEditor : UnityEditor.Editor
     {
@@ -22,4 +23,5 @@ namespace NeoCambion.Unity
 
         }
     }
+#endif
 }

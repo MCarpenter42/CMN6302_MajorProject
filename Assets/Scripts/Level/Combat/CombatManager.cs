@@ -6,7 +6,6 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
-using UnityEditor;
 using TMPro;
 
 using NeoCambion;
@@ -14,6 +13,7 @@ using NeoCambion.Collections;
 using NeoCambion.Collections.Unity;
 using NeoCambion.Encryption;
 using NeoCambion.Heightmaps;
+using NeoCambion.Interpolation;
 using NeoCambion.IO;
 using NeoCambion.IO.Unity;
 using NeoCambion.Maths;
@@ -24,14 +24,13 @@ using NeoCambion.Sorting;
 using NeoCambion.TaggedData;
 using NeoCambion.TaggedData.Unity;
 using NeoCambion.Unity;
-using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
-using NeoCambion.Unity.Interpolation;
-using UnityEngine.UIElements;
+using UnityEngine.Playables;
 
 public class CombatManager : Core
 {
+    public GameDataStorage GameData { get { return GameManager.Instance.GameData; } }
     public HUDManager HUDManager { get { return UIManager.HUD; } }
 
     #region [ OBJECTS / COMPONENTS ]
@@ -48,6 +47,7 @@ public class CombatManager : Core
     [SerializeField] GameObject allyPrefab;
     [SerializeField] GameObject enemyPrefab;
     [SerializeField] GameObject turnIndicator;
+    [SerializeField] DamageNumber damageText;
 
     public CombatantsContainer combatants = new CombatantsContainer();
     public List<CombatPlayer> allyTeam { get { return combatants.allyTeam; } }
@@ -63,26 +63,29 @@ public class CombatManager : Core
     public float combatTime { get; private set; }
     public int turnCounter { get; private set; }
 
-    public float delayBetweenTurns = 1.5f;
+    public static float delayBetweenTurns = 1.5f;
 
     [HideInInspector] public int turnOfInd = -1;
     public CombatantCore currentlyActing { get { return combatants[turnOfInd]; } }
 
     [HideInInspector] public int playerSkillPower = 3;
-    public static int maxSkillPower = 6;
+    public static int maxSkillPower = 5;
+    public bool canUseSkill => playerSkillPower > 0;
+
     [HideInInspector] public int playerUltPower = 0;
     public static int maxUltPower = 25;
     public static int requiredUltPower = 20;
+    public bool canUseUlt => playerUltPower >= requiredUltPower;
 
-    public bool selectionActive = false;
-    public TargetSelection currentTargetingType = TargetSelection.None;
-    public bool targetingAllies { get { return currentTargetingType == TargetSelection.Self || currentTargetingType == TargetSelection.Allied || currentTargetingType == TargetSelection.Self; } }
-    public int currentAllyTarget = -1;
-    public int currentEnemyTarget = -1;
-    public int currentBlastWidth = 0;
+    [HideInInspector] public bool selectionActive = false;
+    [HideInInspector] public TargetSelection currentTargetingType = TargetSelection.None;
+    [HideInInspector] public bool targetingAllies { get { return currentTargetingType == TargetSelection.Self || currentTargetingType == TargetSelection.Allied || currentTargetingType == TargetSelection.Self; } }
+    [HideInInspector] public int currentAllyTarget = -1;
+    [HideInInspector] public int currentEnemyTarget = -1;
+    [HideInInspector] public int currentBlastWidth = 0;
 
-    public CameraAngle defaultCameraAngle;
-    public CameraAngle defaultCameraAngleFlipped;
+    [HideInInspector] public CameraAngle defaultCameraAngle;
+    [HideInInspector] public CameraAngle defaultCameraAngleFlipped;
 
     #endregion
 
@@ -95,30 +98,11 @@ public class CombatManager : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    #region [ BUILT-IN UNITY FUNCTIONS ]
-
-    void Awake()
+    protected override void Initialise()
     {
         defaultCameraAngle = new CameraAngle(combatCamera.position, combatCamera.eulerAngles, combatCamera.camOffset);
         defaultCameraAngleFlipped = new CameraAngle(defaultCameraAngle, new Vector3(0f, 180f, 0f));
     }
-
-    void Start()
-    {
-
-    }
-
-    void Update()
-    {
-
-    }
-
-    void FixedUpdate()
-    {
-
-    }
-
-    #endregion
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -213,9 +197,10 @@ public class CombatManager : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    FloatRange spacing = new FloatRange(3f, 5f);
+    FloatRange spacing = new FloatRange(1f, 2f);
     public void StartCombat(CombatantData[] allyList, CombatantData[] enemyList)
     {
+        Debug.Log("- - - - -");
         Debug.Log("Combat started with " + allyList.Length + " allies and " + enemyList.Length + " enemies");
         if (!disableStart)
         {
@@ -233,21 +218,22 @@ public class CombatManager : Core
             combatants.UpdateTeamPositions(false, spacing);
 
             ResetCombatValues();
+            playerUltPower = GameData.runData.p_ultCharge;
+            HUDManager.UpdateSkillPowerDisplay(playerSkillPower);
+            HUDManager.UpdateUltPowerDisplay(playerUltPower);
 
-            foreach (CombatPlayer combatant in allyTeam)
+            for (int i = 0; i < allyTeam.Count; i++)
             {
-                if (combatant.healthBar != null)
-                    combatant.healthBar.rotateTarget = combatCamera.cam.transform;
+                allyTeam[i].healthBar = HUDManager.playerHealthBars_Combat[i];
             }
             foreach (CombatEnemy combatant in enemyTeam)
             {
                 if (combatant.healthBar != null)
-                    combatant.healthBar.rotateTarget = combatCamera.cam.transform;
+                    ((HealthBar3D)combatant.healthBar).rotateTarget = combatCamera.cam.transform;
             }
 
             foreach (CombatEnemy enemy in enemyTeam)
             {
-                Debug.Log(enemy.pivot == null);
                 enemy.rotation = 180.0f * Vector3.up;
             }
 
@@ -340,24 +326,29 @@ public class CombatManager : Core
             Debug.Log(combatant.displayName + " was damaged for " + value + ", leaving them on " + (combatant.health.Current - value) + "/" + combatant.health.Scaled + " health (" + combatant.health.CurrentPercentString + ")");
         else
             Debug.Log(combatant.displayName + " was attacked but took no damage, leaving them on " + combatant.health.Current + "/" + combatant.health.Scaled + " health (" + combatant.health.CurrentPercentString + ")");
+        Vector3 dmgNumPos = combatant.damageTextAnchor == null ? combatant.transform.position + Vector3.up : combatant.damageTextAnchor.position;
+        SpawnDamageNumber("-" + value.ToString(), dmgNumPos, Color.red, 0.15f, 0.45f, 0.4f);
     }
 
     public void OnCombatantShieldDamaged(CombatantCore combatant, int value)
     {
         Debug.Log(combatant.displayName + "'s shields were damaged for " + value);
-
+        Vector3 dmgNumPos = combatant.damageTextAnchor == null ? combatant.transform.position + Vector3.up : combatant.damageTextAnchor.position;
+        SpawnDamageNumber("-" + value.ToString(), dmgNumPos, Color.cyan, 0.15f, 0.45f, 0.4f);
     }
 
     public void OnCombatantHealed(CombatantCore combatant, int value)
     {
         Debug.Log(combatant.displayName + " was healed for " + value + ", leaving them on " + (combatant.health.Current + value) + " health (" + combatant.health.CurrentPercentString + ")");
-
+        Vector3 dmgNumPos = combatant.damageTextAnchor == null ? combatant.transform.position + Vector3.up : combatant.damageTextAnchor.position;
+        SpawnDamageNumber("+" + value.ToString(), dmgNumPos, Color.green, 0.15f, 0.45f, 0.4f);
     }
 
     public void OnCombatantShielded(CombatantCore combatant, int value)
     {
         Debug.Log(combatant.displayName + " was killed!");
-
+        Vector3 dmgNumPos = combatant.damageTextAnchor == null ? combatant.transform.position + Vector3.up : combatant.damageTextAnchor.position;
+        SpawnDamageNumber("+" + value.ToString(), dmgNumPos, Color.cyan, 0.15f, 0.45f, 0.4f);
     }
 
     public void OnCombatantDied(CombatantCore combatant)
@@ -370,26 +361,10 @@ public class CombatManager : Core
         Debug.Log(combatant.displayName + " was revived, and healed for " + healedBy + "!");
     }
 
-    public void RemoveDead()
-    {
-        for (int i = enemyTeam.Count - 1; i >= 0; i--)
-        {
-            if (!enemyTeam[i].alive)
-            {
-                enemyTeam[i].gameObject.DestroyThis();
-                enemyTeam.RemoveAt(i);
-            }
-        }
-        combatants.ReassignIndices();
-        combatants.UpdateTeamPositions(false, spacing);
-    }
-
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     private int NextTurn()
     {
-        RemoveDead();
-
         if (turnOfInd > -1)
             OnTurnEnded(currentlyActing, combatTime);
 
@@ -419,23 +394,84 @@ public class CombatManager : Core
         }
         else
         {
-            StartPlayerTurn(cInd);
+            StartPlayerTurn();
         }
         return cInd;
     }
 
     public void AdvanceTurnOrder(float delay)
     {
-        StartCoroutine(IAdvanceTurnOrder(delay + delayBetweenTurns));
+        StartCoroutine(IAdvanceTurnOrder(delay));
     }
 
     private IEnumerator IAdvanceTurnOrder(float delay)
     {
-        yield return new WaitForSeconds(delay);
-        NextTurn();
+        yield return new WaitForSeconds(delay + delayBetweenTurns / 2f);
+        RemoveDead();
+        if (!EndCondition())
+        {
+            yield return new WaitForSeconds(delayBetweenTurns / 2f);
+            NextTurn();
+        }
     }
 
-    public void StartPlayerTurn(int characterIndex)
+    public void RemoveDead()
+    {
+        for (int i = enemyTeam.Count - 1; i >= 0; i--)
+        {
+            if (!enemyTeam[i].alive)
+            {
+                enemyTeam[i].gameObject.DestroyThis();
+                enemyTeam.RemoveAt(i);
+            }
+        }
+        combatants.ReassignIndices();
+        combatants.UpdateTeamPositions(false, spacing);
+    }
+
+    public bool EndCondition()
+    {
+        if (enemyTeam.Count > 0)
+        {
+            if (combatants.anyAllyAlive)
+                return false;
+            else
+            {
+                GameManager.Instance.OnCombatEnd(false, 2.5f);
+                ResetCombat();
+                GameData.SaveRunData();
+                return true;
+            }
+        }
+        else
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                GameData.runData.p_healthValues[i] = new int[] { allyTeam[i].health.Current, allyTeam[i].health.Scaled };
+                GameData.playerData[i].currentHealthPercent = GameData.runData.p_healthPercentages[i];
+            }
+            GameManager.Instance.OnCombatEnd(true, 2.5f);
+            ResetCombat();
+            GameData.SaveRunData();
+            return true;
+        }
+    }
+
+    public void ResetCombat()
+    {
+        combatants.Clear();
+        turnOfInd = -1;
+        playerSkillPower = 3;
+        selectionActive = false;
+        currentTargetingType = TargetSelection.None;
+        currentAllyTarget = -1;
+        currentEnemyTarget = -1;
+        currentBlastWidth = 0;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void StartPlayerTurn()
     {
         HUDManager.SetAbilityButtonsEnabled(true);
         StartPlayerTargetSelection(ActionPoolCategory.Standard);
@@ -444,11 +480,8 @@ public class CombatManager : Core
     public void EndPlayerTurn(float delay)
     {
         HUDManager.SetAbilityButtonsEnabled(false);
-        Debug.Log(delay);
         AdvanceTurnOrder(delay);
     }
-
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     private int GetMiddle(bool playerTeam)
     {
@@ -571,7 +604,7 @@ public class CombatManager : Core
                 currentBlastWidth = combatant.brain.actions.special[0].multiTarget.count;
                 break;
         }
-        Debug.Log("Beginning target selection for " + combatant.displayName + ": " + ability.ToString() + "\nTargeting type: " + currentTargetingType.ToString() + " | Blast width: " + currentBlastWidth);
+        //Debug.Log("Beginning target selection for " + combatant.displayName + ": " + ability.ToString() + "\nTargeting type: " + currentTargetingType.ToString() + " | Blast width: " + currentBlastWidth);
 
         if (targetingAllies)
         {
@@ -690,7 +723,7 @@ public class CombatManager : Core
                 if (playerSkillPower > 0)
                 {
                     AdjustSkillPower(-1);
-                    AdjustUltPower(+3);
+                    AdjustUltPower(+2);
                     if (targets.Length > 0)
                         EndPlayerTurn(currentlyActing.brain.ExecuteAction(type, targets, 0, false));
                     else
@@ -718,8 +751,10 @@ public class CombatManager : Core
             playerSkillPower = 0;
         else if (playerSkillPower > maxSkillPower)
             playerSkillPower = maxSkillPower;
+
+        HUDManager.UpdateSkillPowerDisplay(playerSkillPower);
     }
-    
+
     public void AdjustUltPower(int adjustBy)
     {
         playerUltPower += adjustBy;
@@ -727,6 +762,18 @@ public class CombatManager : Core
             playerUltPower = 0;
         else if (playerUltPower > maxUltPower)
             playerUltPower = maxUltPower;
+        GameData.runData.p_ultCharge = playerUltPower;
+        HUDManager.UpdateUltPowerDisplay(playerUltPower);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    public void SpawnDamageNumber(string value, Vector3 spawnAt, Color color, float tFadeIn, float tPause, float tFadeOut)
+    {
+        DamageNumber dmgNum = Instantiate(damageText, spawnAt, Quaternion.identity);
+        dmgNum.Text = value;
+        dmgNum.lookTarg = combatCamera.cameraTransform;
+        dmgNum.Animate(color, tFadeIn, tPause, tFadeOut);
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -777,9 +824,21 @@ public class CombatManager : Core
 
 public class CombatantsContainer
 {
+    public GameDataStorage GameData => GameManager.Instance.GameData;
+
     public Transform allyTransform;
     public Vector3 allyAnchor => allyTransform == null ? -6f * Vector3.forward : allyTransform.position;
     public List<CombatPlayer> allyTeam;
+    public bool anyAllyAlive
+    {
+        get
+        {
+            foreach (CombatPlayer ally in allyTeam)
+                if (ally.alive)
+                    return true;
+            return false;
+        }
+    }
 
     public Transform enemyTransform;
     public Vector3 enemyAnchor => enemyTransform == null ? 6f * Vector3.forward : enemyTransform.position;
@@ -788,7 +847,6 @@ public class CombatantsContainer
     public int Count => (allyTeam == null ? 0 : allyTeam.Count) + (enemyTeam == null ? 0 : enemyTeam.Count);
 
     public CombatantCore this[bool ally, int index] => ally ? allyTeam[index]: enemyTeam[index];
-
     public CombatantCore this[int indexOverall] => indexOverall >= allyTeam.Count ? enemyTeam[indexOverall - allyTeam.Count] : allyTeam[indexOverall];
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -804,12 +862,20 @@ public class CombatantsContainer
     public void Initialise(CombatantData[] allyData, GameObject allyTemplate, CombatantData[] enemyData, GameObject enemyTemplate)
     {
         allyTeam = new List<CombatPlayer>();
-        foreach (PlayerData data in allyData)
+        float perc;
+        for (int i = 0; i < 4; i++)
         {
             CombatPlayer ally = allyTeam.AddClone(allyTemplate, allyTransform);
-            ally.GetData(data);
+            ally.healthBar = Core.UIManager.HUD.playerHealthBars_Combat[i];
+            ally.GetData(allyData[i], GameData.runData.p_level);
             if (ally.gotData)
-                ally.gameObject.name = data.displayName;
+            {
+                ally.gameObject.name = allyData[i].displayName;
+                ally.health.Current = Mathf.RoundToInt(GameData.playerData[i].currentHealthPercent * ally.health.ScaledAsFloat);
+                perc = ally.health.Current / ally.health.ScaledAsFloat;
+                (ally.healthBar as HealthBarCanvas).SetValue(ally.health.Current, ally.health.Scaled, 0f);
+                //Debug.Log(i + ": " + GameData.playerData[i].currentHealthPercent + " / " + perc);
+            }
             else
                 allyTeam.RemoveLastAndDestroy();
         }
@@ -849,11 +915,11 @@ public class CombatantsContainer
             posL = allyAnchor;
             posR = allyAnchor;
             w = allyTeam[0].Size;
-            posL.x -= ((allyTeam.Count - 1) / 2f) * (spacingInfo.upper + w);
+            posL.x += ((allyTeam.Count - 1) / 2f) * (spacingInfo.Upper + w);
             allyTeam[0].position = posL;
             for (int i = 1; i < allyTeam.Count; i++)
             {
-                posL.x += spacingInfo.upper + w;
+                posL.x -= spacingInfo.Upper + w;
                 allyTeam[i].position = posL;
             }
         }
@@ -862,15 +928,15 @@ public class CombatantsContainer
             posL = enemyAnchor;
             posR = enemyAnchor;
             if (enemyTeam.Count <= 4)
-                spacing = spacingInfo.upper;
+                spacing = spacingInfo.Upper;
             else
             {
                 switch (enemyTeam.Count)
                 {
-                    case 5: spacing = spacingInfo.upper - 0.25f * spacingInfo.range; break;
-                    case 6: spacing = spacingInfo.upper - 0.50f * spacingInfo.range; break;
-                    case 7: spacing = spacingInfo.upper - 0.75f * spacingInfo.range; break;
-                    default: spacing = spacingInfo.lower; break;
+                    case 5: spacing = spacingInfo.Upper - 0.25f * spacingInfo.Range; break;
+                    case 6: spacing = spacingInfo.Upper - 0.50f * spacingInfo.Range; break;
+                    case 7: spacing = spacingInfo.Upper - 0.75f * spacingInfo.Range; break;
+                    default: spacing = spacingInfo.Lower; break;
                 }
             }
 

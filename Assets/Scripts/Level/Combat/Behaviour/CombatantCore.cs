@@ -6,7 +6,6 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
-using UnityEditor;
 using TMPro;
 
 using NeoCambion;
@@ -14,6 +13,7 @@ using NeoCambion.Collections;
 using NeoCambion.Collections.Unity;
 using NeoCambion.Encryption;
 using NeoCambion.Heightmaps;
+using NeoCambion.Interpolation;
 using NeoCambion.IO;
 using NeoCambion.IO.Unity;
 using NeoCambion.Maths;
@@ -24,10 +24,8 @@ using NeoCambion.Sorting;
 using NeoCambion.TaggedData;
 using NeoCambion.TaggedData.Unity;
 using NeoCambion.Unity;
-using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
-using NeoCambion.Unity.Interpolation;
 
 // BASIC THREAT AND TAUNT SYSTEMS NEEDED
 // MEMORY (ATTACKED BY + ETC) NEEDED
@@ -48,6 +46,8 @@ public class CombatantCore : Core
     public HealthBar healthBar;
     public TargetingArrow targetingArrow;
     public Transform cameraViewAnchor;
+
+    public Transform damageTextAnchor;
 
     #endregion
 
@@ -127,31 +127,12 @@ public class CombatantCore : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    #region [ BUILT-IN UNITY FUNCTIONS ]
-
-    void Awake()
+    protected override void Initialise()
     {
         statusEffects = new ActiveEffects(this);
         if (targetingArrow != null)
             targetingArrow.ClearState();
     }
-
-    void Start()
-    {
-
-    }
-
-    void Update()
-    {
-
-    }
-
-    void FixedUpdate()
-    {
-
-    }
-
-    #endregion
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -256,11 +237,22 @@ public class CombatantCore : Core
 
         if (healthBar != null)
         {
-            float healthPercent = (float)health.Current / health.Scaled;
-            if (value > 0)
-                healthBar.SetValueWithFlash(healthPercent, false, 0.6f);
-            else if (value < 0)
-                healthBar.SetValueWithFlash(healthPercent, true, 0.6f);
+            if (healthBar.GetType() == typeof(HealthBar3D))
+            {
+                float healthPercent = (float)health.Current / health.Scaled;
+                if (value > 0)
+                    healthBar.SetValueWithFlash(healthPercent, false, 0.6f);
+                else if (value < 0)
+                    healthBar.SetValueWithFlash(healthPercent, true, 0.6f);
+            }
+            else
+            {
+                if (value > 0)
+                    (healthBar as HealthBarCanvas).SetValueWithFlash(health.Current, health.Scaled, false, 0.6f);
+                else if (value < 0)
+                    (healthBar as HealthBarCanvas).SetValueWithFlash(health.Current, health.Scaled, true, 0.6f);
+            }
+            health.Current = Mathf.Clamp(health.Current, 0, health.Scaled);
         }
     }
 
@@ -1461,10 +1453,13 @@ public class CombatantBrain
 
     public float ExecuteNextAction()
     {
+        string debugStr = nextAction.ToString();
         float t = actions.ExecuteAction(combatant, nextAction);
         nextAction++;
         if (nextAction >= actions.Sequence.Length)
             nextAction = 0;
+        debugStr += nextAction.ToString();
+        Debug.Log(debugStr);
         return t;
     }
 }

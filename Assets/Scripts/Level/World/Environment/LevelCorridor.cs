@@ -1,49 +1,46 @@
-using NeoCambion;
-using NeoCambion.Collections;
-using Palmmedia.ReportGenerator.Core.Parser.Analysis;
 using System.Collections;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Runtime.CompilerServices;
+using System.Linq;
 using UnityEngine;
-using static Generation;
 
-public struct CorridorSourceRef : AreaSourceRef
-{
-    public LevelArea source { get { return sourceRoom; } }
-    public int indexInSource { get { return tileInd; } set { tileInd = value; } }
+using NeoCambion;
+using NeoCambion.Collections;
 
-    public LevelRoom sourceRoom;
-    public int tileInd;
-    public HexGridDirection startDirection;
-
-    public bool isNull { get { return source == null && indexInSource < 0; } }
-
-    public CorridorSourceRef(LevelRoom sourceRoom, int tileInd, HexGridDirection startDirection)
-    {
-        this.sourceRoom = sourceRoom;
-        this.tileInd = tileInd;
-        this.startDirection = startDirection;
-    }
-
-    public static CorridorSourceRef Null { get { return new CorridorSourceRef(null, -1, HexGridDirection.INVALID); } }
-}
+#if UNITY_EDITOR
+using UnityEditor;
+using NeoCambion.Unity.Editor;
+#endif
 
 public class LevelCorridor : Core, LevelArea
 {
     public Generation generator { get; private set; }
-    public LevelRoom sourceRoom { get; private set; }
+    private int _sourceID = -1;
+    private LevelRoom _sourceRoom;
+    public LevelRoom sourceRoom
+    {
+        get
+        {
+            if (_sourceRoom == null && _sourceID >= 0)
+                _sourceRoom = LevelManager.Rooms[_sourceID];
+            return _sourceRoom;
+        }
+        set
+        {
+            _sourceRoom = value;
+            _sourceID = _sourceRoom.ID.value;
+        }
+    }
 
     public static LevelTile.TileType tNone = LevelTile.TileType.None;
     public static LevelTile.TileType tEmpty = LevelTile.TileType.Empty;
     public static LevelTile.TileType tCorridor = LevelTile.TileType.Corridor;
     public static LevelTile.TileType tRoom = LevelTile.TileType.Room;
 
-    public int ID { get; private set; }
+    public LevelArea.AreaID ID { get; private set; }
 
     public CorridorBranch mainBranch => branches.HasContents() ? branches[0] : null;
-    private List<CorridorBranch> branches = null;
-    private CorridorBranch GetBranch(int index) => branches.InBounds(index) ? branches[index] : null;
+    public List<CorridorBranch> branches { get; private set; }
+    public CorridorBranch GetBranch(int index) => branches.InBounds(index) ? branches[index] : null;
 
     public float branchChance { get; private set; }
 
@@ -61,8 +58,23 @@ public class LevelCorridor : Core, LevelArea
     }
 
     private List<LevelTile> _tiles = null;
-    public List<LevelTile> tiles { get { return _tiles; } }
-    private List<KeyValuePair<int, int>> internalConns = new List<KeyValuePair<int, int>>();
+    public List<LevelTile> tiles => _tiles ?? (terminated ? GetTiles(true) : GetTiles(false));
+    public List<LevelTile> GetTiles(bool overwrite = false)
+    {
+        List<LevelTile> tiles = new List<LevelTile>();
+        additionalInfo.Clear();
+        foreach (Vec2Int tilePos in tilePositions)
+        {
+            additionalInfo.Add(tilePos.ToString());
+            tiles.AddUnlessNull(LevelManager.TileGrid[tilePos]);
+        }
+        if (overwrite)
+            _tiles = tiles;
+        return tiles;
+    }
+    public void AddTiles(IList<LevelTile> tiles) => tiles.TransferAllUnique(_tiles);
+
+    public bool tileCountMismatch => tiles.Count > tilePositions.Count;
 
     public bool terminated => mainBranch.terminated;
     public bool fullTerminated => mainBranch.fullTerminated;
@@ -74,7 +86,7 @@ public class LevelCorridor : Core, LevelArea
     public bool containsEnemy { get { return true; } set { } }
     public int enemyCount => 0;
     //private WorldEnemySet _enemies = null;
-    public WorldEnemySet enemies { get; private set; }
+    public WorldEnemySet enemies { get; set; }
     /*{
         get
         {
@@ -92,15 +104,9 @@ public class LevelCorridor : Core, LevelArea
         }
     }*/
     public int itemCount { get; set; }
-    public int itemCapacity
-    {
-        get
-        {
-            return ValidItemPlacements().Length;
-        }
-    }
+    public int itemCapacity => ValidItemPlacements.Length;
     //private WorldItem[] _items = null;
-    public WorldItem[] items { get; private set; }
+    public List<WorldItem> items { get; set; }
     /*{
         get
         {
@@ -115,24 +121,40 @@ public class LevelCorridor : Core, LevelArea
         }
     }*/
 
-    public int[] ValidItemPlacements()
+    public Vector3[] GetValidItemPositions()
     {
-        List<int> valid = new List<int>();
+        List<Vector3> valid = new List<Vector3>();
         for (int i = 0; i < tiles.Count; i++)
         {
             if (tiles[i].isCorridorEndcap)
-                valid.Add(i);
+                valid.Add(tiles[i].position);
         }
         return valid.ToArray();
     }
+    public int[] ValidItemPlacements
+    {
+        get
+        {
+            List<int> valid = new List<int>();
+            for (int i = 0; i < tiles.Count; i++)
+            {
+                if (tiles[i].isCorridorEndcap)
+                    valid.Add(i);
+            }
+            return valid.ToArray();
+        }
+    }
+
+    public List<string> additionalInfo { get; private set; } = new List<string>();
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public void Initialise(Generation generator, LevelRoom sourceRoom, int ID, Vec2Int startTile, HexGridDirection firstStep, float initialBranchChance = 0.3f)
+    public void Initialise(Generation generator, int sourceRoomID, int ID, Vec2Int startTile, HexGridDirection firstStep, float initialBranchChance = 0.3f)
     {
+        gameObject.name = "Corridor " + ID;
         this.generator = generator;
-        this.sourceRoom = sourceRoom;
-        this.ID = ID;
+        _sourceID = sourceRoomID;
+        this.ID = LevelArea.CorridorID(ID);
         if (branches == null)
             branches = new List<CorridorBranch>();
         branches.ReturnAdd(new CorridorBranch(this, 0, startTile, HexGridDirection.INVALID)).AddStep(firstStep);
@@ -140,6 +162,36 @@ public class LevelCorridor : Core, LevelArea
         _tiles = new List<LevelTile>();
         revealed = false;
         containsEnemy = false;
+    }
+    public void Initialise(Generation generator, LevelRoom sourceRoom, int ID, Vec2Int startTile, HexGridDirection firstStep, float initialBranchChance = 0.3f)
+    {
+        gameObject.name = "Corridor " + ID;
+        this.generator = generator;
+        this.sourceRoom = sourceRoom;
+        this.ID = LevelArea.CorridorID(ID);
+        if (branches == null)
+            branches = new List<CorridorBranch>();
+        branches.ReturnAdd(new CorridorBranch(this, 0, startTile, HexGridDirection.INVALID)).AddStep(firstStep);
+        branchChance = initialBranchChance;
+        _tiles = new List<LevelTile>();
+        revealed = false;
+        containsEnemy = false;
+    }
+    public void Initialise(Generation generator, CorridorSaveData existingData, float initialBranchChance = 0.3f)
+    {
+        gameObject.name = "Corridor " + existingData.ID;
+        this.generator = generator;
+        _sourceID = existingData.sourceRoomID;
+        ID = LevelArea.CorridorID(existingData.ID);
+        branches = new List<CorridorBranch>();
+        for (int i = 0; i < existingData.branches.Length; i++)
+        {
+            branches.Add(new CorridorBranch(this, i, existingData.branches[i]));
+        }
+        branchChance = initialBranchChance;
+        _tilePositions = mainBranch.GetTilePositions();
+        _tiles = GetTiles();
+        revealed = existingData.revealed;
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -186,12 +238,6 @@ public class LevelCorridor : Core, LevelArea
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public void AddTile(LevelTile newTile)
-    {
-        tiles.Add(newTile);
-        newTile.SetTransformParent(this);
-    }
-
     public Vector3 CentrepointWorld()
     {
         if (tilePositions.Count == 0)
@@ -202,7 +248,7 @@ public class LevelCorridor : Core, LevelArea
             Vector3 posF;
             foreach (Vec2Int pos in tilePositions)
             {
-                posF = generator.TilePosition(pos);
+                posF = pos.TilePosition();
                 xTotal += posF.x;
                 zTotal += posF.z;
             }
@@ -230,10 +276,30 @@ public class LevelCorridor : Core, LevelArea
         }
     }
 
+    private static Vector3[] hexDirVects = new Vector3[]
+    {
+        new Vector3(+0.00000f, 0f, +1.000f), new Vector3(+0.86602f, 0f, +0.50000f),
+        new Vector3(+0.86602f, 0f, -0.500f), new Vector3(+0.00000f, 0f, -1.00000f),
+        new Vector3(-0.86602f, 0f, -0.500f), new Vector3(-0.86602f, 0f, +0.50000f),
+    };
+    private bool placingItem = false;
     public Vector3 RandInternalPosition()
     {
-
-        return Vector3.zero;
+        float fR = Random.Range(0f, 1f);
+        LevelTile tile;
+        Vector3[] itemPositions = GetValidItemPositions();
+        if (placingItem || fR > 0.8f && itemPositions.Length > 0)
+            return itemPositions[Random.Range(0, itemPositions.Length)];
+        else
+            tile = tiles[Random.Range(0, tiles.Count)];
+        List<int> validDirs = new List<int>();
+        for (int i = 0; i < 6; i++)
+        {
+            if (tile.connections.values[i] == LevelTile.ConnectionState.Connect)
+                validDirs.Add(i);
+        }
+        Vector3 dir = hexDirVects[validDirs[Random.Range(0, validDirs.Count)]];
+        return tile.position + dir * Random.Range(0f, LevelManager.Generator.tileRadius);
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -271,7 +337,7 @@ public class LevelCorridor : Core, LevelArea
         transform.position = c;
         foreach (LevelTile tile in tiles)
         {
-            tile.transform.position = generator.TilePosition(tile.gridPosition);
+            tile.transform.position = tile.gridPosition.TilePosition();
         }
     }
 
@@ -286,37 +352,38 @@ public class LevelCorridor : Core, LevelArea
         return itemCount < itemCapacity;
     }
 
-    public (PositionsInArea, PositionsInArea) SpawnPositions(int indexOverride = -1)
+    public (Vector3[], Vector3[]) SpawnPositions()
     {
-        int indToUse = indexOverride >= 0 ? indexOverride : ID;
-        PositionsInArea enemyPositions = new PositionsInArea(true, indToUse, enemyCount), itemPositions = new PositionsInArea(false, indToUse, itemCount);
+        Vector3[] enemyPositions = new Vector3[enemyCount], itemPositions = new Vector3[itemCount];
+        placingItem = false;
         for (int i = 0; i < enemyCount; i++)
         {
             enemyPositions[i] = RandInternalPosition();
         }
+        placingItem = true;
         for (int i = 0; i < itemCount; i++)
         {
             itemPositions[i] = RandInternalPosition();
         }
+        placingItem = false;
         return (enemyPositions, itemPositions);
     }
-
-    public void OverwriteEnemies(int enemyCount)
+    public (PositionsInArea, PositionsInArea) SpawnPositionsInArea(int indexOverride = -1)
     {
-        enemies = new WorldEnemySet(enemyCount, this);
-        if (LevelManager.worldEnemies.ContainsKey((false, ID)))
-            LevelManager.worldEnemies[(false, ID)] = enemies;
-        else
-            LevelManager.worldEnemies.Add((false, ID), enemies);
-    }
-
-    public void OverwriteItems(int itemCount)
-    {
-        items = new WorldItem[itemCount];
-        if (LevelManager.worldItems.ContainsKey((false, ID)))
-            LevelManager.worldItems[(false, ID)] = items;
-        else
-            LevelManager.worldItems.Add((false, ID), items);
+        int indToUse = indexOverride >= 0 ? indexOverride : ID.value;
+        PositionsInArea enemyPositions = new PositionsInArea(LevelArea.CorridorID(indToUse), enemyCount), itemPositions = new PositionsInArea(LevelArea.CorridorID(indToUse), itemCount);
+        placingItem = false;
+        for (int i = 0; i < enemyCount; i++)
+        {
+            enemyPositions[i] = RandInternalPosition();
+        }
+        placingItem = true;
+        for (int i = 0; i < itemCount; i++)
+        {
+            itemPositions[i] = RandInternalPosition();
+        }
+        placingItem = false;
+        return (enemyPositions, itemPositions);
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -325,7 +392,7 @@ public class LevelCorridor : Core, LevelArea
     {
         foreach (LevelTile tile in tiles)
         {
-            if (tile.distToPlayer < generator.tileRadius)
+            if (tile != null && tile.distToPlayer < generator.tileRadius)
                 return true;
         }
         return false;
@@ -347,9 +414,10 @@ public class CorridorBranch
 
     public enum Termination { None, NewRoom, ExistingTile, EndCap }
 
-    private int parentind = -1, childInd = -1;
-    public CorridorBranch parent { get { return parentind > 0 ? container[parentind] : null; } }
-    public CorridorBranch child { get { return childInd > 0 ? container[childInd] : null; } }
+    public int parentInd { get; private set; }
+    public int childInd { get; private set; }
+    public CorridorBranch parent { get { return parentInd > -1 ? container[parentInd] : null; } }
+    public CorridorBranch child { get { return childInd > -1 ? container[childInd] : null; } }
     public bool hasChild { get { return child != null; } }
     public int childStartsAt { get; private set; }
 
@@ -382,7 +450,8 @@ public class CorridorBranch
     {
         this.container = container;
         this.index = index;
-        this.parentind = parentInd;
+        this.parentInd = parentInd;
+        childInd = -1;
         childStartsAt = -1;
         if (tiles == null)
             tiles = new List<Vec2Int>();
@@ -393,7 +462,8 @@ public class CorridorBranch
     {
         this.container = container;
         this.index = index;
-        this.parentind = parentInd;
+        this.parentInd = parentInd;
+        childInd = -1;
         childStartsAt = -1;
         if (tiles == null)
             tiles = new List<Vec2Int>();
@@ -401,6 +471,21 @@ public class CorridorBranch
             steps = new List<HexGridDirection>();
         this.startTile = startTile;
         this.startDir = startDir;
+    }
+    public CorridorBranch(LevelCorridor container, int index, BranchSaveData existingData)
+    {
+        this.container = container;
+        this.index = index;
+        startDir = existingData.steps[0];
+        steps = new List<HexGridDirection>();
+        steps.AddRange(existingData.steps[1..]);
+        startTile = existingData.tilePositions[0];
+        tiles = new List<Vec2Int>();
+        tiles.AddRange(existingData.tilePositions[1..]);
+        parentInd = existingData.parentInd;
+        childInd = existingData.childInd;
+        childStartsAt = existingData.branchesAt;
+        terminated = true;
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -422,7 +507,7 @@ public class CorridorBranch
 
     public CorridorBranch Split(int childInd)
     {
-        if (!terminated && tiles.Count > 0)
+        if (this.childInd < 0 && !terminated && tiles.Count > 0)
         {
             childStartsAt = tiles.Count - 1;
             return new CorridorBranch(container, childInd, tiles.Last(), steps.Last().Rotate(2), index);
@@ -432,11 +517,15 @@ public class CorridorBranch
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public List<Vec2Int> GetTilePositions()
+    public List<Vec2Int> GetTilePositions(bool includeEndTile = false)
     {
         List<Vec2Int> tilesOut = new List<Vec2Int>();
         if (tiles.Count > 0)
+        {
             tilesOut.AddRange(tiles);
+            if (!includeEndTile)
+                tilesOut.RemoveAt(tilesOut.Count - 1);
+        }
         if (child != null)
             tilesOut.AddRange(child.GetTilePositions());
         return tilesOut;
@@ -452,7 +541,7 @@ public class CorridorBranch
         return tilesOut;
     }
 
-    private bool ConnectionFiler(Vec2Int position, bool filterOutSourceRoom) => container.Contains(position) || (filterOutSourceRoom ? container.sourceRoom?.Contains(position) : false).Value;
+    private bool ConnectionFilter(Vec2Int position, bool filterOutSourceRoom) => container.Contains(position) || filterOutSourceRoom ? container.sourceRoom.Contains(position) : false;
 
     private static int w0 = 0, w1 = 1, w2 = 3, w3 = 12;
     private static int[,] dirWeightTable = new int[6, 6]
@@ -500,14 +589,14 @@ public class CorridorBranch
                 }
             }
         }
-        return new AdjacentRef(HexGridDirection.INVALID, endTile.Value, tCorridor);
+        return new AdjacentRef(HexGridDirection.INVALID, endTile.Value, LevelTile.TileType.Corridor);
     }
 
     public AdjacentRef GetConnectionTile(Vec2Int lastPos, List<AdjacentRef> available, HexGridDirection lastDir, bool filterOutSourceRoom, bool debug = false)
     {
         for (int i = available.Count - 1; i >= 0; i--)
         {
-            if (ConnectionFiler(available[i].position, filterOutSourceRoom))
+            if (ConnectionFilter(available[i].position, filterOutSourceRoom))
                 available.RemoveAt(i);
         }
 
@@ -517,5 +606,204 @@ public class CorridorBranch
             return available[0];
         else
             return WeightedDir(lastPos, available, lastDir, debug);
+    }
+}
+
+public struct CorridorSourceRef : AreaSourceRef
+{
+    public LevelArea source { get { return sourceRoom; } }
+    public int indexInSource { get { return tileInd; } set { tileInd = value; } }
+
+    public LevelRoom sourceRoom;
+    public int tileInd;
+    public HexGridDirection startDirection;
+
+    public bool isNull { get { return source == null && indexInSource < 0; } }
+
+    public CorridorSourceRef(LevelRoom sourceRoom, int tileInd, HexGridDirection startDirection)
+    {
+        this.sourceRoom = sourceRoom;
+        this.tileInd = tileInd;
+        this.startDirection = startDirection;
+    }
+
+    public static CorridorSourceRef Null { get { return new CorridorSourceRef(null, -1, HexGridDirection.INVALID); } }
+}
+
+#if UNITY_EDITOR
+[CustomEditor(typeof(LevelCorridor))]
+public class LevelLevelCorridor : Editor
+{
+    LevelCorridor targ { get { return target as LevelCorridor; } }
+
+    public override void OnInspectorGUI()
+    {
+        EditorGUILayout.BeginHorizontal(EditorStylesExtras.noMarginsNoPadding);
+        {
+            EditorGUILayout.BeginVertical(EditorStylesExtras.noMarginsNoPadding);
+            {
+                EditorGUILayout.Space(2);
+                if (targ.additionalInfo != null)
+                {
+                    EditorElements.SectionHeader("Additional Information");
+                    EditorGUILayout.Space(0);
+                    for (int i = 0; i < targ.additionalInfo.Count; i++)
+                    {
+                        EditorGUILayout.LabelField(targ.additionalInfo[i]);
+                    }
+                }
+            }
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.EndHorizontal();
+    }
+}
+#endif
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+public class CorridorSaveData
+{
+    private const char item = ':';
+    private const char sctn = '|';
+
+    public int ID;
+    public int sourceRoomID;
+    public BranchSaveData[] branches;
+    public bool revealed;
+    public string DataString => ToDataString();
+
+    public CorridorSaveData(int ID, int sourceRoomID, BranchSaveData[] branches, bool revealed)
+    {
+        this.ID = ID;
+        this.sourceRoomID = sourceRoomID;
+        this.branches = branches;
+        this.revealed = revealed;
+    }
+    public CorridorSaveData(LevelCorridor source)
+    {
+        ID = source.ID.value;
+        sourceRoomID = source.sourceRoom.ID.value;
+        branches = new BranchSaveData[source.branches.Count];
+        for (int i = 0; i < branches.Length; i++)
+        {
+            branches[i] = new BranchSaveData(source.GetBranch(i));
+        }
+        revealed = source.revealed;
+    }
+
+    public static CorridorSaveData FromDataString(string dataString)
+    {
+        int ID, roomID, search = 0, delim, section = dataString.IndexOf(sctn);
+        List<BranchSaveData> branches = new List<BranchSaveData>();
+        ID = int.Parse(dataString[search..section]);
+        search = section + 1;
+        section = dataString.IndexOf(sctn, search);
+        roomID = dataString.RangeToInt(search, section);
+        search = section + 1;
+        section = dataString.IndexOf(sctn, search);
+        while (search < section)
+        {
+            delim = dataString.IndexOf(item, search);
+            branches.Add(BranchSaveData.FromDataString(dataString[search..delim]));
+            search = delim + 1;
+        }
+        return new CorridorSaveData(ID, roomID, branches.ToArray(), dataString.Last() == 'T');
+    }
+    public string ToDataString()
+    {
+        int i;
+        string result = "" + ID + sctn + sourceRoomID + sctn;
+        for (i = 0; i < branches.Length; i++)
+        {
+            result += "" + branches[i].DataString + item;
+        }
+        result += "" + sctn + (revealed ? 'T' : 'F');
+        return result;
+    }
+}
+
+public class BranchSaveData
+{
+    private const char vctr = ',';
+    private const char item = ';';
+    private const char sctn = '/';
+
+    public Vec2Int[] tilePositions;
+    public HexGridDirection[] steps;
+    public int parentInd;
+    public int childInd;
+    public int branchesAt;
+    public string DataString => ToDataString();
+
+    public BranchSaveData(Vec2Int[] tilePositions, HexGridDirection[] steps, int parentInd = -1, int childInd = -1, int branchesAt = -1)
+    {
+        this.tilePositions = tilePositions;
+        this.steps = steps;
+        this.branchesAt = branchesAt;
+        this.parentInd = parentInd;
+        this.childInd = childInd;
+        this.branchesAt = branchesAt;
+    }
+    public BranchSaveData(CorridorBranch source)
+    {
+        List<Vec2Int> _tilePositions = new List<Vec2Int>() { source.startTile };
+        _tilePositions.AddRange(source.tiles);
+        tilePositions = _tilePositions.ToArray();
+        List<HexGridDirection> _steps = new List<HexGridDirection>() { source.startDir };
+        _steps.AddRange(source.steps);
+        steps = _steps.ToArray();
+        parentInd = source.parentInd;
+        childInd = source.childInd;
+        branchesAt = source.childStartsAt;
+    }
+
+    public static BranchSaveData FromDataString(string dataString)
+    {
+        if (dataString[0] == '{')
+            dataString = dataString[1..^1];
+
+        List<Vec2Int> tilePositions = new List<Vec2Int>();
+        Vec2Int nextPos = Vec2Int.zero;
+        List<HexGridDirection> steps = new List<HexGridDirection>();
+        int parentInd, childInd, branchesAt, search = 0, comma, delim, section = dataString.IndexOf(sctn);
+        while (search < section)
+        {
+            comma = dataString.IndexOf(vctr, search);
+            delim = dataString.IndexOf(item, search);
+            nextPos.x = dataString.RangeToInt(search, comma);
+            nextPos.y = dataString.RangeToInt(comma + 1, delim);
+            tilePositions.Add(nextPos);
+            search = delim + 1;
+        }
+        search = section + 1; section = dataString.IndexOf(sctn, search);
+        while (search < section)
+        {
+            delim = dataString.IndexOf(item, search);
+            steps.Add((HexGridDirection)dataString.RangeToInt(search, delim));
+            search = delim + 1;
+        }
+        search += 1; section = dataString.IndexOf(sctn, search);
+        parentInd = dataString.RangeToInt(search, section);
+        search = section + 1; section = dataString.IndexOf(sctn, search);
+        childInd = dataString.RangeToInt(search, section);
+        search = section + 1;
+        branchesAt = dataString.RangeToInt(search);
+        return new BranchSaveData(tilePositions.ToArray(), steps.ToArray(), parentInd, childInd, branchesAt);
+    }
+    public string ToDataString()
+    {
+        int i;
+        string result = "{";
+        for (i = 0; i < tilePositions.Length; i++)
+        {
+            result += "" + tilePositions[i].x + vctr + tilePositions[i].y + item;
+        }
+        result += "" + sctn;
+        for (i = 0; i < steps.Length; i++)
+        {
+            result += "" + (int)steps[i] + item;
+        }
+        return result += "" + sctn + parentInd + sctn + childInd + sctn + branchesAt + '}';
     }
 }

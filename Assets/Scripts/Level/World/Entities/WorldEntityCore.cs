@@ -2,15 +2,14 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
-using UnityEngine.AI;
-using UnityEditor;
 
 using NeoCambion;
 using NeoCambion.Maths;
 using NeoCambion.Unity;
+
+#if UNITY_EDITOR
+using UnityEditor;
 using NeoCambion.Unity.Editor;
-using NeoCambion.Unity.PersistentUID;
-using UnityEngine.InputSystem.LowLevel;
 
 [CustomEditor(typeof(WorldEntityCore), true)]
 [CanEditMultipleObjects]
@@ -58,6 +57,7 @@ public class WorldEntityCoreEditor : Editor
         serializedObject.ApplyModifiedProperties();
     }
 }
+#endif
 
 public class WorldEntityCore : Core
 {
@@ -101,21 +101,6 @@ public class WorldEntityCore : Core
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     #region [ BUILT-IN UNITY FUNCTIONS ]
-
-    protected virtual void Awake()
-    {
-        hasNavMeshAgent = GetComponent<NavMeshAgent>() != null;
-    }
-
-    protected virtual void Start()
-    {
-
-    }
-
-    protected virtual void Update()
-    {
-
-    }
 
     protected virtual void FixedUpdate()
     {

@@ -6,7 +6,6 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
-using UnityEditor;
 using TMPro;
 
 using NeoCambion;
@@ -14,6 +13,7 @@ using NeoCambion.Collections;
 using NeoCambion.Collections.Unity;
 using NeoCambion.Encryption;
 using NeoCambion.Heightmaps;
+using NeoCambion.Interpolation;
 using NeoCambion.IO;
 using NeoCambion.IO.Unity;
 using NeoCambion.Maths;
@@ -24,19 +24,15 @@ using NeoCambion.Sorting;
 using NeoCambion.TaggedData;
 using NeoCambion.TaggedData.Unity;
 using NeoCambion.Unity;
-using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
-using NeoCambion.Unity.Interpolation;
-using static CombatAction;
-using Unity.VisualScripting;
 
 public enum ActionPoolCategory { None = -1, Standard, Advanced, Special }
 public static class ActionPool
 {
-    public static float[] SINGLE = new float[] { 0.6f, 1.1f, 1.7f, 2.5f };
-    public static float[] BLAST = new float[] { 0.5f, 0.9f, 1.4f, 2.0f };
-    public static float[] AOE = new float[] { 0.3f, 0.6f, 1.0f, 1.5f };
+    public static float[] SINGLE = new float[] { 0.5f, 0.9f, 1.6f, 2.5f };
+    public static float[] BLAST = new float[] { 0.4f, 0.7f, 1.2f, 2.0f };
+    public static float[] AOE = new float[] { 0.3f, 0.5f, 0.8f, 1.5f };
     public static float ATTACK = 1.0f;
     public static float HEAL = 0.3f;
     public static float SHIELD = 1.6f;
@@ -1025,7 +1021,7 @@ public static class ActionPool
             },
             baseAttribute = CombatantAttribute.Attack,
             multiTarget = MultiTargetAttributes.None,
-            actionMultiplier = SINGLE[1],
+            actionMultiplier = SINGLE[1] * ATTACK,
         },
         new CombatAction()
         {
@@ -1039,7 +1035,7 @@ public static class ActionPool
             },
             baseAttribute = CombatantAttribute.Attack,
             multiTarget = MultiTargetAttributes.None,
-            actionMultiplier = SINGLE[1],
+            actionMultiplier = SINGLE[1] * ATTACK,
         },
         new CombatAction()
         {
@@ -1053,7 +1049,7 @@ public static class ActionPool
             },
             baseAttribute = CombatantAttribute.Attack,
             multiTarget = MultiTargetAttributes.None,
-            actionMultiplier = SINGLE[1],
+            actionMultiplier = SINGLE[0] * ATTACK,
         },
         new CombatAction()
         {
@@ -1067,7 +1063,7 @@ public static class ActionPool
             },
             baseAttribute = CombatantAttribute.Attack,
             multiTarget = MultiTargetAttributes.None,
-            actionMultiplier = SINGLE[1],
+            actionMultiplier = SINGLE[0] * ATTACK,
         },
     };
     public static CombatAction[] PlayerSkill = new CombatAction[]
@@ -1082,9 +1078,23 @@ public static class ActionPool
                 tauntable = true,
                 ignoreMarked = false,
             },
+            baseAttribute = CombatantAttribute.Attack,
+            multiTarget = MultiTargetAttributes.None,
+            actionMultiplier = SINGLE[2] * ATTACK,
+        },
+        new CombatAction()
+        {
+            type = CombatActionType.Heal,
+            targeting = new ActionTarget()
+            {
+                selection = TargetSelection.Allied,
+                condition = new TargetCondition(TargConType.Health_Percent),
+                tauntable = true,
+                ignoreMarked = false,
+            },
             baseAttribute = CombatantAttribute.Health,
-            multiTarget = MultiTargetAttributes.Basic,
-            actionMultiplier = BLAST[1],
+            multiTarget = MultiTargetAttributes.None,
+            actionMultiplier = SINGLE[2] * HEAL,
         },
         new CombatAction()
         {
@@ -1096,37 +1106,23 @@ public static class ActionPool
                 tauntable = true,
                 ignoreMarked = false,
             },
-            baseAttribute = CombatantAttribute.Health,
+            baseAttribute = CombatantAttribute.Attack,
             multiTarget = MultiTargetAttributes.Basic,
-            actionMultiplier = BLAST[1],
+            actionMultiplier = BLAST[1] * ATTACK,
         },
         new CombatAction()
         {
-            type = CombatActionType.Attack,
+            type = CombatActionType.Heal,
             targeting = new ActionTarget()
             {
-                selection = TargetSelection.Opposed,
-                condition = new TargetCondition(TargConType.Health_Percent),
+                selection = TargetSelection.AlliedAll,
+                condition = TargetCondition.None,
                 tauntable = true,
                 ignoreMarked = false,
             },
             baseAttribute = CombatantAttribute.Health,
-            multiTarget = MultiTargetAttributes.Basic,
-            actionMultiplier = BLAST[1],
-        },
-        new CombatAction()
-        {
-            type = CombatActionType.Attack,
-            targeting = new ActionTarget()
-            {
-                selection = TargetSelection.Opposed,
-                condition = new TargetCondition(TargConType.Health_Percent),
-                tauntable = true,
-                ignoreMarked = false,
-            },
-            baseAttribute = CombatantAttribute.Health,
-            multiTarget = MultiTargetAttributes.Basic,
-            actionMultiplier = BLAST[1],
+            multiTarget = MultiTargetAttributes.None,
+            actionMultiplier = AOE[2] * HEAL,
         },
     };
     public static CombatAction[] PlayerUltimate = new CombatAction[]
@@ -1141,9 +1137,37 @@ public static class ActionPool
                 tauntable = true,
                 ignoreMarked = false,
             },
-            baseAttribute = CombatantAttribute.Health,
+            baseAttribute = CombatantAttribute.Attack,
             multiTarget = MultiTargetAttributes.None,
-            actionMultiplier = AOE[2],
+            actionMultiplier = SINGLE[3] * ATTACK,
+        },
+        new CombatAction()
+        {
+            type = CombatActionType.Heal,
+            targeting = new ActionTarget()
+            {
+                selection = TargetSelection.Allied,
+                condition = TargetCondition.None,
+                tauntable = true,
+                ignoreMarked = false,
+            },
+            baseAttribute = CombatantAttribute.Health,
+            multiTarget = MultiTargetAttributes.Basic,
+            actionMultiplier = BLAST[3] * HEAL,
+        },
+        new CombatAction()
+        {
+            type = CombatActionType.Attack,
+            targeting = new ActionTarget()
+            {
+                selection = TargetSelection.OpposedAll,
+                condition = new TargetCondition(TargConType.Health_Percent),
+                tauntable = true,
+                ignoreMarked = false,
+            },
+            baseAttribute = CombatantAttribute.Attack,
+            multiTarget = MultiTargetAttributes.None,
+            actionMultiplier = AOE[2] * ATTACK,
         },
         new CombatAction()
         {
@@ -1155,37 +1179,9 @@ public static class ActionPool
                 tauntable = true,
                 ignoreMarked = false,
             },
-            baseAttribute = CombatantAttribute.Health,
-            multiTarget = MultiTargetAttributes.None,
-            actionMultiplier = AOE[2],
-        },
-        new CombatAction()
-        {
-            type = CombatActionType.Attack,
-            targeting = new ActionTarget()
-            {
-                selection = TargetSelection.Opposed,
-                condition = new TargetCondition(TargConType.Health_Percent),
-                tauntable = true,
-                ignoreMarked = false,
-            },
-            baseAttribute = CombatantAttribute.Health,
-            multiTarget = MultiTargetAttributes.None,
-            actionMultiplier = AOE[2],
-        },
-        new CombatAction()
-        {
-            type = CombatActionType.Attack,
-            targeting = new ActionTarget()
-            {
-                selection = TargetSelection.Opposed,
-                condition = new TargetCondition(TargConType.Health_Percent),
-                tauntable = true,
-                ignoreMarked = false,
-            },
-            baseAttribute = CombatantAttribute.Health,
-            multiTarget = MultiTargetAttributes.None,
-            actionMultiplier = AOE[2],
+            baseAttribute = CombatantAttribute.Attack,
+            multiTarget = MultiTargetAttributes.Basic,
+            actionMultiplier = BLAST[2] * ATTACK,
         },
     };
 }
@@ -1249,6 +1245,11 @@ public enum ActionSetName
 }
 public class ActionSet
 {
+    private static readonly string ActionIconDirectory = "Images/UI/Action Icons/";
+    private static readonly string AttackIconPath = ActionIconDirectory + "Action_Icon_Attack_256x";
+    private static readonly string HealIconPath = ActionIconDirectory + "Action_Icon_Heal_256x";
+    private static readonly string ShieldIconPath = ActionIconDirectory + "Action_Icon_Shield_256x";
+
     private static RandTuning RandTuning { get { return Core.RandTuning; }}
 
     public struct SetNameRange
@@ -1310,11 +1311,11 @@ public class ActionSet
                 return new ActionSet() {
                     standardRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(1, "Slice", null),
+                        new ActionCopyRef(1, "Basic Attack (Single)", AttackIconPath),
                     },
                     advancedRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(0, "Impale", null),
+                        new ActionCopyRef(0, "Skill Attack (Single)", AttackIconPath),
                     },
                     specialRefs = new ActionCopyRef[0],
                     Sequence = new ActionSetRef[]
@@ -1329,11 +1330,11 @@ public class ActionSet
                 {
                     standardRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(1, "Potshot", null),
+                        new ActionCopyRef(1, "Basic Attack (Single)", AttackIconPath),
                     },
                     advancedRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(0, "Steady Shot", null),
+                        new ActionCopyRef(0, "Skill Attack (Single)", AttackIconPath),
                     },
                     specialRefs = new ActionCopyRef[0],
                     Sequence = new ActionSetRef[]
@@ -1348,12 +1349,12 @@ public class ActionSet
                 {
                     standardRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(0, "Basic Attack ()", null),
-                        new ActionCopyRef(3, "Basic Attack ()", null),
+                        new ActionCopyRef(0, "Basic Attack (Single)", AttackIconPath),
+                        new ActionCopyRef(3, "Basic Attack (Blast)", AttackIconPath),
                     },
                     advancedRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(2, "Skill Attack ()", null),
+                        new ActionCopyRef(2, "Skill Attack (Blast)", AttackIconPath),
                     },
                     specialRefs = new ActionCopyRef[0],
                     Sequence = new ActionSetRef[]
@@ -1368,12 +1369,12 @@ public class ActionSet
                 {
                     standardRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(0, "Basic Attack ()", null),
-                        new ActionCopyRef(16, "Basic Attack ()", null),
+                        new ActionCopyRef(0, "Basic Attack (Single)", AttackIconPath),
+                        new ActionCopyRef(16, "Basic Attack (AoE)", AttackIconPath),
                     },
                     advancedRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(5, "Skill Attack ()", null),
+                        new ActionCopyRef(5, "Skill Attack (Blast)", AttackIconPath),
                     },
                     specialRefs = new ActionCopyRef[0],
                     Sequence = new ActionSetRef[]
@@ -1389,11 +1390,11 @@ public class ActionSet
                 {
                     standardRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(0, "Basic Attack (Single)", null),
+                        new ActionCopyRef(0, "Basic Attack (Single)", AttackIconPath),
                     },
                     advancedRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(10, "Skill Heal (Single)", null),
+                        new ActionCopyRef(10, "Skill Heal (Single)", HealIconPath),
                     },
                     specialRefs = new ActionCopyRef[0],
                     Sequence = new ActionSetRef[]
@@ -1408,12 +1409,12 @@ public class ActionSet
                 {
                     standardRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(0, "Basic Attack (Single)", null),
-                        new ActionCopyRef(19, "Basic Shield (Blast)", null),
+                        new ActionCopyRef(0, "Basic Attack (Single)", AttackIconPath),
+                        new ActionCopyRef(8, "Basic Heal (Single)", HealIconPath),
                     },
                     advancedRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(12, "Skill Heal (AoE)", null),
+                        new ActionCopyRef(12, "Skill Heal (AoE)", HealIconPath),
                     },
                     specialRefs = new ActionCopyRef[0],
                     Sequence = new ActionSetRef[]
@@ -1549,15 +1550,15 @@ public class ActionSet
                 {
                     standardRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(0, "A_BASIC", null),
+                        new ActionCopyRef(0, "PC 1 Basic (Attack)", AttackIconPath),
                     },
                     advancedRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(0, "A_SKILL", null),
+                        new ActionCopyRef(0, "PC 1 Skill (Attack)", AttackIconPath),
                     },
                     specialRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(0, "A_ULT", null),
+                        new ActionCopyRef(0, "PC 1 Ult (Attack)", AttackIconPath),
                     },
                     Sequence = null
                 };
@@ -1566,15 +1567,15 @@ public class ActionSet
                 {
                     standardRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(1, "B_BASIC", null),
+                        new ActionCopyRef(1, "PC 2 Basic (Attack)", AttackIconPath),
                     },
                     advancedRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(1, "B_SKILL", null),
+                        new ActionCopyRef(1, "PC 2 Skill (Heal)", HealIconPath),
                     },
                     specialRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(1, "B_ULT", null),
+                        new ActionCopyRef(1, "PC 2 Ult (Heal)", HealIconPath),
                     },
                     Sequence = null
                 };
@@ -1583,15 +1584,15 @@ public class ActionSet
                 {
                     standardRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(2, "C_BASIC", null),
+                        new ActionCopyRef(2, "PC 3 Basic (Attack)", AttackIconPath),
                     },
                     advancedRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(2, "C_SKILL", null),
+                        new ActionCopyRef(2, "PC 3 Skill (Attack)", AttackIconPath),
                     },
                     specialRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(2, "C_ULT", null),
+                        new ActionCopyRef(2, "PC 3 Ult (Attack)", AttackIconPath),
                     },
                     Sequence = null
                 };
@@ -1600,15 +1601,15 @@ public class ActionSet
                 {
                     standardRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(3, "D_BASIC", null),
+                        new ActionCopyRef(3, "PC 4 Basic (Attack)", AttackIconPath),
                     },
                     advancedRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(3, "D_SKILL", null),
+                        new ActionCopyRef(3, "PC 4 Skill (Heal)", HealIconPath),
                     },
                     specialRefs = new ActionCopyRef[]
                     {
-                        new ActionCopyRef(3, "D_ULT", null),
+                        new ActionCopyRef(3, "PC 4 Ult (Attack)", AttackIconPath),
                     },
                     Sequence = null
                 };
@@ -1625,7 +1626,7 @@ public class ActionSet
         {
             if (ActionPool.Standard.InBounds(standardRefs[i].index))
             {
-                standard[i] = ActionPool.Standard[i].Copy(standardRefs[i]);
+                standard[i] = ActionPool.Standard[standardRefs[i].index].Copy(standardRefs[i]);
                 if ((int)damageType > 0)
                     standard[i].damageType = (int)damageType;
             }
@@ -1635,7 +1636,7 @@ public class ActionSet
         {
             if (ActionPool.Standard.InBounds(advancedRefs[i].index))
             {
-                advanced[i] = ActionPool.Advanced[i].Copy(advancedRefs[i]);
+                advanced[i] = ActionPool.Advanced[advancedRefs[i].index].Copy(advancedRefs[i]);
                 if ((int)damageType > 0)
                     advanced[i].damageType = (int)damageType;
             }
@@ -1645,7 +1646,7 @@ public class ActionSet
         {
             if (ActionPool.Standard.InBounds(specialRefs[i].index))
             {
-                special[i] = ActionPool.Special[i].Copy(specialRefs[i]);
+                special[i] = ActionPool.Special[specialRefs[i].index].Copy(specialRefs[i]);
                 if ((int)damageType > 0)
                     special[i].damageType = (int)damageType;
             }
@@ -1660,7 +1661,7 @@ public class ActionSet
         {
             if (ActionPool.PlayerBasic.InBounds(standardRefs[i].index))
             {
-                standard[i] = ActionPool.PlayerBasic[i].Copy(standardRefs[i]);
+                standard[i] = ActionPool.PlayerBasic[standardRefs[i].index].Copy(standardRefs[i]);
                 if ((int)damageType > 0)
                     standard[i].damageType = (int)damageType;
             }
@@ -1670,7 +1671,7 @@ public class ActionSet
         {
             if (ActionPool.PlayerSkill.InBounds(advancedRefs[i].index))
             {
-                advanced[i] = ActionPool.PlayerSkill[i].Copy(advancedRefs[i]);
+                advanced[i] = ActionPool.PlayerSkill[advancedRefs[i].index].Copy(advancedRefs[i]);
                 if ((int)damageType > 0)
                     advanced[i].damageType = (int)damageType;
             }
@@ -1680,7 +1681,7 @@ public class ActionSet
         {
             if (ActionPool.PlayerUltimate.InBounds(specialRefs[i].index))
             {
-                special[i] = ActionPool.PlayerUltimate[i].Copy(specialRefs[i]);
+                special[i] = ActionPool.PlayerUltimate[specialRefs[i].index].Copy(specialRefs[i]);
                 if ((int)damageType > 0)
                     special[i].damageType = (int)damageType;
             }
@@ -1689,9 +1690,10 @@ public class ActionSet
 
     public float ExecuteAction(CombatantCore combatant, ActionPoolCategory cat, int index, bool allowVariance = true)
     {
+        Debug.Log("ExecuteAction() [variant 1]");
         int variance = RandTuning.valBhv_selection;
         float f1, f2, r = allowVariance ? Random.Range(0.0f, 1.0f) : 0.0f;
-        ExecutionData executionData = ExecutionData.Empty;
+        CombatAction.ExecutionData executionData = CombatAction.ExecutionData.Empty;
         switch (cat)
         {
             default:
@@ -1829,9 +1831,10 @@ public class ActionSet
     
     public float ExecuteAction(CombatantCore combatant, CombatantTeamIndex[] targets, ActionPoolCategory cat, int index, bool allowVariance = true)
     {
+        Debug.Log("ExecuteAction() [variant 2]");
         int variance = RandTuning.valBhv_selection;
         float f1, f2, r = allowVariance ? Random.Range(0.0f, 1.0f) : 0.0f;
-        ExecutionData executionData = ExecutionData.Empty;
+        CombatAction.ExecutionData executionData = CombatAction.ExecutionData.Empty;
         switch (cat)
         {
             default:
@@ -1969,6 +1972,7 @@ public class ActionSet
 
     public float ExecuteAction(CombatantCore combatant, int sequenceIndex, bool allowVariance = true)
     {
+        Debug.Log("ExecuteAction() [variant 3]");
         if (Sequence.InBounds(sequenceIndex))
         {
             int variance = RandTuning.valBhv_selection;
@@ -1979,6 +1983,8 @@ public class ActionSet
             int index = Sequence[sequenceIndex].index;
             return ExecuteAction(combatant, cat, index, allowVariance);
         }
+        else
+            Debug.Log(sequenceIndex + " is an invalid sequence index!");
         return 0f;
     }
 }

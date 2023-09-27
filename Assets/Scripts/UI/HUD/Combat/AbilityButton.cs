@@ -6,7 +6,9 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using TMPro;
 
 using NeoCambion;
@@ -14,6 +16,7 @@ using NeoCambion.Collections;
 using NeoCambion.Collections.Unity;
 using NeoCambion.Encryption;
 using NeoCambion.Heightmaps;
+using NeoCambion.Interpolation;
 using NeoCambion.IO;
 using NeoCambion.IO.Unity;
 using NeoCambion.Maths;
@@ -24,11 +27,11 @@ using NeoCambion.Sorting;
 using NeoCambion.TaggedData;
 using NeoCambion.TaggedData.Unity;
 using NeoCambion.Unity;
+#if UNITY_EDITOR
 using NeoCambion.Unity.Editor;
+#endif
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
-using NeoCambion.Unity.Interpolation;
-using UnityEditor.UI;
 
 [System.Serializable]
 public struct AbilityIcon
@@ -91,18 +94,19 @@ public class AbilityButton : UIObjectInteractable
     public CombatManager CombatManager { get { return LevelManager.Combat; } }
     public HUDManager HUDManager { get { return UIManager.HUD; } }
 
-    [HideInInspector] public int ind = -1;
-
-    [HideInInspector] public AbilityIcon background;
-    [HideInInspector] public AbilityIcon backgroundDefault;
-    [HideInInspector] public Image backgroundImage;
+    public AbilityIcon background;
+    public AbilityIcon backgroundDefault;
+    public Image backgroundImage;
     
-    [HideInInspector] public AbilityIcon icon;
-    [HideInInspector] public AbilityIcon iconDefault;
-    [HideInInspector] public Image iconImage;
+    public AbilityIcon icon;
+    public AbilityIcon iconDefault;
+    public Image iconImage;
 
-    [HideInInspector] public UIObject hoverRing;
-    [HideInInspector] public UIObject selRing;
+    public UIObject hoverRing;
+    public UIObject selRing;
+
+    public Color selColourUsable;
+    public Color selColourUnusable;
 
     #endregion
 
@@ -111,8 +115,8 @@ public class AbilityButton : UIObjectInteractable
     public ActionPoolCategory abilityToTrigger;
 
     public bool isEnabled { get; private set; }
-    public bool hovered { get; private set; }
-    public bool selected { get; private set; }
+    public bool hovered { get; private set; } = false;
+    public bool selected { get; private set; } = false;
 
     public IconState iconState { get { return selected ? IconState.Selected : (hovered ? IconState.Hovered : IconState.Normal); } }
     private IconState iconStateLast;
@@ -132,14 +136,10 @@ public class AbilityButton : UIObjectInteractable
 
     #region [ BUILT-IN UNITY FUNCTIONS ]
 
-    protected override void Awake()
+    protected override void Initialise()
     {
-        base.Awake();
-    }
-
-    protected override void Start()
-    {
-        base.Start();
+        base.Initialise();
+        selRing.Show(false);
     }
 
     protected override void Update()
@@ -229,6 +229,11 @@ public class AbilityButton : UIObjectInteractable
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    public override void OnShow()
+    {
+        base.OnShow();
+    }
+
     /*public void SetEnabled(bool enable)
     {
         if (enable != isEnabled)
@@ -282,14 +287,24 @@ public class AbilityButton : UIObjectInteractable
             hoverRing.Show(false);
         }
     }
+
+    public void SelRingColour(bool available)
+    {
+        if (available)
+            selRing.ImageColor = selColourUsable;
+        else
+            selRing.ImageColor = selColourUnusable;
+    }
 }
 
+#if UNITY_EDITOR
 [CustomEditor(typeof(AbilityButton))]
 [CanEditMultipleObjects]
 public class AbilityButtonEditor : Editor
 {
     AbilityButton targ { get { return target as AbilityButton; } }
 
+    Color oldColour;
     public override void OnInspectorGUI()
     {
         base.OnInspectorGUI();
@@ -301,10 +316,14 @@ public class AbilityButtonEditor : Editor
         EditorGUILayout.Space(1);
 
         UpdateBackgroundSprite(EditorElements.SpriteField(new GUIContent("Normal Sprite"), targ.background.texNormal));
+        EditorGUILayout.Space(0);
         targ.background.texHover = EditorElements.SpriteField(new GUIContent("Hovered Sprite"), targ.background.texHover);
+        EditorGUILayout.Space(0);
         targ.background.texSelect = EditorElements.SpriteField(new GUIContent("Selected Sprite"), targ.background.texSelect);
         targ.backgroundDefault.CopyFrom(targ.background);
+        EditorGUILayout.Space(0);
         targ.backgroundImage = EditorGUILayout.ObjectField(new GUIContent("Image Object"), targ.backgroundImage, typeof(Image), true) as Image;
+        EditorGUILayout.Space(0);
 
         EditorGUILayout.Space(4);
         
@@ -313,10 +332,14 @@ public class AbilityButtonEditor : Editor
         EditorGUILayout.Space(1);
 
         UpdateIconSprite(EditorElements.SpriteField(new GUIContent("Normal Sprite"), targ.icon.texNormal));
+        EditorGUILayout.Space(0);
         targ.icon.texHover = EditorElements.SpriteField(new GUIContent("Hovered Sprite"), targ.icon.texHover);
+        EditorGUILayout.Space(0);
         targ.icon.texSelect = EditorElements.SpriteField(new GUIContent("Selected Sprite"), targ.icon.texSelect);
         targ.iconDefault.CopyFrom(targ.icon);
+        EditorGUILayout.Space(0);
         targ.iconImage = EditorGUILayout.ObjectField(new GUIContent("Image Object"), targ.iconImage, typeof(Image), true) as Image;
+        EditorGUILayout.Space(0);
 
         EditorGUILayout.Space(4);
 
@@ -325,8 +348,16 @@ public class AbilityButtonEditor : Editor
         EditorGUILayout.Space(1);
 
         EditorGUILayout.PropertyField(serializedObject.FindProperty("selRing"), new GUIContent("Selection Ring"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("hoverRing"));
+        EditorGUILayout.Space(0);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("selColourUsable"), new GUIContent("Available Colour"));
+        EditorGUILayout.Space(0);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("selColourUnusable"), new GUIContent("Unavailable Colour"));
+        EditorGUILayout.Space(0);
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("hoverRing"), new GUIContent("Hover Highlight Ring"));
+        EditorGUILayout.Space(0);
         serializedObject.ApplyModifiedProperties();
+        UpdateSelRingColour(oldColour);
+        oldColour = targ.selColourUsable;
     }
 
     private void UpdateBackgroundSprite(Sprite sprite)
@@ -348,4 +379,13 @@ public class AbilityButtonEditor : Editor
                 targ.iconImage.sprite = targ.icon.texNormal;
         }
     }
+
+    private void UpdateSelRingColour(Color oldColour)
+    {
+        if (targ.selColourUsable != oldColour)
+        {
+            targ.selRing.ImageColor = targ.selColourUsable;
+        }
+    }
 }
+#endif

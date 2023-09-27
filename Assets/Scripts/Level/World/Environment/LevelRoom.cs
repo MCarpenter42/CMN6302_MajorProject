@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
-using UnityEditor;
 
 using NeoCambion;
 using NeoCambion.Collections;
@@ -9,8 +9,6 @@ using NeoCambion.Collections.Unity;
 using NeoCambion.Maths;
 using NeoCambion.Random.Unity;
 using NeoCambion.Unity;
-using NeoCambion.Unity.Editor;
-using Unity.VisualScripting;
 
 public class LevelRoom : Core, LevelArea
 {
@@ -21,7 +19,8 @@ public class LevelRoom : Core, LevelArea
     public static LevelTile.TileType tCorridor = LevelTile.TileType.Corridor;
     public static LevelTile.TileType tRoom = LevelTile.TileType.Room;
 
-    public int ID { get; private set; }
+    public LevelArea.AreaID ID { get; private set; }
+
     private List<Vec2Int> _tilePositions = null;
     public List<Vec2Int> tilePositions { get { return _tilePositions ?? (_tilePositions = new List<Vec2Int>()); } private set { _tilePositions = value; } }
     private List<KeyValuePair<int, int>> internalConns = new List<KeyValuePair<int, int>>();
@@ -35,7 +34,7 @@ public class LevelRoom : Core, LevelArea
     public bool isStartRoom = false;
     public bool isEndRoom = false;
 
-    public bool revealed { get; private set; }
+    public bool revealed { get; set; }
 
     public bool containsEnemy { get; set; }
     private int _enemyCount = -1;
@@ -57,7 +56,7 @@ public class LevelRoom : Core, LevelArea
         }
     }
     //private WorldEnemySet _enemies = null;
-    public WorldEnemySet enemies { get; private set; }
+    public WorldEnemySet enemies { get; set; }
     /*{
         get
         {
@@ -92,7 +91,7 @@ public class LevelRoom : Core, LevelArea
         }
     }
     //private WorldItem[] _items = null;
-    public WorldItem[] items { get; private set; }
+    public List<WorldItem> items { get; set; }
     /*{
         get
         {
@@ -107,14 +106,43 @@ public class LevelRoom : Core, LevelArea
         }
     }*/
 
-    public void Initialise(Generation generatior, int ID)
+    public void Initialise(Generation generator, int ID)
     {
-        this.generator = generatior;
-        this.ID = ID;
+        gameObject.name = "Room " + ID;
+        this.generator = generator;
+        this.ID = LevelArea.RoomID(ID);
         tilePositions = new List<Vec2Int>();
         _tiles = new List<LevelTile>();
         revealed = false;
         containsEnemy = false;
+    }
+    public void Initialise(Generation generator, int ID, LevelTile[] tiles, bool revealed = false)
+    {
+        gameObject.name = "Room " + ID;
+        this.generator = generator;
+        this.ID = LevelArea.RoomID(ID);
+        tilePositions = new List<Vec2Int>();
+        _tiles = new List<LevelTile>();
+        this.revealed = revealed;
+
+        for (int i = 0; i < tiles.Length; i++)
+        {
+            Add(tiles[i]);
+        }
+    }
+    public void Initialise(Generation generator, RoomSaveData saveData)
+    {
+        gameObject.name = "Room " + saveData.ID;
+        this.generator = generator;
+        ID = LevelArea.RoomID(saveData.ID);
+        tilePositions = new List<Vec2Int>();
+        _tiles = new List<LevelTile>();
+        revealed = saveData.revealed;
+
+        for (int i = 0; i < saveData.tilePositions.Length; i++)
+        {
+            Add(LevelManager.TileGrid[saveData.tilePositions[i]]);
+        }
     }
 
     public void InternalConnections()
@@ -126,7 +154,7 @@ public class LevelRoom : Core, LevelArea
         for (i = 0; i < tilePositions.Count; i++)
         {
             pos = tilePositions[i];
-            tile = generator.tiles[pos];
+            tile = LevelManager.TileGrid[pos];
             if (tile != null)
             {
                 for (j = 0; j < 6; j++)
@@ -139,7 +167,7 @@ public class LevelRoom : Core, LevelArea
                         if (adjInd > -1)
                         {
                             tile.connections[dir] = LevelTile.ConnectionState.Merge;
-                            generator.tiles[adj].connections[dir.Invert()] = LevelTile.ConnectionState.Merge;
+                            LevelManager.TileGrid[adj].connections[dir.Invert()] = LevelTile.ConnectionState.Merge;
                             internalConns.Add(new KeyValuePair<int, int>(i, adjInd));
                         }
                         else
@@ -165,7 +193,7 @@ public class LevelRoom : Core, LevelArea
         for (i = 0; i < nTiles; i++)
         {
             pos = tilePositions[i];
-            tile = generator.tiles[pos];
+            tile = LevelManager.TileGrid[pos];
             if (tile == null)
                 connsBefore[i] = i + " - " + pos + ": NULL";
             else
@@ -175,7 +203,7 @@ public class LevelRoom : Core, LevelArea
         for (i = 0; i < nTiles; i++)
         {
             pos = tilePositions[i];
-            tile = generator.tiles[pos];
+            tile = LevelManager.TileGrid[pos];
             if (tile == null)
                 connsAfter[i] = i + " - " + pos + ": NULL";
             else
@@ -285,10 +313,7 @@ public class LevelRoom : Core, LevelArea
     public void Add(LevelTile newTile)
     {
         if (Add(newTile.gridPosition))
-        {
             tiles.Add(newTile);
-            newTile.SetTransformParent(this);
-        }
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -303,7 +328,7 @@ public class LevelRoom : Core, LevelArea
             Vector3 posF;
             foreach (Vec2Int pos in tilePositions)
             {
-                posF = generator.TilePosition(pos);
+                posF = pos.TilePosition();
                 xTotal += posF.x;
                 zTotal += posF.z;
             }
@@ -386,6 +411,22 @@ public class LevelRoom : Core, LevelArea
         return connInds;
     }
 
+    public Vector3 ClosestTilePosition(Vector3 position)
+    {
+        float closest = float.MaxValue, dist;
+        int x = -1;
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            dist = (tiles[i].position - position).magnitude;
+            if (dist < closest)
+            {
+                closest = dist;
+                x = i;
+            }
+        }
+        return tiles[x].position;
+    }
+    
     public int ClosestTile(Vector3 position)
     {
         float closest = float.MaxValue, dist;
@@ -407,7 +448,7 @@ public class LevelRoom : Core, LevelArea
         float aR = Random.Range(0.0f, 360.0f), dR = Random.Range(0.0f, 1.0f);
         Vector3 position, offset;
         position = tiles[tileInd].position;
-        offset = generator.tileInnerRadius * dR * new Vector3(Mathf.Sin(aR.ToRad()), 0.0f, Mathf.Cos(aR.ToRad()));
+        offset = generator.tileInnerRadius * dR * new Vector3(Mathf.Sin(aR.ToRad()), 0.0f, Mathf.Cos(aR.ToRad())).normalized;
         return position + offset;
     }
     
@@ -419,13 +460,13 @@ public class LevelRoom : Core, LevelArea
         if (iR < tiles.Count)
         {
             position = tiles[iR].position;
-            offset = generator.tileInnerRadius * dR * new Vector3(Mathf.Sin(aR.ToRad()), 0.0f, Mathf.Cos(aR.ToRad()));
+            offset = generator.tileInnerRadius * dR * new Vector3(Mathf.Sin(aR.ToRad()), 0.0f, Mathf.Cos(aR.ToRad())).normalized;
         }
         else
         {
             iR -= tiles.Count;
             position = PosBetween(iR).Value;
-            offset = generator.tileInnerRadius * 0.5f * dR * new Vector3(Mathf.Sin(aR.ToRad()), 0.0f, Mathf.Cos(aR.ToRad()));
+            offset = generator.tileInnerRadius * 0.5f * dR * new Vector3(Mathf.Sin(aR.ToRad()), 0.0f, Mathf.Cos(aR.ToRad())).normalized;
         }
         return position + offset;
     }
@@ -482,7 +523,7 @@ public class LevelRoom : Core, LevelArea
             for (i = 0; i < Size; i++)
             {
                 pos = tilePositions[i];
-                (localNone, _, _, localRoom) = generator.CategorisedAdjacent(pos);
+                (localNone, _, _, localRoom) = pos.CategorisedAdjacent();
                 for (j = 0; j < localNone.Count; j++)
                 {
                     if (!pickedTiles.Contains(pos))
@@ -521,7 +562,7 @@ public class LevelRoom : Core, LevelArea
             for (i = 0; i < Size; i++)
             {
                 pos = tilePositions[i];
-                localNone = generator.Adjacent(pos, tNone);
+                localNone = pos.Adjacent(tNone);
                 for (j = 0; j < localNone.Count; j++)
                 {
                     options.Add(new AdjacentRef(localNone[j].direction, pos, tNone));
@@ -561,7 +602,7 @@ public class LevelRoom : Core, LevelArea
         transform.position = c;
         foreach (LevelTile tile in tiles)
         {
-            tile.transform.position = generator.TilePosition(tile.gridPosition);
+            tile.transform.position = tile.gridPosition.TilePosition();
         }
     }
 
@@ -593,10 +634,23 @@ public class LevelRoom : Core, LevelArea
         return itemCount < itemCapacity;
     }
 
-    public (PositionsInArea, PositionsInArea) SpawnPositions(int indexOverride = -1)
+    public (Vector3[], Vector3[]) SpawnPositions()
     {
-        int indToUse = indexOverride >= 0 ? indexOverride : ID;
-        PositionsInArea enemyPositions = new PositionsInArea(true, indToUse, enemyCount), itemPositions = new PositionsInArea(false, indToUse, itemCount);
+        Vector3[] enemyPositions = new Vector3[enemyCount], itemPositions = new Vector3[itemCount];
+        for (int i = 0; i < enemyCount; i++)
+        {
+            enemyPositions[i] = RandInternalPosition();
+        }
+        for (int i = 0; i < itemCount; i++)
+        {
+            itemPositions[i] = RandInternalPosition();
+        }
+        return (enemyPositions, itemPositions);
+    }
+    public (PositionsInArea, PositionsInArea) SpawnPositionsInArea(int indexOverride = -1)
+    {
+        int indToUse = indexOverride >= 0 ? indexOverride : ID.value;
+        PositionsInArea enemyPositions = new PositionsInArea(LevelArea.RoomID(indToUse), enemyCount), itemPositions = new PositionsInArea(LevelArea.RoomID(indToUse), itemCount);
         for (int i = 0; i < enemyCount; i++)
         {
             enemyPositions[i] = RandInternalPosition();
@@ -608,31 +662,13 @@ public class LevelRoom : Core, LevelArea
         return (enemyPositions, itemPositions);
     }
 
-    public void OverwriteEnemies(int enemyCount)
-    {
-        enemies = new WorldEnemySet(enemyCount, this);
-        if (LevelManager.worldEnemies.ContainsKey((false, ID)))
-            LevelManager.worldEnemies[(false, ID)] = enemies;
-        else
-            LevelManager.worldEnemies.Add((false, ID), enemies);
-    }
-
-    public void OverwriteItems(int itemCount)
-    {
-        items = new WorldItem[itemCount];
-        if (LevelManager.worldItems.ContainsKey((false, ID)))
-            LevelManager.worldItems[(false, ID)] = items;
-        else
-            LevelManager.worldItems.Add((false, ID), items);
-    }
-
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public bool PlayerInRange()
     {
         foreach (LevelTile tile in tiles)
         {
-            if (tile.distToPlayer < generator.tileRadius)
+            if (tile != null && tile.distToPlayer < generator.tileRadius)
                 return true;
         }
         return false;
@@ -672,4 +708,63 @@ public struct RoomSourceRef : AreaSourceRef
     }
 
     public static RoomSourceRef Null { get { return new RoomSourceRef(Vec2Int.zero); } }
+}
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+public class RoomSaveData
+{
+    private const char vctr = ',';
+    private const char item = ':';
+    private const char sctn = '|';
+
+    public int ID;
+    public Vec2Int[] tilePositions;
+    public bool revealed;
+    public string DataString => GetDataString();
+
+    public RoomSaveData(int ID, Vec2Int[] tilePositions, bool revealed)
+    {
+        this.ID = ID;
+        this.tilePositions = tilePositions;
+        this.revealed = revealed;
+    }
+    public RoomSaveData(LevelRoom source)
+    {
+        ID = source.ID.value;
+        tilePositions = source.tilePositions.ToArray();
+        revealed = source.revealed;
+    }
+
+    public static RoomSaveData FromDataString(string dataString)
+    {
+        int ID, search = 0, comma, delim, section = dataString.IndexOf(sctn);
+        List<Vec2Int> tilePositions = new List<Vec2Int>();
+        Vec2Int next = Vec2Int.zero;
+
+        ID = dataString.RangeToInt(search, section);
+
+        search = section + 1;
+        section = dataString.IndexOf(sctn, search);
+        while (search < section)
+        {
+            comma = dataString.IndexOf(vctr, search);
+            delim = dataString.IndexOf(item, search);
+            next.x = dataString.RangeToInt(search, comma);
+            next.y = dataString.RangeToInt(comma + 1, delim);
+            tilePositions.Add(next);
+            search = delim + 1;
+        }
+        return new RoomSaveData(ID, tilePositions.ToArray(), dataString.Last() == 'T');
+    }
+    public string GetDataString()
+    {
+        string result = "" + ID + sctn;
+        for (int i = 0; i < tilePositions.Length; i++)
+        {
+            result += "" + tilePositions[i].x + vctr + tilePositions[i].y + item;
+        }
+        result += "" + sctn + (revealed ? 'T' : 'F');
+        return result;
+    }
 }

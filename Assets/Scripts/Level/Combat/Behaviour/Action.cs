@@ -6,7 +6,6 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
-using UnityEditor;
 using TMPro;
 
 using NeoCambion;
@@ -14,6 +13,7 @@ using NeoCambion.Collections;
 using NeoCambion.Collections.Unity;
 using NeoCambion.Encryption;
 using NeoCambion.Heightmaps;
+using NeoCambion.Interpolation;
 using NeoCambion.IO;
 using NeoCambion.IO.Unity;
 using NeoCambion.Maths;
@@ -24,11 +24,8 @@ using NeoCambion.Sorting;
 using NeoCambion.TaggedData;
 using NeoCambion.TaggedData.Unity;
 using NeoCambion.Unity;
-using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
-using NeoCambion.Unity.Interpolation;
-using static UnityEngine.UI.Image;
 
 [System.Serializable]
 public enum CombatActionType { Attack, Heal, Shield, ApplyStatus, RemoveStatus, Mark, Taunt, Summon, Dismiss, MultiAction, Charge }
@@ -90,8 +87,8 @@ public class CombatAction
     public List<NamedCallback> onSuccess = new List<NamedCallback>();
     public List<NamedCallback> onFailure = new List<NamedCallback>();
 
-    public float animDurWindup = 3.0f;
-    public float animDurCompletion = 2.0f;
+    public float animDurWindup = 1.5f;
+    public float animDurCompletion = 1.5f;
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     
@@ -105,6 +102,33 @@ public class CombatAction
         this.targeting = targeting;
     }
 
+    public CombatAction(CombatAction template, string newName = null, string newIcon = null)
+    {
+        displayName = newName == null ? displayName : newName;
+        iconPath = newIcon == null ? iconPath : newIcon;
+
+        type = template.type;
+        damageType = template.damageType;
+        targeting = new ActionTarget(template.targeting);
+        baseAttribute = template.baseAttribute;
+        multiTarget = template.multiTarget;
+
+        markForAll = template.markForAll;
+
+        actionMultiplier = template.actionMultiplier;
+        selfMultiplier = template.selfMultiplier;
+        selfMultCondition = template.selfMultCondition;
+        targMultiplier = template.targMultiplier;
+        targMultCondition = template.targMultCondition;
+
+        subActions = new CombatAction[template.subActions.Length];
+        for (int i = 0; i < subActions.Length; i++)
+            subActions[i] = new CombatAction(template.subActions[i]);
+
+        onSuccess = new List<NamedCallback>(template.onSuccess);
+        onFailure = new List<NamedCallback>(template.onFailure);
+    }
+    
     public CombatAction Copy(string newName = null, string newIcon = null)
     {
         return new CombatAction()
@@ -142,7 +166,7 @@ public class CombatAction
 
             type = type,
             damageType = damageType,
-            targeting = targeting,
+            targeting = new ActionTarget(targeting),
             baseAttribute = baseAttribute,
             multiTarget = multiTarget,
 
@@ -328,6 +352,7 @@ public class CombatAction
             else
             {
                 int tInd = targets[0].teamIndex;
+                targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[tInd]);
                 CombatManager.enemyTeam[tInd].DamageTaken(animDurWindup, animDurCompletion, actorTeamIndex, dmgOut, damageType, allyTeam && RollForCrit());
                 if (multiTarget.enabled)
                 {
@@ -362,6 +387,8 @@ public class CombatAction
             }
             return new ExecutionData() { succeeded = true, duration = (animDurWindup + animDurCompletion) };
         }
+        else
+            Debug.Log("No available targets!");
         onFailure.Invoke();
         return ExecutionData.Failed;
     }
@@ -428,6 +455,7 @@ public class CombatAction
             {
                 int tInd = targets[0].teamIndex;
                 targCondMet = targMultCondition.MetBy(CombatManager.allyTeam[targets[0].teamIndex]);
+                CombatManager.allyTeam[tInd].Healed(animDurWindup, animDurCompletion, actorTeamIndex, healOut);
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -463,6 +491,7 @@ public class CombatAction
             {
                 int tInd = targets[0].teamIndex;
                 targCondMet = targMultCondition.MetBy(CombatManager.enemyTeam[targets[0].teamIndex]);
+                CombatManager.enemyTeam[tInd].Healed(animDurWindup, animDurCompletion, actorTeamIndex, healOut);
                 if (multiTarget.enabled)
                 {
                     if (multiTarget.type == MultiTargetType.Blast)
@@ -496,6 +525,8 @@ public class CombatAction
             }
             return new ExecutionData() { succeeded = true };
         }
+        else
+            Debug.Log("No available targets!");
         onFailure.Invoke();
         return ExecutionData.Failed;
     }
@@ -1007,6 +1038,18 @@ public class ActionTarget
     public TargetCondition condition;
     public bool tauntable;
     public bool ignoreMarked;
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public ActionTarget() { }
+
+    public ActionTarget(ActionTarget template)
+    {
+        selection = template.selection;
+        condition = template.condition;
+        tauntable = template.tauntable;
+        ignoreMarked = template.ignoreMarked;
+    }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 

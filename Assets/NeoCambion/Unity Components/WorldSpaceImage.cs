@@ -12,6 +12,7 @@ namespace NeoCambion.Unity
         public Sprite sprite { get { return GetComponent<SpriteRenderer>().sprite; } set { GetComponent<SpriteRenderer>().sprite = value; } }
     }
 
+#if UNITY_EDITOR
     [CustomEditor(typeof(WorldSpaceImage))]
     public class WorldSpaceImageEditor : UnityEditor.Editor
     {
@@ -22,4 +23,5 @@ namespace NeoCambion.Unity
 
         }
     }
+#endif
 }

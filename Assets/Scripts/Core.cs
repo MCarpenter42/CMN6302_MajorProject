@@ -14,6 +14,7 @@ using NeoCambion.Collections;
 using NeoCambion.Collections.Unity;
 using NeoCambion.Encryption;
 using NeoCambion.Heightmaps;
+using NeoCambion.Interpolation;
 using NeoCambion.IO;
 using NeoCambion.IO.Unity;
 using NeoCambion.Maths;
@@ -24,29 +25,36 @@ using NeoCambion.Sorting;
 using NeoCambion.TaggedData;
 using NeoCambion.TaggedData.Unity;
 using NeoCambion.Unity;
-using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
-using NeoCambion.Unity.Interpolation;
 
 #region [ ENUM TYPES ]
 
-public enum ControlState { None, Menu, World, Combat }
+[System.Serializable]
+public enum ControlState { None = -1, Menu, World, Combat }
+[System.Serializable]
+public enum SceneID { Unknown = -1, MainMenu = 0, Gameplay = 1 }
 
 #endregion
 
+#if UNITY_EDITOR
+[CanEditMultipleObjects]
+#endif
 public class Core : MonoBehaviourExt
 {
     #region [ OBJECTS / COMPONENTS ]
 
+    public static ControlsHandler ControlsHandler = null;
     public static EventSystem EventSystem = null;
     public static LevelManager LevelManager = null;
-    public static UIManager UIManager = null;
     public static RandTuning RandTuning = null;
+    public static UIManager UIManager = null;
 
     #endregion
 
     #region [ PROPERTIES ]
+
+    public static char PathSeparator => System.IO.Path.DirectorySeparatorChar;
 
     public const char markdownDelimiter = '%';
 
@@ -60,54 +68,50 @@ public class Core : MonoBehaviourExt
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public static void SetRef_LevelManager(LevelManager levelManager)
-    {
-        //if (LevelManager != null)
-            //Debug.LogWarning("Static LevelManager setter accessed with a value already present! The previous value has been overridden.\n" + FindObjectsOfType<LevelManager>().Length + " object(s) of this type found in the current scene.");
-        LevelManager = levelManager;
-    }
-    public static void SetRef_UIManager(UIManager uiManager)
-    {
-        //if (UIManager != null)
-            //Debug.LogError("Static UIManager setter accessed with a value already present! The previous value has been overridden.\n" + FindObjectsOfType<UIManager>().Length + " object(s) of this type found in the current scene.");
-        UIManager = uiManager;
-    }
-    public static void SetRef_RandTuning(RandTuning randTuning)
-    {
-        //if (RandTuning == null)
-            //Debug.LogError("Static RandTuning setter accessed with a value already present! The previous value has been overridden.\n" + FindObjectsOfType<RandTuning>().Length + " object(s) of this type found in the current scene.");
-        RandTuning = randTuning;
-    }
+    //public static void SetRef_LevelManager(LevelManager levelManager) => LevelManager = levelManager;
+    //public static void SetRef_UIManager(UIManager uiManager) => UIManager = uiManager;
+    //public static void SetRef_RandTuning(RandTuning randTuning) => RandTuning = randTuning;
+    //public static void SetRef_ControlsHandler(ControlsHandler controlsHandler) => ControlsHandler = controlsHandler;
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public static void Pause()
+    protected void Awake()
     {
-        GameManager.Instance.OnPause();
+        if (!GameManager.InSceneTransition)
+            Initialise();
+        else
+            GameManager.Initialisers.Add(this, Initialise);
     }
+    protected virtual void Initialise() { }
 
-    public static void Resume()
-    {
-        GameManager.Instance.OnResume();
-    }
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    public void PauseGame() => Pause();
+    public static void Pause() => GameManager.Instance.OnPause();
+
+    public void ResumeGame() => Resume();
+    public static void Resume() => GameManager.Instance.OnResume();
+
+    public void ToggleGamePause() => TogglePause();
     public static void TogglePause()
     {
-        if (GameManager.allowPauseToggle)
+        if (GameManager.GamePaused)
         {
-            if (GameManager.gamePaused)
-                GameManager.Instance.OnResume();
-            else
-                GameManager.Instance.OnPause();
+            GameManager.Instance.OnResume();
+        }
+        else
+        {
+            GameManager.Instance.OnPause();
         }
     }
 
-    public static void ExitGame()
+    public void QuitGame() => Quit();
+    public static void Quit()
     {
-        Application.Quit();
 #if UNITY_EDITOR
         EditorApplication.ExitPlaymode();
 #endif
+        Application.Quit();
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */

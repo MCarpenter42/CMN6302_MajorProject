@@ -4,7 +4,9 @@ namespace NeoCambion.IO
     using System.Collections.Generic;
     using System.IO;
     using System.Runtime.Serialization.Json;
+
     using NeoCambion;
+    using NeoCambion.Collections;
 
     public static class Ext_Stream
     {
@@ -22,6 +24,8 @@ namespace NeoCambion.IO
 
     public static class FileHandler
     {
+        public static char Separator => Path.DirectorySeparatorChar;
+
         #region [ JSON SETTINGS DATA ]
 
         public static DataContractJsonSerializerSettings jsonSettings = new DataContractJsonSerializerSettings()
@@ -34,66 +38,49 @@ namespace NeoCambion.IO
         
         #endregion
 
-        public static void Write(byte[] data, string filePathFull, bool overwrite = true)
+        public static void ValidateFile(string filePathFull)
         {
             if (!File.Exists(filePathFull))
-                File.Create(filePathFull);
-
-            if (overwrite)
             {
-                File.WriteAllBytes(filePathFull, data);
-            }
-            else
-            {
-                byte[] existingData = File.ReadAllBytes(filePathFull);
-                byte[] mergedData = new byte[existingData.Length + data.Length];
-                int i, l = existingData.Length;
-                for (i = 0; i < data.Length; i++)
+                try
                 {
-                    mergedData[l + i] = data[i];
+                    FileStream fs = new FileStream(filePathFull, FileMode.Create);
+                    fs.Close();
                 }
-                File.WriteAllBytes(filePathFull, mergedData);
+                catch (Exception caught)
+                {
+                    throw new Exception("Attempted to validate file at: " + filePathFull + "\n" + caught.Message, caught.InnerException);
+                }
             }
         }
-        
+
+        public static void Write(byte[] data, string filePathFull, bool overwrite = true)
+        {
+            ValidateFile(filePathFull);
+            if (overwrite)
+                File.WriteAllBytes(filePathFull, data);
+            else
+                File.WriteAllBytes(filePathFull, File.ReadAllBytes(filePathFull).Combine(data));
+        }
         public static void Write(string data, string filePathFull, bool overwrite = true)
         {
-            if (!File.Exists(filePathFull))
-                File.Create(filePathFull);
-
+            ValidateFile(filePathFull);
             if (overwrite)
-            {
                 File.WriteAllText(filePathFull, data);
-            }
             else
             {
                 string existingData = File.ReadAllText(filePathFull);
                 File.WriteAllText(filePathFull, existingData + data);
             }
         }
-        
         public static void Write(string[] data, string filePathFull, bool overwrite = true)
         {
-            if (!File.Exists(filePathFull))
-                File.Create(filePathFull);
-
+            ValidateFile(filePathFull);
             if (overwrite)
-            {
                 File.WriteAllLines(filePathFull, data);
-            }
             else
-            {
-                string[] existingData = File.ReadAllLines(filePathFull);
-                string[] mergedData = new string[existingData.Length + data.Length];
-                int i, l = existingData.Length;
-                for (i = 0; i < data.Length; i++)
-                {
-                    mergedData[l + i] = data[i];
-                }
-                File.WriteAllLines(filePathFull, mergedData);
-            }
+                File.WriteAllLines(filePathFull, File.ReadAllLines(filePathFull).Combine(data));
         }
-
         public static void Write(object data, string filePathFull)
         {
             DataContractJsonSerializer serializer = new DataContractJsonSerializer(data.GetType());
@@ -104,7 +91,14 @@ namespace NeoCambion.IO
             }
         }
         
-        public static byte[] Read(string filePathFull, out byte[] target)
+        public static byte[] ReadBytes(string filePathFull)
+        {
+            if (File.Exists(filePathFull))
+                return File.ReadAllBytes(filePathFull);
+            else
+                return new byte[0];
+        }
+        public static byte[] ReadBytes(string filePathFull, out byte[] target)
         {
             if (File.Exists(filePathFull))
                 target = File.ReadAllBytes(filePathFull);
@@ -112,7 +106,14 @@ namespace NeoCambion.IO
                 target = new byte[0];
             return target;
         }
-        
+
+        public static string ReadString(string filePathFull)
+        {
+            if (File.Exists(filePathFull))
+                return File.ReadAllText(filePathFull);
+            else
+                return null;
+        }
         public static string ReadString(string filePathFull, out string target)
         {
             if (File.Exists(filePathFull))
@@ -121,8 +122,15 @@ namespace NeoCambion.IO
                 target = null;
             return target;
         }
-        
-        public static string[] Read(string filePathFull, out string[] target)
+
+        public static string[] ReadLines(string filePathFull)
+        {
+            if (File.Exists(filePathFull))
+                return File.ReadAllLines(filePathFull);
+            else
+                return new string[0];
+        }
+        public static string[] ReadLines(string filePathFull, out string[] target)
         {
             if (File.Exists(filePathFull))
                 target = File.ReadAllLines(filePathFull);
@@ -130,7 +138,7 @@ namespace NeoCambion.IO
                 target = new string[0];
             return target;
         }
-        
+
         public static T ReadAs<T>(string filePathFull)
         {
             DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(T));
@@ -149,6 +157,26 @@ namespace NeoCambion.IO
                 stream.Close();
             }
             return output;
+        }
+
+        private static bool CanDelete(string filePathFull)
+        {
+            if (File.Exists(filePathFull))
+                return !File.GetAttributes(filePathFull).HasAnyFlag(FileAttributes.ReadOnly, FileAttributes.System);
+            return false;
+        }
+        public static int Delete(params string[] filePaths)
+        {
+            int deleted = 0;
+            foreach (string path in filePaths)
+            {
+                if (CanDelete(path))
+                {
+                    File.Delete(path);
+                    deleted++;
+                }
+            }
+            return deleted;
         }
     }
 

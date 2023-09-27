@@ -1,7 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
-using UnityEditor;
 
 using NeoCambion;
 using NeoCambion.Collections;
@@ -9,12 +10,63 @@ using NeoCambion.Collections.Unity;
 using NeoCambion.Maths;
 using NeoCambion.Random.Unity;
 using NeoCambion.Unity;
+
+#if UNITY_EDITOR
+using UnityEditor;
 using NeoCambion.Unity.Editor;
-using TMPro;
+#endif
 
 public interface LevelArea : IEnumerable
 {
+    public enum AreaType { Null = -1, Room, Corridor }
+    public struct AreaID : System.IEquatable<AreaID>, System.IComparable<AreaID>
+    {
+        public AreaType type;
+        public int value;
+
+        public AreaID(AreaType type, int ID)
+        {
+            this.type = type;
+            this.value = ID;
+        }
+
+        public static AreaID Null => new AreaID(AreaType.Null, int.MinValue);
+        public bool isNull => type == AreaType.Null && value == int.MinValue;
+
+        public override bool Equals(object obj)
+        {
+            if (isNull && obj == null)
+                return true;
+            if (obj.GetType() != typeof(AreaID))
+                return false;
+            return Equals((AreaID)obj);
+        }
+        public bool Equals(AreaID other) => type == other.type && value == other.value;
+        public int CompareTo(AreaID compareTo)
+        {
+            if (type == compareTo.type)
+            {
+                if (value == compareTo.value)
+                    return 2;
+                else
+                    return 1;
+            }
+            return 0;
+        }
+        public override int GetHashCode() => (type, value).GetHashCode();
+        public static bool operator ==(AreaID operand1, AreaID operand2) => operand1.Equals(operand2);
+        public static bool operator !=(AreaID operand1, AreaID operand2) => !operand1.Equals(operand2);
+
+        public override readonly string ToString() => type + ": " + value;
+    }
+    public static AreaID RoomID(int ID) => new AreaID(AreaType.Room, ID);
+    public static AreaID CorridorID(int ID) => new AreaID(AreaType.Corridor, ID);
+    public static AreaID NullID => AreaID.Null;
+
     public GameObject gameObject { get; }
+    public Transform transform { get; }
+
+    public AreaID ID { get; }
 
     public List<Vec2Int> tilePositions { get; }
     public List<LevelTile> tiles { get; }
@@ -22,10 +74,10 @@ public interface LevelArea : IEnumerable
 
     public bool containsEnemy { get; set; }
     public int enemyCount { get; }
-    public WorldEnemySet enemies { get; }
+    public WorldEnemySet enemies { get; set; }
     public int itemCount { get; }
     public int itemCapacity { get; }
-    public WorldItem[] items { get; }
+    public List<WorldItem> items { get; set; }
 
     public bool Contains(Vec2Int position);
 
@@ -33,34 +85,29 @@ public interface LevelArea : IEnumerable
 
     public Vector3 RandInternalPosition();
     public bool IncrementItemCount();
-    public (PositionsInArea, PositionsInArea) SpawnPositions(int indexOverride);
-    public void OverwriteEnemies(int enemyCount);
-    public void OverwriteItems(int itemCount);
+    public (Vector3[], Vector3[]) SpawnPositions();
+    public (PositionsInArea, PositionsInArea) SpawnPositionsInArea(int indexOverride);
 }
 
 public struct PositionInArea
 {
-    public bool inRoom;
-    public int areaIndex;
+    LevelArea.AreaID areaID;
     public Vector3 worldPosition;
 
-    public PositionInArea(bool inRoom, int areaIndex, Vector3 worldPosition)
+    public PositionInArea(LevelArea.AreaID areaID, Vector3 worldPosition)
     {
-        this.inRoom = inRoom;
-        this.areaIndex = areaIndex;
+        this.areaID = areaID;
         this.worldPosition = worldPosition;
     }
 
-    public PositionInArea Room(int roomIndex, Vector3 worldPosition) => new PositionInArea(true, roomIndex, worldPosition);
-    public PositionInArea Corridor(int corridorIndex, Vector3 worldPosition) => new PositionInArea(false, corridorIndex, worldPosition);
+    public PositionInArea Room(int roomIndex, Vector3 worldPosition) => new PositionInArea(LevelArea.RoomID(roomIndex), worldPosition);
+    public PositionInArea Corridor(int corridorIndex, Vector3 worldPosition) => new PositionInArea(LevelArea.CorridorID(corridorIndex), worldPosition);
 
-    public PositionInArea Offset(Vector3 offset) => new PositionInArea(inRoom, areaIndex, worldPosition + offset);
+    public PositionInArea Offset(Vector3 offset) => new PositionInArea(areaID, worldPosition + offset);
 }
-
 public struct PositionsInArea
 {
-    public bool inRoom;
-    public int areaIndex;
+    LevelArea.AreaID areaID;
     public Vector3[] worldPositions;
 
     public Vector3 this[int index]
@@ -70,23 +117,21 @@ public struct PositionsInArea
     }
     public int Length => worldPositions.Length;
 
-    public PositionsInArea(bool inRoom, int areaIndex, int posCount)
+    public PositionsInArea(LevelArea.AreaID areaID, int posCount)
     {
-        this.inRoom = inRoom;
-        this.areaIndex = areaIndex;
+        this.areaID = areaID;
         this.worldPositions = new Vector3[posCount];
     }
-    public PositionsInArea(bool inRoom, int areaIndex, Vector3[] worldPositions)
+    public PositionsInArea(LevelArea.AreaID areaID, Vector3[] worldPositions)
     {
-        this.inRoom = inRoom;
-        this.areaIndex = areaIndex;
+        this.areaID = areaID;
         this.worldPositions = worldPositions;
     }
 
-    public PositionsInArea Room(int roomIndex, Vector3[] worldPositions) => new PositionsInArea(true, roomIndex, worldPositions);
-    public PositionsInArea Corridor(int corridorIndex, Vector3[] worldPositions) => new PositionsInArea(false, corridorIndex, worldPositions);
+    public PositionsInArea Room(int roomIndex, Vector3[] worldPositions) => new PositionsInArea(LevelArea.RoomID(roomIndex), worldPositions);
+    public PositionsInArea Corridor(int corridorIndex, Vector3[] worldPositions) => new PositionsInArea(LevelArea.CorridorID(corridorIndex), worldPositions);
 
-    public PositionInArea Single(int index) => new PositionInArea(inRoom, areaIndex, worldPositions[index]);
+    public PositionInArea Single(int index) => new PositionInArea(areaID, worldPositions[index]);
 }
 
 public struct AdjacentRef
@@ -133,6 +178,7 @@ public class Generation : Core
                 }
             }
             private Dictionary<int, LevelTile> tiles;
+            public int Count => tiles.Count;
             public int y;
 
             public GridRow(Grid grid, int y)
@@ -149,6 +195,7 @@ public class Generation : Core
             public bool Contains(int x) => Get(x) != null;
 
             public LevelTile Get(int x) => InBounds(x) ? tiles.GetOrRemove(x) : null;
+            public LevelTile[] GetAll() => tiles.Values.ToArray();
 
             public LevelTile Create(int x, LevelTile.TileType type)
             {
@@ -163,7 +210,7 @@ public class Generation : Core
                         tiles.Remove(x);
                     }
                     tile = tiles.AddCloneValue(x, generator.tileTemplate, null).Value;
-                    tile.SetAttributes(position, generator.TilePosition(position), type);
+                    tile.SetAttributes(position, position.TilePosition(), type);
                 }
                 return tile;
             }
@@ -177,8 +224,8 @@ public class Generation : Core
                     if (tile == null)
                     {
                         Vec2Int position = new Vec2Int(x, y);
-                        tile = tiles.AddCloneValue(x, generator.tileTemplate, grid.generator.transform).Value;
-                        tile.SetAttributes(position, generator.TilePosition(position), type);
+                        tile = tiles.AddCloneValue(x, generator.tileTemplate, grid.generator.mapTransform).Value;
+                        tile.SetAttributes(position, position.TilePosition(), type);
                     }
                 }
                 return tile;
@@ -204,22 +251,18 @@ public class Generation : Core
             {
                 if (destroyTiles)
                 {
-                    foreach (int x in tiles.Keys)
+                    foreach (LevelTile tile in tiles.Values)
                     {
-                        if (tiles[x] != null)
-                            tiles[x].gameObject.DestroyThis();
-                        tiles.Remove(x);
+                        if (tile != null)
+                            tile.gameObject.DestroyThis(1f);
                     }
                 }
-                else
-                {
-                    tiles.Clear();
-                }
+                tiles.Clear();
             }
 
             /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-            public void GenerateMeshes(bool[] debug = null)
+            /*public void GenerateMeshes(bool[] debug = null)
             {
                 Vec2Int pos = new Vec2Int();
                 LevelTile tile;
@@ -254,7 +297,7 @@ public class Generation : Core
                             break;
                     }
 
-                    if (debug[0] && !(debug[3] && debug[5]))
+                    if (debug != null && debug[0] && !(debug != null && debug[3] && debug[5]))
                     {
                         if (mesh == null)
                             Debug.Log("Mesh for " + type + " tile at " + pos.ToString() + " is null");
@@ -268,7 +311,7 @@ public class Generation : Core
                     if (cMesh != null)
                         tile.SetCollider(cMesh);
                 }
-            }
+            }*/
 
             public void GenerateMiniTiles(Transform parentTransform, Material miniTileMat)
             {
@@ -282,13 +325,32 @@ public class Generation : Core
         public const int Min = -1073741824;
         public const int Max = 1073741823;
 
-        private Dictionary<int, GridRow> rows;
         public Generation generator;
+
+        private Dictionary<int, GridRow> rows;
+        public int Count
+        {
+            get
+            {
+                int n = 0;
+                foreach (GridRow row in rows.Values)
+                {
+                    n += row.Count;
+                }
+                return n;
+            }
+        }
 
         public Grid(Generation generator)
         {
             this.generator = generator;
             rows = new Dictionary<int, GridRow>();
+        }
+        public Grid(Generation generator, ICollection<LevelTile> tiles)
+        {
+            this.generator = generator;
+            rows = new Dictionary<int, GridRow>();
+            OverwriteTiles(tiles);
         }
 
         public GridRow Row(int y)
@@ -308,6 +370,30 @@ public class Generation : Core
                 }
             }
             return rowParent;
+        }
+
+        public LevelTile[] GetTiles()
+        {
+            LevelTile[] allTiles = new LevelTile[Count];
+            int i = 0;
+            foreach (GridRow row in rows.Values)
+            {
+                foreach (LevelTile tile in row.GetAll())
+                {
+                    allTiles[i++] = tile;
+                }
+            }
+            return allTiles;
+        }
+
+        public void OverwriteTiles(ICollection<LevelTile> tiles)
+        {
+            if (Count > 0)
+                Clear();
+            foreach (LevelTile tile in tiles)
+            {
+                Add(tile);
+            }
         }
 
         /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -371,6 +457,15 @@ public class Generation : Core
             }
             return false;
         }
+        public bool Add(LevelTile tile)
+        {
+            Vec2Int position = tile.gridPosition;
+            if (InBounds(position))
+            {
+                return Row(position.y).Add(position.x, tile);
+            }
+            return false;
+        }
 
         /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -380,8 +475,8 @@ public class Generation : Core
             {
                 if (kvp.Value != null)
                     kvp.Value.Clear(destroyTiles);
-                rows.Remove(kvp.Key);
             }
+            rows.Clear();
         }
 
         public bool Contains(int x, int y)
@@ -408,34 +503,38 @@ public class Generation : Core
 
         /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-        public void GenerateMeshes(bool[] debug = null)
+        /*public void GenerateMeshes(bool[] debug = null)
         {
             foreach (GridRow row in rows.Values)
                 row?.GenerateMeshes(debug);
-        }
+        }*/
 
         public void GenerateMiniTiles(Transform parentTransform, Material miniTileMat)
         {
-            foreach (GridRow row in rows.Values)
+            foreach (LevelRoom room in LevelManager.Rooms)
+            {
+                foreach (LevelTile tile in room.tiles)
+                {
+                    tile.SpawnMiniTile(parentTransform, miniTileMat, room.revealed);
+                }
+            }
+            foreach (LevelCorridor corr in LevelManager.Corridors)
+            {
+                foreach (LevelTile tile in corr.tiles)
+                {
+                    tile.SpawnMiniTile(parentTransform, miniTileMat, corr.revealed);
+                }
+            }
+            /*foreach (GridRow row in rows.Values)
             {
                 row.GenerateMiniTiles(parentTransform, miniTileMat);
-            }
+            }*/
         }
     }
 
+    public Grid TileGrid => LevelManager.TileGrid;
+
     #region [ OBJECTS / COMPONENTS ]
-
-    public Grid tiles { get { return LevelManager.TileGrid; } }
-
-    public List<LevelRoom> rooms { get { return LevelManager.Rooms; } }
-    public List<LevelCorridor> corridors { get { return LevelManager.Corridors; } }
-    public List<LevelArea> allAreas { get { return LevelManager.AllAreas; } }
-
-    public int spawnRoomInd { get; private set; }
-    public LevelRoom spawnRoom { get { return rooms.InBounds(spawnRoomInd) ? rooms[spawnRoomInd] : null; } }
-    public int endRoomInd { get; private set; }
-    public LevelRoom endRoom { get { return rooms.InBounds(endRoomInd) ? rooms[endRoomInd] : null; } }
-
 
     public Transform mapTransform;
     public Transform entityTransform;
@@ -443,8 +542,8 @@ public class Generation : Core
     public Transform miniMapTransform;
 
     public LevelTile tileTemplate;
-    public PlayerSpawn spawnPoint;
-    public GameObject endTarget;
+    public StageStart spawnPoint;
+    public StageEnd endTarget;
     public GameObject worldEnemy;
     public GameObject enemyPathAnchor;
     public GameObject worldItem;
@@ -483,16 +582,16 @@ public class Generation : Core
     public GameObject coll_roomWall;
 
 
-    public Material matWallRoom;
-    public Material MatWallRoom { get { return matWallRoom ?? UnityExt_Material.DefaultDiffuse; } }
-    public Material matWallCorridor;
-    public Material MatWallCorridor { get { return matWallCorridor ?? UnityExt_Material.DefaultDiffuse; } }
-    public Material matDoor;
-    public Material MatDoor { get { return matDoor ?? UnityExt_Material.DefaultDiffuse; } }
-    public Material matFloor;
-    public Material MatFloor { get { return matFloor ?? UnityExt_Material.DefaultDiffuse; } }
-    public Material matMiniMap;
-    public Material MatMiniMap { get { return matMiniMap ?? UnityExt_Material.DefaultDiffuse; } }
+    [SerializeField] Material matWallRoom;
+    public Material MatWallRoom { get { return matWallRoom ?? Ext_Material.DefaultDiffuse; } }
+    [SerializeField] Material matWallCorridor;
+    public Material MatWallCorridor { get { return matWallCorridor ?? Ext_Material.DefaultDiffuse; } }
+    [SerializeField] Material matDoor;
+    public Material MatDoor { get { return matDoor ?? Ext_Material.DefaultDiffuse; } }
+    [SerializeField] Material matFloor;
+    public Material MatFloor { get { return matFloor ?? Ext_Material.DefaultDiffuse; } }
+    [SerializeField] Material matMiniMap;
+    public Material MatMiniMap { get { return matMiniMap ?? Ext_Material.DefaultDiffuse; } }
 
     #endregion
 
@@ -502,8 +601,9 @@ public class Generation : Core
     public static LevelTile.TileType tEmpty = LevelTile.TileType.Empty;
     public static LevelTile.TileType tCorridor = LevelTile.TileType.Corridor;
     public static LevelTile.TileType tRoom = LevelTile.TileType.Room;
+    public static LevelArea.AreaType aRoom = LevelArea.AreaType.Room;
+    public static LevelArea.AreaType aCorridor = LevelArea.AreaType.Corridor;
 
-    [Header("Other Settings")]
     public float tileRadius = 6.0f;
     public float tileInnerRadius = 5.0f;
     public float miniTileRadius { get { return tileRadius * 0.1f; } }
@@ -518,12 +618,6 @@ public class Generation : Core
     public float wallHeight = 1.0f;
 
     public UVec2Int test;
-
-    #endregion
-
-    #region [ COROUTINES ]
-
-
 
     #endregion
 
@@ -605,24 +699,18 @@ public class Generation : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public void Generate(GenerationSettings settings)
+    public (List<LevelRoom>, List<LevelCorridor>) GenerateMap(int maxIterations, RoomStructureVariance roomVariance, CorridorStructureVariance corrVariance, bool connectToExisting)
     {
-        GenerateMap(settings.iterations, settings.roomStructure, settings.corridorStructure, settings.connectToExisting);
-        PopulateLevel(settings.enemyDensity, settings.itemDensity);
-    }
-
-    public void GenerateMap(int baseIterations, RoomStructureVariance roomVariance, CorridorStructureVariance corrVariance, bool connectToExisting)
-    {
-        tiles.Clear();
-        int maxIterations = baseIterations;
         int i, j, n;
         int nRooms = 1, nCorridors = 0, iterCount = 0;
 
         List<RoomSourceRef> newRooms = new List<RoomSourceRef>();
+        List<LevelRoom> rooms = new List<LevelRoom>();
         List<CorridorSourceRef> newCorridors = new List<CorridorSourceRef>();
+        List<LevelCorridor> corridors = new List<LevelCorridor>();
 
         LevelRoom newRoom = NewRoom(roomVariance, true, 0, roomDebug);
-        LevelManager.AddRoom(newRoom);
+        rooms.Add(newRoom);
         int nConnect = newRoom.ConnectionCount(roomDebug[3]);
         newCorridors.AddRange(newRoom.GetCorridorStarts(nConnect, connectToExisting, roomDebug[4]));
         LevelCorridor newCorridor;
@@ -640,12 +728,12 @@ public class Generation : Core
                 newCorridor = NewCorridor(corrVariance, newCorridors[j], nCorridors, corrDebug);
                 if (newCorridor != null)
                 {
-                    LevelManager.AddCorridor(newCorridor);
+                    corridors.Add(newCorridor);
                     newRooms.AddRange(newCorridor.GetRoomStarts());
                     foreach (Vec2Int pos in newCorridor.tilePositions)
                     {
-                        if (tiles[pos] != null)
-                            tiles[pos].connections.Replace();
+                        if (TileGrid[pos] != null)
+                            TileGrid[pos].connections.Replace();
                     }
                     nCorridors++;
                 }
@@ -659,127 +747,263 @@ public class Generation : Core
                 newRoom = NewRoom(roomVariance, newRooms[j], false, nRooms, roomDebug);
                 if (newRoom != null)
                 {
-                    LevelManager.AddRoom(newRoom);
+                    rooms.Add(newRoom);
                     if (i < maxIterations - 1)
                         nConnect = newRoom.ConnectionCount(roomDebug[3]) - (i > 2 ? branchRestrict++ : 0);
                     newCorridors.AddRange(newRoom.GetCorridorStarts(nConnect, roomDebug[4]));
                     foreach (Vec2Int pos in newRoom.tilePositions)
                     {
-                        if (tiles[pos] != null)
-                            tiles[pos].connections.Replace();
+                        if (TileGrid[pos] != null)
+                            TileGrid[pos].connections.Replace();
                     }
                     nRooms++;
                 }
             }
             newRooms.Clear();
 
-            if (newCorridors.Count == 0/* || rooms.Count >= roomCutoff*/)
+            if (newCorridors.Count == 0)
                 break;
         }
 
         if (endingDebug)
             Debug.Log("Iterations: " + iterCount + " | Total rooms: " + nRooms + " | Total corridors: " + nCorridors);
 
-        LevelManager.GetAllAreas();
-        tiles.GenerateMeshes(meshDebug);
-        GenerateFloorMeshes();
+        return (rooms, corridors);
     }
-
-    public void GenerateFloorMeshes()
+    /*public (List<LevelRoom>, List<LevelCorridor>) GenerateMap(MapGenSaveData existingData)
     {
-        foreach (LevelArea area in allAreas)
+        List<LevelRoom> rooms = new List<LevelRoom>();
+        List<LevelCorridor> corridors = new List<LevelCorridor>();
+
+        foreach (TileSaveData tileData in existingData.tiles)
         {
-            area.gameObject.GetOrAddComponent<MeshFilter>().sharedMesh = FloorMesh(area);
-            area.gameObject.GetOrAddComponent<MeshRenderer>().sharedMaterial = matFloor;
+            LevelTile newTile = UpdateTile(tileData.gridPosition, tileData.type, true);
+            newTile.connections.Overwrite(tileData.connections);
+            TileGrid.Add(newTile);
+        }
+        foreach (RoomSaveData roomData in existingData.rooms)
+        {
+            LevelRoom newRoom = NewObject("Room " + roomData.ID, mapTransform, typeof(LevelRoom)).GetComponent<LevelRoom>();
+            newRoom.Initialise(this, roomData);
+            rooms.Add(newRoom);
+        }
+        foreach (CorridorSaveData corrData in existingData.corridors)
+        {
+            LevelCorridor newCorr = NewObject("Room " + corrData.ID, mapTransform, typeof(LevelCorridor)).GetComponent<LevelCorridor>();
+            newCorr.Initialise(this, corrData);
+            corridors.Add(newCorr);
+        }
+
+        return (rooms, corridors);
+    }*/
+
+    public struct LevelPopulationData
+    {
+        public Vector3 spawnPosition;
+        public Vector3 endPosition;
+        public Dictionary<LevelArea.AreaID, WorldEnemySet> enemySets;
+        public Dictionary<LevelArea.AreaID, List<WorldItem>> items;
+
+        public LevelPopulationData(Vector3 spawnPosition, Vector3 endPosition, Dictionary<LevelArea.AreaID, WorldEnemySet> enemySets, Dictionary<LevelArea.AreaID, List<WorldItem>> items)
+        {
+            this.spawnPosition = spawnPosition;
+            this.endPosition = endPosition;
+            this.enemySets = enemySets;
+            this.items = items;
         }
     }
-
-    public void PopulateLevel(FloatRange enemyDensityRange, FloatRange itemDensityRange)
+    public LevelPopulationData PopulateLevel(FloatRange enemyDensityRange, FloatRange itemDensityRange)
     {
-        int i, j, iR;
+        int i, j, iR, roomCount = LevelManager.Rooms.Count;
         float enemyDensity = Random.Range(enemyDensityRange.lower, enemyDensityRange.upper);
         float itemDensity = Random.Range(itemDensityRange.lower, itemDensityRange.upper);
 
-        List<int> enemyAreaInds = new List<int>(), itemAreaInds = new List<int>();
-        HashSet<int> areasToPopulate = new HashSet<int>();
-        enemyAreaInds.IncrementalPopulate(0, 1, rooms.Count);
-        itemAreaInds.IncrementalPopulate(0, 1, rooms.Count);
-        for (i = 0; i < corridors.Count; i++)
+        Vector3 spawnPosition, endPosition;
+        LevelArea.AreaID spawnArea, endArea;
+        Dictionary<LevelArea.AreaID, WorldEnemySet> enemySets = new Dictionary<LevelArea.AreaID, WorldEnemySet>();
+        Dictionary<LevelArea.AreaID, List<WorldItem>> items = new Dictionary<LevelArea.AreaID, List<WorldItem>>();
+
+        List<LevelArea.AreaID> playerAreas, enemyAreas, itemAreas, areasToPopulate = new List<LevelArea.AreaID>();
+        playerAreas = LevelManager.AllAreas.GetIDs();
+        enemyAreas = LevelManager.Rooms.GetIDs();
+        itemAreas = LevelManager.Rooms.GetIDs();
+        foreach (LevelCorridor corr in LevelManager.Corridors)
         {
-            if (corridors[i].ValidItemPlacements().Length > 0)
-                itemAreaInds.Add(i + rooms.Count);
+            if (corr.ValidItemPlacements.Length > 0)
+                itemAreas.Add(corr.ID);
         }
 
-        iR = Random.Range(1, enemyAreaInds.Count);
-        spawnRoomInd = enemyAreaInds[iR];
-        rooms[spawnRoomInd].isStartRoom = true;
-        PlayerSpawn spawn = Instantiate(spawnPoint, rooms[spawnRoomInd].transform);
-        spawn.transform.position = rooms[spawnRoomInd].RandInternalPosition();
-        Debug.Log("Player Spawn Info\nRoom Index: " + spawnRoomInd + "\nRoom grid position: " + rooms[spawnRoomInd] + "\nWorld position of spawn: " + spawn.transform.position);
-        LevelManager.spawnPoint = spawn;
-        enemyAreaInds.RemoveAt(iR);
-        itemAreaInds.RemoveAt(iR);
+        iR = playerAreas.Count > 1 ? Random.Range(1, playerAreas.Count) : 0;
+        spawnArea = playerAreas[iR];
+        spawnPosition = LevelManager.RandPos(spawnArea);
+        if (playerAreas.Count > 1)
+            playerAreas.Remove(spawnArea);
 
-        iR = Random.Range(0, enemyAreaInds.Count);
-        endRoomInd = enemyAreaInds[iR];
+        if (enemyAreas.Contains(spawnArea) && enemyAreas.Count > 1)
+            enemyAreas.Remove(spawnArea);
 
-        int enemyCount = Mathf.RoundToInt(rooms.Count * enemyDensity);
+        iR = Random.Range(0, playerAreas.Count);
+        endArea = playerAreas[iR];
+        endPosition = LevelManager.RandPos(endArea);
+
+        int enemyCount = Mathf.RoundToInt(roomCount * enemyDensity);
         if (enemyCount < 2)
             enemyCount = 2;
-        int itemCount = Mathf.RoundToInt(rooms.Count * itemDensity);
+        int itemCount = Mathf.RoundToInt(roomCount * itemDensity);
         if (itemCount < 1)
             itemCount = 1;
-        
+
         for (i = 0; i < enemyCount; i++)
         {
-            iR = Random.Range(0, enemyAreaInds.Count);
-            LevelArea area = GetArea(enemyAreaInds[iR]);
+            iR = Random.Range(0, enemyAreas.Count);
+            LevelArea area = LevelManager.GetArea(enemyAreas[iR]);
             if (!area.containsEnemy)
             {
                 area.containsEnemy = true;
-                areasToPopulate.Add(enemyAreaInds[iR]);
-                enemyAreaInds.RemoveAt(iR);
+                enemyAreas.Transfer(iR, areasToPopulate);
+            }
+            if (enemyAreas.Count < 1)
+            {
+                if (i == enemyCount - 1)
+                    Debug.Log("Terminating enemy spawn selection early");
+                break;
             }
         }
+
         for (i = 0; i < itemCount; i++)
         {
-            iR = Random.Range(0, itemAreaInds.Count);
-            LevelArea area = GetArea(itemAreaInds[iR]);
+            iR = Random.Range(0, itemAreas.Count);
+            LevelArea area = LevelManager.GetArea(itemAreas[iR]);
             if (area.itemCount == 0)
-                areasToPopulate.Add(itemAreaInds[iR]);
+                areasToPopulate.AddIfUnique(itemAreas[iR]);
             if (!area.IncrementItemCount())
-                itemAreaInds.RemoveAt(iR);
+                itemAreas.RemoveAt(iR);
         }
 
-        int indAdj;
-        foreach (int index in areasToPopulate)
+        foreach (LevelArea.AreaID ID in areasToPopulate)
         {
-            indAdj = index > rooms.Count ? index - rooms.Count : index;
-            LevelArea area = GetArea(index);
+            LevelArea area = LevelManager.GetArea(ID);
             if (area != null)
             {
-                (PositionsInArea enemyPositions, PositionsInArea itemPositions) = area.SpawnPositions(indAdj);
+                (Vector3[] enemyPositions, Vector3[] itemPositions) = area.SpawnPositions();
                 if (enemyPositions.Length > 0)
                 {
-                    area.OverwriteEnemies(enemyPositions.Length);
+                    area.enemies = new WorldEnemySet(area);
+                    enemySets.TryAdd(area.ID, area.enemies);
                     for (i = 0; i < enemyPositions.Length; i++)
                     {
                         WorldEnemy newEnemy = Instantiate(worldEnemy, entityTransform).GetComponent<WorldEnemy>();
-                        area.enemies[i] = newEnemy;
-                        newEnemy.Setup(enemyPositions.Single(i), area.enemies);
+                        area.enemies.Add(newEnemy, enemyPositions[i]);
+                        if (newEnemy == null) Debug.Log("Null world enemy!");
                     }
                 }
                 if (itemPositions.Length > 0)
                 {
-                    area.OverwriteItems(itemPositions.Length);
+                    area.items = new List<WorldItem>();
+                    items.TryAdd(area.ID, area.items);
                     for (i = 0; i < itemPositions.Length; i++)
                     {
                         WorldItem newItem = Instantiate(worldItem, objectTransform).GetComponent<WorldItem>();
-                        (area.items[i] = newItem).transform.position = itemPositions[i];
+                        area.items.Add(newItem);
+                        newItem.Setup(area, itemPositions[i]);
                     }
                 }
             }
         }
+        return new LevelPopulationData(spawnPosition, endPosition, enemySets, items);
+    }
+
+    public (List<LevelRoom>, List<LevelCorridor>) GenerateRestMap() => (new List<LevelRoom>() { NewRestArea() }, new List<LevelCorridor>());
+
+    public LevelPopulationData PopulateRestLevel()
+    {
+        LevelPopulationData popData = new LevelPopulationData();
+        popData.spawnPosition = new Vector3(0f, 0f, -3f);
+        popData.endPosition = LevelManager.TileGrid.GetTiles().Last().position;
+        popData.enemySets = new Dictionary<LevelArea.AreaID, WorldEnemySet>();
+        WorldItem newItem = Instantiate(worldItem, objectTransform).GetComponent<WorldItem>();
+        if (LevelManager.Rooms[0].items == null)
+            LevelManager.Rooms[0].items = new List<WorldItem>() { newItem };
+        else
+            LevelManager.Rooms[0].items.Add(newItem);
+        newItem.Setup(LevelManager.Rooms[0], Vector3.zero);
+        popData.items = new Dictionary<LevelArea.AreaID, List<WorldItem>>() { { new LevelArea.AreaID(LevelArea.AreaType.Room, 0), new List<WorldItem>() { newItem } } };
+        return popData;
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public LevelTile[] LoadTiles(TileSaveData[] data)
+    {
+        LevelTile[] tiles = new LevelTile[data.Length];
+        for (int i = 0; i < tiles.Length; i++)
+        {
+            tiles[i] = Instantiate(tileTemplate, mapTransform);
+            tiles[i].SetAttributes(data[i].gridPosition, data[i].gridPosition.TilePosition(), data[i].type);
+            tiles[i].connections.Overwrite(data[i].connections);
+        }
+        return tiles;
+    }
+    public (List<LevelRoom>, List<LevelCorridor>) ReGenerateMap(MapGenSaveData mapGenData)
+    {
+        TileGrid.OverwriteTiles(LoadTiles(mapGenData.tiles));
+        List<LevelRoom> rooms = new List<LevelRoom>();
+        foreach (RoomSaveData roomData in mapGenData.rooms)
+        {
+            rooms.ReturnAdd(NewObject(mapTransform, typeof(LevelRoom)).GetComponent<LevelRoom>()).Initialise(this, roomData);
+        }
+        List<LevelCorridor> corridors = new List<LevelCorridor>();
+        foreach (CorridorSaveData corrData in mapGenData.corridors)
+        {
+            corridors.ReturnAdd(NewObject(mapTransform, typeof(LevelCorridor)).GetComponent<LevelCorridor>()).Initialise(this, corrData);
+        }
+        //Debug.Log(rooms.Count + " rooms, " + corridors.Count + " corridors");
+        return (rooms, corridors);
+    }
+
+    public LevelPopulationData RePopulateLevel(LevelPopSaveData lvlPopData)
+    {
+        Vector3 spawnPosition, endPosition;
+        Dictionary<LevelArea.AreaID, WorldEnemySet> enemySets = new Dictionary<LevelArea.AreaID, WorldEnemySet>();
+        Dictionary<LevelArea.AreaID, List<WorldItem>> items = new Dictionary<LevelArea.AreaID, List<WorldItem>>();
+
+        spawnPosition = new Vector3(lvlPopData.spawnPosition.x, 0f, lvlPopData.spawnPosition.y);
+        endPosition = new Vector3(lvlPopData.endPosition.x, 0f, lvlPopData.endPosition.y);
+
+        LevelArea.AreaID areaID;
+        LevelArea area;
+        foreach (EnemySetSaveData setData in lvlPopData.enemySetData)
+        {
+            areaID = new LevelArea.AreaID(setData.areaType, setData.areaID);
+            area = LevelManager.GetArea(areaID);
+            WorldEnemySet set = new WorldEnemySet(area);
+            enemySets.TryAdd(area.ID, set);
+            foreach (int ind in setData.enemyDataInds)
+            {
+                WorldEnemy newEnemy = Instantiate(worldEnemy, entityTransform).GetComponent<WorldEnemy>();
+                set.Add(newEnemy, area.RandInternalPosition());
+                newEnemy.SetData(ind);
+            }
+        }
+
+        List<WorldItem> list;
+        foreach (WorldItemSaveData itemData in lvlPopData.itemData)
+        {
+            areaID = new LevelArea.AreaID(itemData.areaType, itemData.areaID);
+            area = LevelManager.GetArea(areaID);
+            if (area.items == null)
+                area.items = new List<WorldItem>();
+            if (!items.ContainsKey(areaID))
+            {
+                list = new List<WorldItem>();
+                items.Add(areaID, list);
+            }
+            WorldItem newItem = Instantiate(worldItem, objectTransform).GetComponent<WorldItem>();
+            area.items.Add(newItem);
+            newItem.Setup(area, new Vector3(itemData.position.x, 0f, itemData.position.y));
+        }
+
+        return new LevelPopulationData(spawnPosition, endPosition, enemySets, items);
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -787,30 +1011,17 @@ public class Generation : Core
 
     public LevelTile UpdateTile(Vec2Int position, LevelTile.TileType type, bool overwrite = false)
     {
-        LevelTile tile = tiles.GetOrCreate(position, type);
+        LevelTile tile = TileGrid.GetOrCreate(position, type);
         bool typeSupercedes = type != tNone && tile.type == tNone;
         if (typeSupercedes || overwrite)
-            tile.SetAttributes(position, TilePosition(position), type);
+            tile.SetAttributes(position, position.TilePosition(), type);
         return tile;
     }
-    
-    public LevelTile UpdateTile(Vec2Int position, LevelTile.TileType type, LevelArea parent, bool overwrite = false)
-    {
-        LevelTile tile = tiles.GetOrCreate(position, type);
-        bool typeSupercedes = type != tNone && tile.type == tNone;
-        if (typeSupercedes || overwrite)
-            tile.SetAttributes(position, TilePosition(position), type);
-        if (parent.GetType() == typeof(LevelRoom))
-            tile.SetTransformParent(parent as LevelRoom);
-        else if (parent.GetType() == typeof(LevelCorridor))
-            tile.SetTransformParent(parent as LevelCorridor);
-        return tile;
-    }
-    
+
     public bool SetConnectionStates(Vec2Int position, HexGridDirection direction, LevelTile.ConnectionState state)
     {
         Vec2Int pos2 = HexGrid2D.Adjacent(position, direction);
-        LevelTile tileA = tiles[position], tileB = tiles[pos2];
+        LevelTile tileA = TileGrid[position], tileB = TileGrid[pos2];
         if (tileA != null && tileB != null)
         {
             tileA.connections[direction] = state;
@@ -821,98 +1032,6 @@ public class Generation : Core
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-    public List<AdjacentRef> Adjacent(Vec2Int position, LevelTile.TileType tileType)
-    {
-        List<AdjacentRef> selAdj = new List<AdjacentRef>();
-        HexGridDirection dir;
-        Vec2Int pos;
-        LevelTile tile;
-        for (int i = 0; i < 6; i++)
-        {
-            dir = (HexGridDirection)i;
-            pos = HexGrid2D.Adjacent(position, dir);
-            tile = tiles[pos];
-            if (tile == null)
-            {
-                if (tileType == tNone)
-                    selAdj.Add(new AdjacentRef(dir, pos, tileType));
-            }
-            else
-            {
-                if (tileType == tile.type)
-                    selAdj.Add(new AdjacentRef(dir, pos, tileType));
-            }
-        }
-        return selAdj;
-    }
-    
-    public (List<AdjacentRef>, List<AdjacentRef>, List<AdjacentRef>, List<AdjacentRef>) CategorisedAdjacent(Vec2Int position)
-    {
-        List<AdjacentRef> none = new List<AdjacentRef>();
-        List<AdjacentRef> empty = new List<AdjacentRef>();
-        List<AdjacentRef> corridor = new List<AdjacentRef>();
-        List<AdjacentRef> room = new List<AdjacentRef>();
-        HexGridDirection dir;
-        Vec2Int pos;
-        LevelTile tile;
-
-        for (int i = 0; i < 6; i++)
-        {
-            dir = (HexGridDirection)i;
-            pos = HexGrid2D.Adjacent(position, dir);
-            tile = tiles[pos];
-            LevelTile.TileType type = tile == null ? tNone : tile.type;
-            switch (type)
-            {
-                default:
-                case LevelTile.TileType.None:
-                    none.Add(new AdjacentRef(dir, pos, type));
-                    break;
-
-                case LevelTile.TileType.Empty:
-                    empty.Add(new AdjacentRef(dir, pos, type));
-                    break;
-
-                case LevelTile.TileType.Corridor:
-                    corridor.Add(new AdjacentRef(dir, pos, type));
-                    break;
-
-                case LevelTile.TileType.Room:
-                    room.Add(new AdjacentRef(dir, pos, type));
-                    break;
-            }
-        }
-
-        return (none, empty, corridor, room);
-    }
-
-    public Vector3 TilePosition(Vec2Int gridPosition)
-    {
-        Vector3 vect = Vector3.zero;
-        vect.x = (float)gridPosition.x * 1.5f * xOffset;
-        vect.z = ((float)gridPosition.y * 2.0f + (gridPosition.x % 2 == 0 ? 0.0f : 1.0f)) * zOffset;
-        return vect;
-    }
-
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-    private LevelArea GetArea(int index)
-    {
-        if (index < 0)
-            return null;
-
-        if (index < rooms.Count)
-            return rooms[index];
-
-        int indexAdj = index - rooms.Count;
-        if (indexAdj < corridors.Count)
-            return corridors[indexAdj];
-
-        Debug.Log("Original index: " + index + " --> " + rooms.Count + " rooms | Adjusted index: " + indexAdj + " --> " + corridors.Count + " corridors");
-        return null;
-    }
-    private LevelArea GetArea(bool room, int index) => room ? rooms[index] : corridors[index];
 
     private LevelRoom NewRoom(RoomStructureVariance roomVar, bool largeRoom, int ID = -1, bool[] debug = null)
     {
@@ -927,7 +1046,7 @@ public class Generation : Core
             startTile = source.startTile;
 
         LevelRoom room = null;
-        bool cont = !source.isNull || tiles[startTile] == null || tiles[startTile].emptySpace;
+        bool cont = !source.isNull || TileGrid[startTile] == null || TileGrid[startTile].emptySpace;
 
         if (cont)
         {
@@ -938,7 +1057,7 @@ public class Generation : Core
             WeightingCurve weighting = largeRoom ? WeightingCurve.None : WeightingCurve.Power;
             int tileCount = Ext_Random.RangeWeighted(sizeMin, sizeMax, weighting, false, 2.0f);
 
-            LevelTile newTile = UpdateTile(startTile, tRoom, room, true);
+            LevelTile newTile = UpdateTile(startTile, tRoom, true);
             newTile.AddAdditionalInfo("Room start tile");
             room.Add(newTile);
 
@@ -950,7 +1069,7 @@ public class Generation : Core
                 cTile = room.CentreTileIndex();
                 for (j = 0; j < room.tilePositions.Count; j++)
                 {
-                    localFree = Adjacent(room.tilePositions[j], tNone);
+                    localFree = room.tilePositions[j].Adjacent(tNone);
                     if (localFree != null && localFree.Count > 0)
                     {
                         if (j == cTile)
@@ -963,21 +1082,20 @@ public class Generation : Core
                 if (allFree.Count > 0)
                 {
                     targ = allFree[Random.Range(0, allFree.Count)].position;
-                    newTile = tiles.GetOrCreate(targ, tRoom);
+                    newTile = TileGrid.GetOrCreate(targ, tRoom);
                     if (newTile == null)
                     {
-                        if (debug[0])
+                        if (debug != null && debug[0])
                             Debug.Log("Failed to update tile at " + targ.ToString() + " on iteration " + i);
                     }
                     else
                     {
                         room.Add(newTile);
                     }
-                    //newTile.SetTransformParent(room);
                 }
                 else
                 {
-                    if (debug[1])
+                    if (debug != null && debug[1])
                         Debug.Log("No new tile positions available on iteration " + i + "!");
                     break;
                 }
@@ -993,11 +1111,28 @@ public class Generation : Core
 
         if (room != null)
         {
-            if (debug[2])
+            if (debug != null && debug[2])
                 room.DebugInternalConnections();
             else
                 room.InternalConnections();
         }
+        return room;
+    }
+    public LevelRoom NewRestArea()
+    {
+        LevelTile[] tiles = new LevelTile[]
+        {
+            UpdateTile(new Vec2Int(0, 0), tRoom),
+            UpdateTile(new Vec2Int(0, 1), tRoom),
+        };
+        tiles[0].connections.Overwrite(new int[] { 2, 1, 1, 1, 1, 1 });
+        tiles[1].connections.Overwrite(new int[] { 1, 1, 1, 2, 1, 1 });
+
+        LevelRoom room = NewObject("Room " + 0, mapTransform, typeof(LevelRoom)).GetComponent<LevelRoom>();
+        room.Initialise(this, 0);
+        room.Add(tiles[0]);
+        room.Add(tiles[1]);
+
         return room;
     }
 
@@ -1017,16 +1152,15 @@ public class Generation : Core
         LevelCorridor corr = NewObject("Corridor " + ID, mapTransform, typeof(LevelCorridor)).GetComponent<LevelCorridor>();
         corr.Initialise(this, source.sourceRoom, ID, startTile, initDir);
 
-        if (debug[0] && tiles[initPos] == null)
+        List<LevelTile> tiles = new List<LevelTile>();
+        if (debug != null && debug[0] && TileGrid[initPos] == null)
             Debug.LogError("Corridor source tile " + initPos.ToString() + " is null!");
         firstTile = corr.mainBranch.tiles.Last();
-        LevelTile newTile = UpdateTile(firstTile, tCorridor);
-        corr.AddTile(newTile);
-        //newTile.SetTransformParent(corr);
+        tiles.Add(UpdateTile(firstTile, tCorridor));
 
         if (!SetConnectionStates(initPos, initDir, LevelTile.ConnectionState.Connect) && debug[1])
         {
-            string logString = "Can't connect a null tile!" + (tiles[initPos] == null ? " | From tile " + initPos.ToString() + " is null" : null) + (tiles[firstTile] == null ? " | To tile " + firstTile.ToString() + " is null" : null);
+            string logString = "Can't connect a null tile!" + (TileGrid[initPos] == null ? " | From tile " + initPos.ToString() + " is null" : null) + (TileGrid[firstTile] == null ? " | To tile " + firstTile.ToString() + " is null" : null);
             Debug.LogError(logString);
         }
 
@@ -1050,7 +1184,7 @@ public class Generation : Core
                 if (branch.child != null && (branch.tiles.Count - 1) == branch.childStartsAt)
                     lastDir = lastDir.Rotate(-2);
 
-                (localNone, _, localCorridor, localRoom) = CategorisedAdjacent(lastPos);
+                (localNone, _, localCorridor, localRoom) = lastPos.CategorisedAdjacent();
                 ending = false;
                 connecting = false;
                 chance = Random.Range(0.0f, 1.0f);
@@ -1060,7 +1194,7 @@ public class Generation : Core
                 if (noFreeSpace)
                 {
                     ending = true;
-                    if (debug[5])
+                    if (debug != null && debug[5])
                         Debug.Log("Branch terminating due to lack of available positions\nOrigin tile: " + corr.startTile + "\nBranch index: " + branch.index);
                     if (localRoom.Count > 0)
                         next = branch.GetConnectionTile(lastPos, localRoom, lastDir, true, debug[2]);
@@ -1073,7 +1207,7 @@ public class Generation : Core
                 else if (i == (maxLength - 1))
                 {
                     ending = true;
-                    if (debug[5])
+                    if (debug != null && debug[5])
                         Debug.Log("Branch terminating due to corridor reaching maximum length\nCorridor length: " + (i + 1) + "\n Branch length: " + (branch.tiles.Count + 1) + "\nOrigin tile: " + corr.startTile + "\nBranch index: " + branch.index);
                     if (localRoom.Count > 0 && chance >= 0.65f)
                         next = branch.GetConnectionTile(lastPos, localRoom, lastDir, true, debug[2]);
@@ -1090,7 +1224,7 @@ public class Generation : Core
                 {
                     if (localRoom.Count > 0 && chance >= 0.90f)
                     {
-                        if (debug[5])
+                        if (debug != null && debug[5])
                             Debug.Log("Branch terminating due to random chance\nOrigin tile: " + corr.startTile + "\nBranch index: " + branch.index);
                         next = branch.GetConnectionTile(lastPos, localRoom, lastDir, true, debug[2]);
                         ending = true;
@@ -1098,7 +1232,7 @@ public class Generation : Core
                     }
                     else if (localCorridor.Count > 0 && chance <= 0.10f)
                     {
-                        if (debug[5])
+                        if (debug != null && debug[5])
                             Debug.Log("Branch terminating due to random chance\nOrigin tile: " + corr.startTile + "\nBranch index: " + branch.index);
                         next = branch.GetConnectionTile(lastPos, localCorridor, lastDir, true, debug[2]);
                         ending = true;
@@ -1127,7 +1261,7 @@ public class Generation : Core
                         }
                         branch.terminated = true;
                         string debugStr = "Corridor branch terminated at " + nextPos + "\nCorridor origin: " + corr.startTile + "\nEnded with ";
-                        if (debug[4])
+                        if (debug != null && debug[4])
                         {
                             switch (branch.terminateType)
                             {
@@ -1144,8 +1278,7 @@ public class Generation : Core
                         {
                             newBranches.Add(branch.index);
                         }
-                        newTile = UpdateTile(nextPos, tCorridor);
-                        corr.AddTile(newTile);
+                        tiles.Add(UpdateTile(nextPos, tCorridor));
                     }
                     SetConnectionStates(lastPos, nextDir, LevelTile.ConnectionState.Connect);
                 }
@@ -1156,78 +1289,42 @@ public class Generation : Core
             {
                 corr.SplitBranch(newBranches[j]);
             }
-
         }
+
+        corr.GetTiles(true);
+        corr.AddTiles(tiles);
+        foreach (LevelTile tile in corr.tiles)
+            tile.AddAdditionalInfo("Included in corridor " + corr.ID.value);
 
         db_endPositions = db_endPositions.Substring(0, db_endPositions.Length - 2);
         debugInfo += "\nMax length: " + maxLength + " | Total branches: " + db_totalCorridorBranches + "\n" + db_endPositions + " ]";
 
-        if (debug[3])
+        if (debug != null && debug[3])
             Debug.Log(debugInfo);
+
+        /*if (corr.tileCountMismatch)
+            Debug.Log("Corridor " + corr.ID.value + "'s tile count is mismatched!");*/
 
         return corr;
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    public (Mesh, Mesh) RoomTileMesh(Vec2Int tilePos) => CorridorTileMesh(TileGrid[tilePos].connections);
     public (Mesh, Mesh) RoomTileMesh(LevelTile.HexConnections connections, bool[] debug = null)
     {
-        if (debug[1])
+        if (debug != null && debug[1])
             Debug.Log("Generating room tile mesh with the following connections:\n" + connections.ToString());
 
-        List<GameObject> components = new List<GameObject>();
-        List<GameObject> coll_components = new List<GameObject>();
-        Vector3 rot;
-        HexGridDirection dir;
-        LevelTile.ConnectionState conn, connL, connR;
-        int i, iters = 0;
-        for (i = 0; i < connections.Length; ++i)
-        {
-            rot = new Vector3(0.0f, (float)i * 60.0f + meshRotation, 0.0f);
-            dir = (HexGridDirection)i;
-            conn = connections[dir];
-            connL = connections[dir.Rotate(-1)];
-            connR = connections[dir.Rotate(1)];
-            if (debug[2])
-                Debug.Log(dir.ToString() + " --> [L] " + dir.Rotate(-1).ToString() + " / [R] " + dir.Rotate(1).ToString());
-            if (conn == LevelTile.ConnectionState.Merge)
-            {
-                if (connL != LevelTile.ConnectionState.Merge)
-                {
-                    components.AddClone(roomConnectorL, null).transform.eulerAngles = rot;
-                    coll_components.AddClone(coll_roomConnectorL, null).transform.eulerAngles = rot;
-                }
-                if (connR != LevelTile.ConnectionState.Merge)
-                {
-                    components.AddClone(roomConnectorR, null).transform.eulerAngles = rot;
-                    coll_components.AddClone(coll_roomConnectorR, null).transform.eulerAngles = rot;
-                }
-            }
-            else
-            {
-                if (conn == LevelTile.ConnectionState.Connect)
-                {
-                    components.AddClone(roomDoorway, null).transform.eulerAngles = rot;
-                    coll_components.AddClone(coll_roomDoorway, null).transform.eulerAngles = rot;
-                }
-                else
-                {
-                    components.AddClone(roomWall, null).transform.eulerAngles = rot;
-                    coll_components.AddClone(coll_roomWall, null).transform.eulerAngles = rot;
-                }
-
-                if (connR != LevelTile.ConnectionState.Merge)
-                    components.AddClone(roomWallCorner, null).transform.eulerAngles = rot;
-            }
-            iters++;
-        }
+        List<GameObject> components = new List<GameObject>(), coll_components = new List<GameObject>();
+        (components, coll_components) = GetComponents(connections, debug != null && debug[2]);
 
         int nComponents = components.Count;
         string compVertCounts = nComponents > 0 ? "Vertex count per component:" : "Vertex count per component:\n < No components >";
-        if (debug[5])
+        if (debug != null && debug[5])
         {
             Mesh _mesh;
-            for (i = 0; i < components.Count; i++)
+            for (int i = 0; i < components.Count; i++)
             {
                 _mesh = components[i].GetMesh();
                 if (_mesh != null)
@@ -1236,25 +1333,75 @@ public class Generation : Core
         }
 
         components.Rescale(wallHeight, Axis.Y);
-        coll_components.Rescale(wallHeight, Axis.Y);
-        Mesh meshOut = UnityExt_Mesh.MergeFrom(components, true);
-        Mesh coll_meshOut = UnityExt_Mesh.MergeFrom(coll_components, true);
+        Mesh meshOut = Ext_Mesh.MergeFrom(components, true);
 
-        if (debug[3])
+        coll_components.Rescale(wallHeight, Axis.Y);
+        Mesh coll_meshOut = Ext_Mesh.MergeFrom(coll_components, true);
+
+        if (debug != null && debug[3])
         {
-            if (debug[5])
-                Debug.Log("[Room] " + nComponents + " components generated for mesh" + (debug[0] ? " with " + meshOut.vertexCount + " vertices" : null) + "\n" + compVertCounts);
+            if (debug != null && debug[5])
+                Debug.Log("[Room] " + nComponents + " components generated for mesh" + (debug != null && debug[0] ? " with " + meshOut.vertexCount + " vertices" : null) + "\n" + compVertCounts);
             else
                 Debug.Log("[Room] " + nComponents + " components generated for mesh");
         }
-        else if (debug[5])
+        else if (debug != null && debug[5])
         {
             Debug.Log(compVertCounts);
         }
 
         return (meshOut, coll_meshOut);
     }
-    public (Mesh, Mesh) RoomTileMesh(Vec2Int tilePos) => CorridorTileMesh(tiles[tilePos].connections);
+    private (List<GameObject>, List<GameObject>) GetComponents(LevelTile.HexConnections connections, bool debug = false)
+    {
+        List<GameObject> components = new List<GameObject>(), coll_components = new List<GameObject>();
+        Quaternion rot;
+        HexGridDirection dir;
+        LevelTile.ConnectionState conn, connL, connR;
+
+        int i, iters = 0;
+        for (i = 0; i < connections.Length; ++i)
+        {
+            rot = Quaternion.Euler(new Vector3(0.0f, (float)i * 60.0f + meshRotation, 0.0f));
+            dir = (HexGridDirection)i;
+            conn = connections[dir]; connL = connections[dir.Rotate(-1)]; connR = connections[dir.Rotate(1)];
+
+            if (debug)
+                Debug.Log(dir.ToString() + " --> [L] " + dir.Rotate(-1).ToString() + " / [R] " + dir.Rotate(1).ToString());
+
+            if (conn == LevelTile.ConnectionState.Merge)
+            {
+                if (connL != LevelTile.ConnectionState.Merge)
+                {
+                    components.AddClone(roomConnectorL, Vector3.zero, rot, null);
+                    coll_components.AddClone(coll_roomConnectorL, Vector3.zero, rot, null);
+                }
+                if (connR != LevelTile.ConnectionState.Merge)
+                {
+                    components.AddClone(roomConnectorR, Vector3.zero, rot, null);
+                    coll_components.AddClone(coll_roomConnectorR, Vector3.zero, rot, null);
+                }
+            }
+            else
+            {
+                if (conn == LevelTile.ConnectionState.Connect)
+                {
+                    components.AddClone(roomDoorway, Vector3.zero, rot, null);
+                    coll_components.AddClone(coll_roomDoorway, Vector3.zero, rot, null);
+                }
+                else
+                {
+                    components.AddClone(roomWall, Vector3.zero, rot, null);
+                    coll_components.AddClone(coll_roomWall, Vector3.zero, rot, null);
+                }
+
+                if (connR != LevelTile.ConnectionState.Merge)
+                    components.AddClone(roomWallCorner, Vector3.zero, rot, null);
+            }
+            iters++;
+        }
+        return (components, coll_components);
+    }
     
     private static float[] r = new float[]
     {
@@ -1588,7 +1735,7 @@ public class Generation : Core
             new KeyValuePair<int, float>(5, r[0]),
             new KeyValuePair<int, float>(5, r[1]),
             new KeyValuePair<int, float>(5, r[2]),
-            new KeyValuePair<int, float>(5, r[4]),
+            new KeyValuePair<int, float>(5, r[5]),
         },
         new KeyValuePair<int, float>[]/*56*/
         {
@@ -1687,15 +1834,15 @@ public class Generation : Core
 
     public (Mesh, Mesh) CorridorTileMesh(LevelTile.HexConnections connections, bool[] debug = null)
     {
-        if (debug[1])
+        if (debug != null && debug[1])
             Debug.Log("Generating corridor tile mesh with the following connections:\n" + connections.ToString());
 
         List<GameObject> components, coll_components;
-        (components, coll_components) = CorridorTileMeshComponents(connections, debug[4]);
+        (components, coll_components) = CorridorTileMeshComponents(connections, debug != null && debug[4]);
 
         int i, nComponents = components.Count;
         string compVertCounts = nComponents > 0 ? "Vertex count per component:" : "Vertex count per component:\n < No components >";
-        if (debug[5])
+        if (debug != null && debug[5])
         {
             Mesh _mesh;
             for (i = 0; i < components.Count; i++)
@@ -1708,24 +1855,24 @@ public class Generation : Core
 
         components.Rescale(wallHeight, Axis.Y);
         coll_components.Rescale(wallHeight, Axis.Y);
-        Mesh meshOut = UnityExt_Mesh.MergeFrom(components, true);
-        Mesh coll_meshOut = UnityExt_Mesh.MergeFrom(coll_components, true);
+        Mesh meshOut = Ext_Mesh.MergeFrom(components, true);
+        Mesh coll_meshOut = Ext_Mesh.MergeFrom(coll_components, true);
 
-        if (debug[3])
+        if (debug != null && debug[3])
         {
-            if (debug[5])
-                Debug.Log("[Corridor] " + nComponents + " components " + (debug[0] ? " --> " + meshOut.vertexCount + " vertices" : "generated for mesh") + "\n" + compVertCounts);
+            if (debug != null && debug[5])
+                Debug.Log("[Corridor] " + nComponents + " components " + (debug != null && debug[0] ? " --> " + meshOut.vertexCount + " vertices" : "generated for mesh") + "\n" + compVertCounts);
             else
                 Debug.Log("[Corridor] " + nComponents + " components generated for mesh");
         }
-        else if (debug[5])
+        else if (debug != null && debug[5])
         {
             Debug.Log(compVertCounts);
         }
 
         return (meshOut, coll_meshOut);
     }
-    public (Mesh, Mesh) CorridorTileMesh(Vec2Int tilePos) => CorridorTileMesh(tiles[tilePos].connections);
+    public (Mesh, Mesh) CorridorTileMesh(Vec2Int tilePos) => CorridorTileMesh(TileGrid[tilePos].connections);
 
     public Mesh FloorMesh(LevelArea area)
     {
@@ -1740,7 +1887,7 @@ public class Generation : Core
             adj = HexGrid2D.AllAdjacent(gPos);
             for (i = 0; i < 6; i++)
             {
-                emptyAdj[i] = tiles.EmptyAt(adj[i]);
+                emptyAdj[i] = TileGrid.EmptyAt(adj[i]);
             }
 
             for (i = 0, iL = 5, iR = 1; i < 6; i++, iL++, iR++)
@@ -1773,7 +1920,7 @@ public class Generation : Core
                 component.transform.position = tile.transform.position;
             }
         }
-        return UnityExt_Mesh.MergeFrom(components, true);
+        return Ext_Mesh.MergeFrom(components, true);
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -1819,8 +1966,8 @@ public class Generation : Core
                 }
                 components.AddRange(CorridorTileMeshComponents(connections));
                 GameObject obj = NewObject((a + " | " + connections.ToString(true)), transform, pos, typeof(MeshFilter), typeof(MeshRenderer));
-                obj.GetComponent<MeshFilter>().sharedMesh = UnityExt_Mesh.MergeFrom(components, false);
-                obj.GetComponent<MeshRenderer>().sharedMaterial = UnityExt_Material.DefaultDiffuse;
+                obj.GetComponent<MeshFilter>().sharedMesh = Ext_Mesh.MergeFrom(components, false);
+                obj.GetComponent<MeshRenderer>().sharedMaterial = Ext_Material.DefaultDiffuse;
                 foreach (GameObject cObj in components)
                     cObj.transform.SetParent(obj.transform, false);
                 components.Clear();
@@ -1829,20 +1976,21 @@ public class Generation : Core
     }*/
 }
 
+#if UNITY_EDITOR
 [CustomEditor(typeof(Generation))]
 [CanEditMultipleObjects]
 public class GenerationEditor : Editor
 {
     private Generation targ { get { return target as Generation; } }
-    Rect rect, toggleRect;
-    GUIContent label = new GUIContent() { tooltip = null };
+    private Rect rect, toggleRect;
+    private GUIContent label = new GUIContent() { tooltip = null };
 
-    bool showObjects = false;
-    bool showComponents = false;
-    bool showCollComponents = false;
-    bool showMaterials = false;
-    bool showSettings = false;
-    bool showDebug = false;
+    private static bool showObjects;
+    private static bool showComponents;
+    private static bool showCollComponents;
+    private static bool showMaterials;
+    private static bool showSettings;
+    private static bool showDebug;
 
     private Object ObjField(string labelText, Object obj, System.Type type)
     {
@@ -1896,20 +2044,29 @@ public class GenerationEditor : Editor
                 EditorElements.BeginSubSection(10, 0);
                 {
                     EditorElements.SectionHeader("Transform Parents");
-                    targ.mapTransform = TrnField("Map Transform", targ.mapTransform);
-                    targ.entityTransform = TrnField("Entity Transform", targ.entityTransform);
-                    targ.objectTransform = TrnField("Object Transform", targ.objectTransform);
-                    targ.miniMapTransform = TrnField("Minimap Transform", targ.miniMapTransform);
+                    label.text = "Map Transform";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("mapTransform"), label);
+                    label.text = "Entity Transform";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("entityTransform"), label);
+                    label.text = "Object Transform";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("objectTransform"), label);
+                    label.text = "Minimap Transform";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("miniMapTransform"), label);
                     EditorGUILayout.Space(4);
 
                     EditorElements.SectionHeader("Templates");
-                    targ.tileTemplate = ObjField("Tile Template", targ.tileTemplate, typeof(LevelTile)) as LevelTile;
-                    targ.spawnPoint = ObjField("Spawn Point", targ.spawnPoint, typeof(PlayerSpawn)) as PlayerSpawn;
-                    targ.endTarget = ObjField("End Target", targ.endTarget, typeof(GameObject)) as GameObject;
-                    targ.worldEnemy = ObjField("World Enemy", targ.worldEnemy, typeof(GameObject)) as GameObject;
-                    targ.enemyPathAnchor = ObjField("Path Anchor", targ.enemyPathAnchor, typeof(GameObject)) as GameObject;
-                    targ.worldItem = ObjField("World Item", targ.worldItem, typeof(GameObject)) as GameObject;
-
+                    label.text = "Tile Template";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("tileTemplate"), label);
+                    label.text = "Spawn Point";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("spawnPoint"), label);
+                    label.text = "End Target";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("endTarget"), label);
+                    label.text = "World Enemy";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("worldEnemy"), label);
+                    /*label.text = "Path Anchor";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("enemyPathAnchor"), label);*/
+                    label.text = "World Item";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("worldItem"), label);
                 }
                 EditorElements.EndSubSection();
             }
@@ -1920,28 +2077,44 @@ public class GenerationEditor : Editor
                 EditorElements.BeginSubSection(10, 0);
                 {
                     EditorElements.SectionHeader("Corridor");
-                    targ.corridorConn060 = ObjField("60° Inner", targ.corridorConn060, typeof(GameObject)) as GameObject;
-                    targ.corridorConn300 = ObjField("60° Outer", targ.corridorConn300, typeof(GameObject)) as GameObject;
-                    targ.corridorConn120 = ObjField("120° Inner", targ.corridorConn120, typeof(GameObject)) as GameObject;
-                    targ.corridorConn240 = ObjField("120° Outer", targ.corridorConn240, typeof(GameObject)) as GameObject;
-                    targ.corridorConn180 = ObjField("Straight", targ.corridorConn180, typeof(GameObject)) as GameObject;
-                    targ.corridorConn360 = ObjField("End", targ.corridorConn360, typeof(GameObject)) as GameObject;
+                    label.text = "60° Inner";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("corridorConn060"), label);
+                    label.text = "60° Outer";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("corridorConn300"), label);
+                    label.text = "120° Inner";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("corridorConn120"), label);
+                    label.text = "120° Outer";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("corridorConn240"), label);
+                    label.text = "Straight";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("corridorConn180"), label);
+                    label.text = "End";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("corridorConn360"), label);
                     EditorGUILayout.Space(4);
 
                     EditorElements.SectionHeader("Room");
-                    targ.roomWall = ObjField("Wall", targ.roomWall, typeof(GameObject)) as GameObject;
-                    targ.roomDoorway = ObjField("Doorway", targ.roomDoorway, typeof(GameObject)) as GameObject;
-                    targ.roomWallCorner = ObjField("Wall Corner", targ.roomWallCorner, typeof(GameObject)) as GameObject;
-                    targ.roomConnectorL = ObjField("Connector (Left)", targ.roomConnectorL, typeof(GameObject)) as GameObject;
-                    targ.roomConnectorR = ObjField("Connector (Right)", targ.roomConnectorR, typeof(GameObject)) as GameObject;
+                    label.text = "Wall";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("roomWall"), label);
+                    label.text = "Doorway";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("roomDoorway"), label);
+                    label.text = "Wall Corner";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("roomWallCorner"), label);
+                    label.text = "Connector (Left)";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("roomConnectorL"), label);
+                    label.text = "Connector (Right)";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("roomConnectorR"), label);
                     EditorGUILayout.Space(4);
 
                     EditorElements.SectionHeader("Floor");
-                    targ.floorInner = ObjField("Inner", targ.floorInner, typeof(GameObject)) as GameObject;
-                    targ.floorEdge = ObjField("Edge", targ.floorEdge, typeof(GameObject)) as GameObject;
-                    targ.floorLeftI2E = ObjField("Left To Edge", targ.floorLeftI2E, typeof(GameObject)) as GameObject;
-                    targ.floorRightI2E = ObjField("Right To Edge", targ.floorRightI2E, typeof(GameObject)) as GameObject;
-                    targ.floorBothI2E = ObjField("Both To Edge", targ.floorBothI2E, typeof(GameObject)) as GameObject;
+                    label.text = "Inner";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("floorInner"), label);
+                    label.text = "Edge";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("floorEdge"), label);
+                    label.text = "Left To Edge";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("floorLeftI2E"), label);
+                    label.text = "Right To Edge";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("floorRightI2E"), label);
+                    label.text = "Both To Edge";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("floorBothI2E"), label);
                     EditorGUILayout.Space(0);
                 }
                 EditorElements.EndSubSection();
@@ -1953,19 +2126,29 @@ public class GenerationEditor : Editor
                 EditorElements.BeginSubSection(10, 0);
                 {
                     EditorElements.SectionHeader("Corridor");
-                    targ.coll_corridorConn060 = ObjField("60° Inner", targ.coll_corridorConn060, typeof(GameObject)) as GameObject;
-                    targ.coll_corridorConn300 = ObjField("60° Outer", targ.coll_corridorConn300, typeof(GameObject)) as GameObject;
-                    targ.coll_corridorConn120 = ObjField("120° Inner", targ.coll_corridorConn120, typeof(GameObject)) as GameObject;
-                    targ.coll_corridorConn240 = ObjField("120° Outer", targ.coll_corridorConn240, typeof(GameObject)) as GameObject;
-                    targ.coll_corridorConn180 = ObjField("Straight", targ.coll_corridorConn180, typeof(GameObject)) as GameObject;
-                    targ.coll_corridorConn360 = ObjField("End", targ.coll_corridorConn360, typeof(GameObject)) as GameObject;
+                    label.text = "60° Inner";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("coll_corridorConn060"), label);
+                    label.text = "60° Outer";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("coll_corridorConn300"), label);
+                    label.text = "120° Inner";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("coll_corridorConn120"), label);
+                    label.text = "120° Outer";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("coll_corridorConn240"), label);
+                    label.text = "Straight";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("coll_corridorConn180"), label);
+                    label.text = "End";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("coll_corridorConn360"), label);
                     EditorGUILayout.Space(4);
 
                     EditorElements.SectionHeader("Room");
-                    targ.coll_roomWall = ObjField("Wall", targ.coll_roomWall, typeof(GameObject)) as GameObject;
-                    targ.coll_roomDoorway = ObjField("Doorway", targ.coll_roomDoorway, typeof(GameObject)) as GameObject;
-                    targ.coll_roomConnectorL = ObjField("Connector (Left)", targ.coll_roomConnectorL, typeof(GameObject)) as GameObject;
-                    targ.coll_roomConnectorR = ObjField("Connector (Right)", targ.coll_roomConnectorR, typeof(GameObject)) as GameObject;
+                    label.text = "Wall";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("coll_roomWall"), label);
+                    label.text = "Doorway";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("coll_roomDoorway"), label);
+                    label.text = "Connector (Left)";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("coll_roomConnectorL"), label);
+                    label.text = "Connector (Right)";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("coll_roomConnectorR"), label);
                     EditorGUILayout.Space(0);
                 }
                 EditorElements.EndSubSection();
@@ -1976,11 +2159,16 @@ public class GenerationEditor : Editor
             {
                 EditorElements.BeginSubSection(10, 0);
                 {
-                    targ.matWallRoom = MatField("Wall (Room)", targ.matWallRoom);
-                    targ.matWallCorridor = MatField("Wall (Corridor)", targ.matWallCorridor);
-                    targ.matMiniMap = MatField("Wall (Minimap)", targ.matMiniMap);
-                    targ.matFloor = MatField("Floor", targ.matFloor);
-                    targ.matDoor = MatField("Door", targ.matDoor);
+                    label.text = "Wall (Room)";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("matWallRoom"), label);
+                    label.text = "Wall (Corridor)";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("matWallCorridor"), label);
+                    label.text = "Wall (Minimap)";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("matMiniMap"), label);
+                    label.text = "Floor";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("matFloor"), label);
+                    label.text = "Door";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("matDoor"), label);
                 }
                 EditorElements.EndSubSection();
             }
@@ -1990,19 +2178,24 @@ public class GenerationEditor : Editor
             {
                 EditorElements.BeginSubSection(10, 0);
                 {
-                    targ.tileRadius = FloatField("Tile Radius (Outer)", targ.tileRadius);
-                    targ.tileInnerRadius = FloatField("Tile Radius (Inner)", targ.tileInnerRadius);
-                    targ.switchRadiusAxis = Toggle("Switch Radius Axis", targ.switchRadiusAxis);
-                    targ.radiusToCorner = Toggle("Radius Measures To Corner", targ.radiusToCorner);
-                    label.text = "Mesh Rotation";
+                    label.text = "Tile Radius";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("tileRadius"), label);
+                    label.text = "Internal Tile Radius";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("tileInnerRadius"), label);
+                    label.text = "Switch Radius Axis";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("switchRadiusAxis"), label);
+                    label.text = "Measure To Corner";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("radiusToCorner"), label);
+                    /*label.text = "Mesh Rotation";
                     rect = EditorElements.PrefixLabel(label);
                     targ.meshRotation = EditorElements.Slider(rect, targ.meshRotation, 0, 360);
                     EditorGUILayout.Space(1);
                     label.text = "Room Merge Chance";
                     rect = EditorElements.PrefixLabel(label);
                     targ.mergeRooms = EditorElements.PercentSlider(rect, targ.mergeRooms, 2, false);
-                    EditorGUILayout.Space(1);
-                    targ.wallHeight = FloatField("Wall Height", targ.wallHeight);
+                    EditorGUILayout.Space(1);*/
+                    label.text = "Wall Height";
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("wallHeight"), label);
                 }
                 EditorElements.EndSubSection();
             }
@@ -2050,9 +2243,418 @@ public class GenerationEditor : Editor
             }
         }
         EditorElements.EndHorizVert();
+        serializedObject.ApplyModifiedProperties();
+    }
+}
+#endif
+
+public static class GenerationUtility
+{
+    private static Generation.Grid TileGrid => Core.LevelManager.TileGrid;
+    private static Generation Generator => Core.LevelManager.Generator;
+
+    public static List<LevelArea.AreaID> GetIDs<T>(this List<T> areas) where T : LevelArea
+    {
+        List<LevelArea.AreaID> IDs = new List<LevelArea.AreaID>();
+        foreach (LevelArea area in areas)
+        {
+            IDs.Add(area.ID);
+        }
+        return IDs;
+    }
+
+    public static List<AdjacentRef> Adjacent(this Vec2Int position, LevelTile.TileType tileType)
+    {
+        List<AdjacentRef> selAdj = new List<AdjacentRef>();
+        HexGridDirection dir;
+        Vec2Int pos;
+        LevelTile tile;
+        for (int i = 0; i < 6; i++)
+        {
+            dir = (HexGridDirection)i;
+            pos = HexGrid2D.Adjacent(position, dir);
+            tile = TileGrid[pos];
+            if (tile == null)
+            {
+                if (tileType == LevelTile.TileType.None)
+                    selAdj.Add(new AdjacentRef(dir, pos, tileType));
+            }
+            else
+            {
+                if (tileType == tile.type)
+                    selAdj.Add(new AdjacentRef(dir, pos, tileType));
+            }
+        }
+        return selAdj;
+    }
+
+    public static (List<AdjacentRef>, List<AdjacentRef>, List<AdjacentRef>, List<AdjacentRef>) CategorisedAdjacent(this Vec2Int position)
+    {
+        List<AdjacentRef> none = new List<AdjacentRef>();
+        List<AdjacentRef> empty = new List<AdjacentRef>();
+        List<AdjacentRef> corridor = new List<AdjacentRef>();
+        List<AdjacentRef> room = new List<AdjacentRef>();
+        HexGridDirection dir;
+        Vec2Int pos;
+        LevelTile tile;
+
+        for (int i = 0; i < 6; i++)
+        {
+            dir = (HexGridDirection)i;
+            pos = HexGrid2D.Adjacent(position, dir);
+            tile = TileGrid[pos];
+            LevelTile.TileType type = tile == null ? LevelTile.TileType.None : tile.type;
+            switch (type)
+            {
+                default:
+                case LevelTile.TileType.None:
+                    none.Add(new AdjacentRef(dir, pos, type));
+                    break;
+
+                case LevelTile.TileType.Empty:
+                    empty.Add(new AdjacentRef(dir, pos, type));
+                    break;
+
+                case LevelTile.TileType.Corridor:
+                    corridor.Add(new AdjacentRef(dir, pos, type));
+                    break;
+
+                case LevelTile.TileType.Room:
+                    room.Add(new AdjacentRef(dir, pos, type));
+                    break;
+            }
+        }
+
+        return (none, empty, corridor, room);
+    }
+
+    public static Vector3 TilePosition(this Vec2Int gridPosition)
+    {
+        Vector3 vect = Vector3.zero;
+        vect.x = (float)gridPosition.x * 1.5f * Generator.xOffset;
+        vect.z = ((float)gridPosition.y * 2.0f + (gridPosition.x % 2 == 0 ? 0.0f : 1.0f)) * Generator.zOffset;
+        return vect;
+    }
+
+    public static void ReParentTiles(this LevelArea area)
+    {
+        foreach (LevelTile tile in area.tiles)
+        {
+            tile.transform.SetParent(area.transform, true);
+        }
+    }
+    public static void ReParentTiles(this ICollection<LevelArea> areas)
+    {
+        foreach (LevelArea area in areas)
+        {
+            area.ReParentTiles();
+        }
+    }
+    public static void ReParentTiles(this LevelRoom area)
+    {
+        foreach (LevelTile tile in area.tiles)
+        {
+            tile.transform.SetParent(area.transform, true);
+        }
+    }
+    public static void ReParentTiles(this ICollection<LevelRoom> areas)
+    {
+        foreach (LevelArea area in areas)
+        {
+            area.ReParentTiles();
+        }
+    }
+    public static void ReParentTiles(this LevelCorridor area)
+    {
+        foreach (LevelTile tile in area.tiles)
+        {
+            tile.transform.SetParent(area.transform, true);
+        }
+    }
+    public static void ReParentTiles(this ICollection<LevelCorridor> areas)
+    {
+        foreach (LevelArea area in areas)
+        {
+            area.ReParentTiles();
+        }
     }
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+public class MapGenSaveData
+{
+    private const char info = ';';
+    private const char tile = '&';
+
+    public int stageIndex;
+    public TileSaveData[] tiles;
+    public RoomSaveData[] rooms;
+    public CorridorSaveData[] corridors;
+    public string[] DataStrings => GetDataStrings(5);
+
+    public MapGenSaveData(int stageIndex, ICollection<TileSaveData> tiles, ICollection<RoomSaveData> rooms, ICollection<CorridorSaveData> corridors)
+    {
+        this.stageIndex = stageIndex;
+        this.tiles = tiles.ToArray();
+        this.rooms = rooms.ToArray();
+        this.corridors = corridors.ToArray();
+    }
+    public MapGenSaveData(int stageIndex, Generation.Grid grid, ICollection<LevelRoom> rooms, ICollection<LevelCorridor> corridors)
+    {
+        this.stageIndex = stageIndex;
+        tiles = grid.GetTiles().GetSaveData();
+        this.rooms = rooms.GetSaveData();
+        this.corridors = corridors.GetSaveData();
+    }
+
+    public static MapGenSaveData FromDataStrings(string[] dataStrings)
+    {
+        List<TileSaveData> tiles = new List<TileSaveData>();
+        List<RoomSaveData> rooms = new List<RoomSaveData>();
+        List<CorridorSaveData> corridors = new List<CorridorSaveData>();
+
+        IntRange tileLines = IntRange.Max, roomLines = IntRange.Max, corridorLines = new IntRange(0, dataStrings.Length - 1);
+        int i, search = 0, delim = dataStrings[0].IndexOf(info);
+        int stageIndex = dataStrings[0].RangeToInt(search, delim);
+
+        search = delim + 1; delim = dataStrings[0].IndexOf(info, search);
+        tileLines.lower = dataStrings[0].RangeToInt(search, delim);
+
+        search = delim + 1; delim = dataStrings[0].IndexOf(info, search);
+        tileLines.upper = dataStrings[0].RangeToInt(search, delim);
+
+        search = delim + 1; delim = dataStrings[0].IndexOf(info, search);
+        roomLines.lower = dataStrings[0].RangeToInt(search, delim);
+
+        search = delim + 1; delim = dataStrings[0].IndexOf(info, search);
+        roomLines.upper = dataStrings[0].RangeToInt(search, delim);
+
+        search = delim + 1; delim = dataStrings[0].IndexOf(info, search);
+        corridorLines.lower = dataStrings[0].RangeToInt(search, delim);
+
+        for (i = tileLines.lower; i <= tileLines.upper; i++)
+        {
+            search = 0;
+            string line = dataStrings[i];
+            while (search < line.Length)
+            {
+                delim = line.IndexOf(tile, search);
+                tiles.Add(TileSaveData.FromDataString(line[search..delim]));
+                search = delim + 1;
+            }
+        }
+
+        for (i = roomLines.lower; i <= roomLines.upper; i++)
+        {
+            rooms.Add(RoomSaveData.FromDataString(dataStrings[i]));
+        }
+        for (i = corridorLines.lower; i <= corridorLines.upper; i++)
+        {
+            corridors.Add(CorridorSaveData.FromDataString(dataStrings[i]));
+        }
+
+        return new MapGenSaveData(stageIndex, tiles, rooms, corridors);
+    }
+    public string[] GetDataStrings(int tilesPerLine)
+    {
+        int i, j = 0, k;
+        int tileLines = Ext_Int.MinSets(tilesPerLine, tiles.Length);
+        int tStart = 1, tEnd = tStart + tileLines - 1;
+        int rStart = tEnd + 1, rEnd = tEnd + rooms.Length;
+        int cStart = rEnd + 1, cEnd = rEnd + corridors.Length;
+
+        string lineInfo = stageIndex.ToString() + info + tStart + info + tEnd + info + rStart + info + rEnd + info + cStart + info/* + cEnd + info*/;
+        List<string> result = new List<string>() { lineInfo };
+
+        for (i = 0; i < tileLines; i++)
+        {
+            string str = "";
+            for (k = 0; k < tilesPerLine; k++, j++)
+            {
+                if (j >= tiles.Length)
+                    break;
+                str += "" + tiles[j].DataString + tile;
+            }
+            result.Add(str);
+        }
+        for (i = 0; i < rooms.Length; i++)
+        {
+            result.Add(rooms[i].DataString);
+        }
+        for (i = 0; i < corridors.Length; i++)
+        {
+            result.Add(corridors[i].DataString);
+        }
+        return result.ToArray();
+    }
+}
+
+public class LevelPopSaveData
+{
+    private const char item = ',';
+    private const char info = ';';
+    private const char sect = '|';
+
+    public Vector2 spawnPosition;
+    public Vector2 endPosition;
+    public EnemySetSaveData[] enemySetData;
+    public WorldItemSaveData[] itemData;
+    public string[] DataStrings => GetDataStrings();
+
+    public LevelPopSaveData(Vector2 spawnPosition, Vector2 endPosition, IList<EnemySetSaveData> enemySetData, IList<WorldItemSaveData> itemData)
+    {
+        this.spawnPosition = spawnPosition;
+        this.endPosition = endPosition;
+        this.enemySetData = enemySetData.ToArray();
+        this.itemData = itemData.ToArray();
+    }
+    public LevelPopSaveData(Vector3 spawnPosition, Vector3 endPosition, IList<WorldEnemySet> sets, IList<WorldItem> items)
+    {
+        this.spawnPosition = new Vector2(spawnPosition.x, spawnPosition.z);
+        this.endPosition = new Vector2(endPosition.x, endPosition.z);
+        enemySetData = new EnemySetSaveData[sets.Count];
+        for (int i = 0; i < sets.Count; i++)
+        {
+            enemySetData[i] = new EnemySetSaveData(sets[i]);
+        }
+        itemData = new WorldItemSaveData[items.Count];
+        for (int i = 0; i < items.Count; i++)
+        {
+            itemData[i] = new WorldItemSaveData(items[i]);
+        }
+    }
+
+    public static LevelPopSaveData FromDataStrings(string[] dataStrings)
+    {
+        Vector2 spawnPosition = Vector2.zero, endPosition = Vector2.zero, itemPosition = Vector2.zero;
+        List<EnemySetSaveData> enemySetData = new List<EnemySetSaveData>();
+        List<WorldItemSaveData> itemData = new List<WorldItemSaveData>();
+
+        int type, id, rarity, yaw, search = 0, comma = dataStrings[0].IndexOf(item), delim, section = dataStrings[0].IndexOf(sect);
+
+        spawnPosition.x = dataStrings[0].RangeToFloat(search, comma);
+        spawnPosition.y = dataStrings[0].RangeToFloat(comma + 1, section);
+        search = section + 1; comma = dataStrings[0].IndexOf(item, search); section = dataStrings[0].IndexOf(sect, search);
+        endPosition.x = dataStrings[0].RangeToFloat(search, comma);
+        endPosition.y = dataStrings[0].RangeToFloat(comma + 1, section);
+
+        search = 0;
+        List<int> inds = new List<int>();
+        while (search < dataStrings[1].Length)
+        {
+            delim = dataStrings[1].IndexOf(info, search);
+            type = dataStrings[1].RangeToInt(search, delim);
+            search = delim + 1; delim = dataStrings[1].IndexOf(info, search);
+            id = dataStrings[1].RangeToInt(search, delim);
+            search = delim + 1; section = dataStrings[1].IndexOf(sect, search);
+            while (search < section)
+            {
+                comma = dataStrings[1].IndexOf(item, search);
+                inds.Add(dataStrings[1].RangeToInt(search, comma));
+                search = comma + 1;
+            }
+            enemySetData.Add(new EnemySetSaveData((LevelArea.AreaType)type, id, inds));
+            inds.Clear();
+            search = section + 1;
+        }
+
+        search = 0;
+        while (search < dataStrings[2].Length)
+        {
+            delim = dataStrings[2].IndexOf(info, search);
+            type = dataStrings[2].RangeToInt(search, delim);
+
+            search = delim + 1; delim = dataStrings[2].IndexOf(info, search);
+            id = dataStrings[2].RangeToInt(search, delim);
+
+            search = delim + 1; delim = dataStrings[2].IndexOf(info, search);
+            rarity = dataStrings[2].RangeToInt(search, delim);
+
+            search = delim + 1; comma = dataStrings[2].IndexOf(item, search);
+            itemPosition.x = dataStrings[2].RangeToFloat(search, comma);
+
+            search = comma + 1; delim = dataStrings[2].IndexOf(info, search);
+            itemPosition.y = dataStrings[2].RangeToFloat(search, delim);
+
+            search = delim + 1; section = dataStrings[2].IndexOf(sect, search);
+            yaw = dataStrings[2].RangeToInt(search, section);
+
+            itemData.Add(new WorldItemSaveData((LevelArea.AreaType)type, id, (ItemRarity)rarity, itemPosition, yaw));
+            search = section + 1;
+        }
+
+        return new LevelPopSaveData(spawnPosition, endPosition, enemySetData, itemData);
+    }
+    public string[] GetDataStrings()
+    {
+        string[] result = new string[3];
+        result[0] = "" + spawnPosition.x.ToString() + item + spawnPosition.y.ToString() + sect + endPosition.x.ToString() + item + endPosition.y.ToString() + sect;
+        int i;
+        foreach (EnemySetSaveData setData in enemySetData)
+        {
+            result[1] += "" + (int)setData.areaType + info + setData.areaID + info;
+            for (i = 0; i < setData.enemyDataInds.Length; i++)
+            {
+                result[1] += "" + setData.enemyDataInds[i] + item;
+            }
+            result[1] += "" + sect;
+        }
+        foreach (WorldItemSaveData data in itemData)
+        {
+            result[2] += "" + (int)data.areaType + info + data.areaID + info + (int)data.rarity + info + data.position.x.ToString() + item + data.position.x.ToString() + info + data.yaw + sect;
+        }
+        return result;
+    }
+}
+
+public struct EnemySetSaveData
+{
+    public LevelArea.AreaType areaType;
+    public int areaID;
+    public int[] enemyDataInds;
+
+    public EnemySetSaveData(LevelArea.AreaType areaType, int areaID, ICollection<int> enemyDataInds)
+    {
+        this.areaType = areaType;
+        this.areaID = areaID;
+        this.enemyDataInds = enemyDataInds.ToArray();
+    }
+    public EnemySetSaveData(WorldEnemySet set)
+    {
+        areaType = set.area.ID.type;
+        areaID = set.area.ID.value;
+        enemyDataInds = set.dataIndices;
+    }
+}
+
+public struct WorldItemSaveData
+{
+    public LevelArea.AreaType areaType;
+    public int areaID;
+    public ItemRarity rarity;
+    public Vector2 position;
+    public int yaw;
+
+    public WorldItemSaveData(LevelArea.AreaType areaType, int areaID, ItemRarity rarity, Vector2 position, int yaw)
+    {
+        this.areaType = areaType;
+        this.areaID = areaID;
+        this.rarity = rarity;
+        this.position = position;
+        this.yaw = yaw;
+    }
+    public WorldItemSaveData(WorldItem source)
+    {
+        areaType = source.areaID.type;
+        areaID = source.areaID.value;
+        rarity = source.rarity;
+        position = new Vector2(source.position.x, source.position.z);
+        yaw = source.yaw;
+    }
+}
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 public static class RoomGenTemplatePoints
 {

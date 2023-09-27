@@ -5,7 +5,7 @@ using UnityEngine.UI;
 using TMPro;
 
 using NeoCambion;
-using NeoCambion.Unity.Interpolation;
+using NeoCambion.Interpolation;
 
 public class ActionNameDisplay : UIObject
 {
@@ -13,9 +13,9 @@ public class ActionNameDisplay : UIObject
     public TMP_Text textObject;
     public Graphic[] attachedGraphics;
 
-    protected override void Awake()
+    protected override void Initialise()
     {
-        base.Awake();
+        base.Initialise();
         SetAllAlphas(0f);
     }
 

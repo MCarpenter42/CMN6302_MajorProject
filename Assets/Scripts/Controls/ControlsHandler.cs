@@ -6,11 +6,17 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Layouts;
 using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.InputSystem.Utilities;
-using UnityEditor;
+using UnityEngine.InputSystem.DualShock;
+using UnityEngine.InputSystem.XInput;
+using UnityEngine.InputSystem.Switch;
 
 using NeoCambion;
 using NeoCambion.Collections;
+
+#if UNITY_EDITOR
+using UnityEditor;
 using NeoCambion.Unity.Editor;
+#endif
 
 public enum ControlScheme { Other, MouseAndKeyboard, Gamepad }
 public enum GamepadType { None, Generic, Xbox, PlayStation, Nintendo }
@@ -19,7 +25,7 @@ public class ControlsHandler : Core
 {
 	#region [ OBJECTS / COMPONENTS ]
 
-	private InputActions actions;
+	private static InputActions actions;
 
 	public struct DeviceInfo
 	{
@@ -101,33 +107,43 @@ public class ControlsHandler : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    void Awake()
+    public void AddListeners()
 	{
-		actions = new InputActions();
+        Debug.Log("Initialising controls handler");
 
-		actions.Menu.showHide.performed += ActMenu.OnShowHide;
+        actions = new InputActions();
 
-		actions.World.move.performed += ActWorld.OnMove;
-		actions.World.move.canceled += ActWorld.OnMove;
-		actions.World.sprint.performed += ActWorld.OnSprint;
-		actions.World.sprint.canceled += ActWorld.OnSprint;
+        actions.Universal.showHideMenu.performed += ActUniversal.OnShowHideMenu;
+
+        actions.Menu.moveSelectUp.performed += ActMenu.OnMoveSelUp;
+        actions.Menu.moveSelectDown.performed += ActMenu.OnMoveSelDown;
+        actions.Menu.moveSelectLeft.performed += ActMenu.OnMoveSelLeft;
+        actions.Menu.moveSelectRight.performed += ActMenu.OnMoveSelRight;
+        actions.Menu.pressSelected.performed += ActMenu.OnPressSelected;
+
+        actions.World.move.performed += ActWorld.OnMove;
+        actions.World.move.canceled += ActWorld.OnMove;
+        actions.World.sprint.performed += ActWorld.OnSprint;
+        actions.World.sprint.canceled += ActWorld.OnSprint;
         actions.World.cameraTurn.performed += ActWorld.OnCameraTurn;
         actions.World.cameraTurn.canceled += ActWorld.OnCameraTurn;
-		actions.World.interact.performed += ActWorld.OnInteract;
-		actions.World.minimap.performed += ActWorld.OnMap;
+        actions.World.interact.performed += ActWorld.OnInteract;
+        actions.World.minimap.performed += ActWorld.OnMap;
 
-		actions.Combat.basic.performed += ActCombat.OnBasic;
-		actions.Combat.skill.performed += ActCombat.OnSkill;
-		actions.Combat.ult.performed += ActCombat.OnUlt;
+        actions.Combat.basic.performed += ActCombat.OnBasic;
+        actions.Combat.skill.performed += ActCombat.OnSkill;
+        actions.Combat.ult.performed += ActCombat.OnUlt;
         actions.Combat.use.performed += ActCombat.OnUse;
-		actions.Combat.moveSelLeft.performed += ActCombat.OnMoveSelLeft;
-		actions.Combat.moveSelRight.performed += ActCombat.OnMoveSelRight;
-#if UNITY_EDITOR
-		actions.InDev.cursorLockToggle.performed += ActInDev.OnCursorLockToggle;
-#endif
-	}
+        actions.Combat.moveSelLeft.performed += ActCombat.OnMoveSelLeft;
+        actions.Combat.moveSelRight.performed += ActCombat.OnMoveSelRight;
 
-	void Start()
+#if UNITY_EDITOR
+        actions.InDev.cursorLockToggle.performed += ActInDev.OnCursorLockToggle;
+        actions.InDev.endRun.performed += ActInDev.OnEndRun;
+#endif
+    }
+
+    void Start()
 	{
 
 	}
@@ -144,7 +160,7 @@ public class ControlsHandler : Core
 
 	void OnEnable()
     {
-        actions.Menu.Enable();
+		actions.Universal.Enable();
         SetControlState(GameManager.controlState);
 #if UNITY_EDITOR
 		actions.InDev.Enable();
@@ -153,8 +169,9 @@ public class ControlsHandler : Core
     }
 
 	void OnDisable()
-	{
-		actions.Menu.Disable();
+    {
+        actions.Universal.Disable();
+        actions.Menu.Disable();
 		actions.World.Disable();
 		actions.Combat.Disable();
 
@@ -165,25 +182,34 @@ public class ControlsHandler : Core
 	
 	public void SetControlState(ControlState state)
     {
+        actions.Universal.Enable();
+
         switch (state)
 		{
 			default:
 			case ControlState.Menu:
+				actions.Menu.Enable();
                 actions.World.Disable();
                 actions.Combat.Disable();
 				break;
 
 			case ControlState.World:
+                actions.Menu.Disable();
                 actions.World.Enable();
                 actions.Combat.Disable();
 				break;
 
 			case ControlState.Combat:
+                actions.Menu.Disable();
                 actions.World.Disable();
                 actions.Combat.Enable();
 				break;
         }
-    }
+
+#if UNITY_EDITOR
+		actions.InDev.Enable();
+#endif
+	}
 
 	public void GetLastDevice(IEnumerable<InputControl> buttonPresses)
 	{
@@ -193,100 +219,126 @@ public class ControlsHandler : Core
             InputDevice device = last.device;
             DeviceInfo info = new DeviceInfo(device.description, device.valueType.Name, device.native);
             if (device.deviceId != lastDevice.Key)
-                OnLastDeviceChange(info);
+                OnLastDeviceChange(device);
             lastDevice = devices.GetOrAdd(device.deviceId, info);
         }
 	}
 
-	public void OnLastDeviceChange(DeviceInfo info)
+	public void OnLastDeviceChange(InputDevice device)
 	{
 		ControlScheme controlScheme;
-		if (info.native)
-		{
-			string devClass = info.deviceClass.ToUpper();
-			switch (devClass)
-			{
-				default:
-                    controlScheme = ControlScheme.Other;
-					break;
-
-				case "MOUSE":
-				case "KEYBOARD":
-                    controlScheme = ControlScheme.MouseAndKeyboard;
-					break;
-
-				case "GAMEPAD":
-                    controlScheme = ControlScheme.Gamepad;
-					break;
-			}
-		}
+		GamepadType gamepadType;
+		System.Type devType = device.GetType();
+		if (devType.IsSubclassOf(typeof(Keyboard)) || devType.IsSubclassOf(typeof(Pointer)))
+        {
+            controlScheme = ControlScheme.MouseAndKeyboard;
+            gamepadType = GamepadType.None;
+        }
+		else if (devType.IsSubclassOf(typeof(Gamepad)))
+        {
+            controlScheme = ControlScheme.Gamepad;
+			gamepadType = GetGamepadType(device);
+        }
 		else
-		{
+        {
             controlScheme = ControlScheme.Other;
-		}
-		if (controlScheme != activeControlScheme)
+            gamepadType = GamepadType.None;
+        }
+
+        if (controlScheme != activeControlScheme || gamepadType != _activeGamepadType)
 		{
-			GameManager.Instance.UI.UpdateControlIcons(controlScheme);
+			GameManager.Instance.UI.UpdateControlIcons(controlScheme, gamepadType);
 			activeControlScheme = controlScheme;
+			activeGamepadType = gamepadType;
 		}
+	}
+
+	private GamepadType GetGamepadType(InputDevice device)
+	{
+		System.Type devType = device.GetType();
+		if (devType.IsAssignableFrom(typeof(XInputController)) || devType.IsAssignableFrom(typeof(XInputControllerWindows)))
+			return GamepadType.Xbox;
+		else if (devType.IsAssignableFrom(typeof(IDualShockHaptics)))
+            return GamepadType.PlayStation;
+		else if (devType.IsAssignableFrom(typeof(SwitchProControllerHID)))
+            return GamepadType.Nintendo;
+		else
+            return GamepadType.Generic;
 	}
 
 	/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+	private class ActUniversal
+	{
+        public static void OnShowHideMenu(InputAction.CallbackContext context)
+        {
+            TogglePause();
+        }
+    }
+
 	private class ActMenu
 	{
-		public static void OnShowHide(InputAction.CallbackContext context)
+		public static void OnMoveSelUp(InputAction.CallbackContext context)
 		{
-			TogglePause();
+			UIManager.MoveHighlighted(CompassBearing_Precision0.North);
 		}
-	}
+		
+		public static void OnMoveSelDown(InputAction.CallbackContext context)
+        {
+            UIManager.MoveHighlighted(CompassBearing_Precision0.South);
+		}
+		
+		public static void OnMoveSelLeft(InputAction.CallbackContext context)
+        {
+            UIManager.MoveHighlighted(CompassBearing_Precision0.West);
+		}
+		
+		public static void OnMoveSelRight(InputAction.CallbackContext context)
+        {
+            UIManager.MoveHighlighted(CompassBearing_Precision0.East);
+		}
+
+		public static void OnPressSelected(InputAction.CallbackContext context)
+		{
+			UIManager.selHandler.PressHighlighted();
+		}
+    }
 
 	private class ActWorld
 	{
 		public static void OnMove(InputAction.CallbackContext context)
 		{
-			if (GameManager.controlState == ControlState.World)
-            {
-				Vector2 mv = context.ReadValue<Vector2>();
-				GameManager.Instance.playerW.velScale = new Vector3(mv.x, 0, mv.y);
-			}
+			Vector2 mv = context.ReadValue<Vector2>();
+			GameManager.Instance.Player.velScale = new Vector3(mv.x, 0, mv.y);
         }
 
 		public static void OnSprint(InputAction.CallbackContext context)
 		{
-			if (GameManager.controlState == ControlState.World)
-			{
-				GameManager.Instance.playerW.sprintActive = context.ReadValueAsButton();
-			}
+			GameManager.Instance.Player.sprintActive = context.ReadValueAsButton();
 		}
 
 		public static void OnCameraTurn(InputAction.CallbackContext context)
 		{
-			if (GameManager.controlState == ControlState.World)
+			if (Cursor.lockState == CursorLockMode.Locked)
 			{
-				if (Cursor.lockState == CursorLockMode.Locked)
-				{
-					Vector2 val = context.ReadValue<Vector2>();
-					Vector2 rot = new Vector2(-val.y, val.x) * 0.1f;
-					GameManager.Instance.cameraW.SetRotSpeed(rot);
-				}
-				else
-				{
-					GameManager.Instance.cameraW.SetRotSpeed(Vector3.zero);
-				}
+				Vector2 val = context.ReadValue<Vector2>();
+				Vector2 rot = new Vector2(-val.y, val.x) * 0.1f;
+				GameManager.Instance.WorldCamPivot.SetRotSpeed(rot);
+			}
+			else
+			{
+				GameManager.Instance.WorldCamPivot.SetRotSpeed(Vector3.zero);
 			}
 		}
 
 		public static void OnInteract(InputAction.CallbackContext context)
 		{
-			if (GameManager.controlState == ControlState.World && GameManager.Instance.playerW.targetInteract != null)
-				GameManager.Instance.playerW.targetInteract.Trigger();
+			GameManager.Instance.Player.TriggerTargetInteract();
         }
 
 		public static void OnMap(InputAction.CallbackContext context)
         {
-            if (GameManager.controlState == ControlState.World)
-                GameManager.Instance.UI.HUD.ToggleMinimap();
+            GameManager.Instance.UI.HUD.ToggleMinimap();
         }
 	}
 
@@ -294,50 +346,32 @@ public class ControlsHandler : Core
 	{
 		public static void OnBasic(InputAction.CallbackContext context)
 		{
-			if (GameManager.controlState == ControlState.Combat)
-			{
-				UIManager.HUD.AbilityButtonPressed(ActionPoolCategory.Standard);
-            }
+			UIManager.HUD.AbilityButtonPressed(ActionPoolCategory.Standard);
         }
 
 		public static void OnSkill(InputAction.CallbackContext context)
 		{
-            if (GameManager.controlState == ControlState.Combat)
-            {
-                UIManager.HUD.AbilityButtonPressed(ActionPoolCategory.Advanced);
-            }
+            UIManager.HUD.AbilityButtonPressed(ActionPoolCategory.Advanced);
         }
 
 		public static void OnUlt(InputAction.CallbackContext context)
 		{
-            if (GameManager.controlState == ControlState.Combat)
-            {
-                UIManager.HUD.AbilityButtonPressed(ActionPoolCategory.Special);
-            }
+            UIManager.HUD.AbilityButtonPressed(ActionPoolCategory.Special);
         }
 
 		public static void OnUse(InputAction.CallbackContext context)
 		{
-			if (GameManager.controlState == ControlState.Combat)
-            {
-                LevelManager.Combat.TriggerPlayerAbility();
-            }
+            LevelManager.Combat.TriggerPlayerAbility();
         }
 
 		public static void OnMoveSelLeft(InputAction.CallbackContext context)
         {
-            if (GameManager.controlState == ControlState.Combat)
-            {
-				LevelManager.Combat.MoveSelect(false);
-            }
+			LevelManager.Combat.MoveSelect(false);
         }
 
 		public static void OnMoveSelRight(InputAction.CallbackContext context)
         {
-            if (GameManager.controlState == ControlState.Combat)
-            {
-                LevelManager.Combat.MoveSelect(true);
-            }
+            LevelManager.Combat.MoveSelect(true);
         }
 	}
 
@@ -351,75 +385,90 @@ public class ControlsHandler : Core
 			else
 				Cursor.lockState = CursorLockMode.Locked;
 		}
+
+		public static void OnEndRun(InputAction.CallbackContext context)
+		{
+			LevelManager.OnRunWon();
+		}
 	}
 
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+	/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#if UNITY_EDITOR
 	public void LogLastDevice()
 	{
 		bool logAny = false;
 		string str = null;
+		log_deviceClass = true;
+		log_empty = true;
+		log_interfaceName = true;
+		log_manufacturer = true;
+		log_product = true;
+		log_valueType = true;
+		log_native = true;
 		if (log_deviceClass)
         {
             if (str == null)
-                str = "Device Class: " + GameManager.Instance.ControlsHandler.lastDevice.Value.deviceClass;
+                str = "Device Class: " + lastDevice.Value.deviceClass;
             else
-                str += " | Device Class: " + GameManager.Instance.ControlsHandler.lastDevice.Value.deviceClass;
+                str += " | Device Class: " + lastDevice.Value.deviceClass;
             logAny = true;
 		}
 		if (log_empty)
         {
             if (str == null)
-                str = "Empty: " + GameManager.Instance.ControlsHandler.lastDevice.Value.empty;
+                str = "Empty: " + lastDevice.Value.empty;
             else
-                str += " | Empty: " + GameManager.Instance.ControlsHandler.lastDevice.Value.empty;
+                str += " | Empty: " + lastDevice.Value.empty;
             logAny = true;
         }
 		if (log_interfaceName)
         {
             if (str == null)
-                str = "Interface Name: " + GameManager.Instance.ControlsHandler.lastDevice.Value.interfaceName;
+                str = "Interface Name: " + lastDevice.Value.interfaceName;
             else
-                str += " | Interface Name: " + GameManager.Instance.ControlsHandler.lastDevice.Value.interfaceName;
+                str += " | Interface Name: " + lastDevice.Value.interfaceName;
             logAny = true;
         }
 		if (log_manufacturer)
         {
             if (str == null)
-                str = "Manufacturer: " + GameManager.Instance.ControlsHandler.lastDevice.Value.manufacturer;
+                str = "Manufacturer: " + lastDevice.Value.manufacturer;
             else
-                str += " | Manufacturer: " + GameManager.Instance.ControlsHandler.lastDevice.Value.manufacturer;
+                str += " | Manufacturer: " + lastDevice.Value.manufacturer;
             logAny = true;
         }
 		if (log_product)
         {
             if (str == null)
-                str = "Empty: " + GameManager.Instance.ControlsHandler.lastDevice.Value.product;
+                str = "Empty: " + lastDevice.Value.product;
             else
-                str += " | Empty: " + GameManager.Instance.ControlsHandler.lastDevice.Value.product;
+                str += " | Empty: " + lastDevice.Value.product;
             logAny = true;
         }
 		if (log_valueType)
         {
             if (str == null)
-                str = "Value Type: " + GameManager.Instance.ControlsHandler.lastDevice.Value.valueType;
+                str = "Value Type: " + lastDevice.Value.valueType;
             else
-                str += " | Value Type: " + GameManager.Instance.ControlsHandler.lastDevice.Value.valueType;
+                str += " | Value Type: " + lastDevice.Value.valueType;
             logAny = true;
         }
 		if (log_native)
         {
             if (str == null)
-                str = "Is Native: " + GameManager.Instance.ControlsHandler.lastDevice.Value.native;
+                str = "Is Native: " + lastDevice.Value.native;
             else
-                str += " | Is Native: " + GameManager.Instance.ControlsHandler.lastDevice.Value.native;
+                str += " | Is Native: " + lastDevice.Value.native;
             logAny = true;
         }
 		if (logAny)
 			Debug.Log(str);
 	}
+#endif
 }
 
+#if UNITY_EDITOR
 [CustomEditor(typeof(ControlsHandler))]
 [CanEditMultipleObjects]
 public class ControlsHandlerEditor : Editor
@@ -500,3 +549,4 @@ public class ControlsHandlerEditor : Editor
 		}
 	}
 }
+#endif

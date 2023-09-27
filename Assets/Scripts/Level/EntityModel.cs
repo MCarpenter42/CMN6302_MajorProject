@@ -2,13 +2,16 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
-using UnityEditor;
 
 using NeoCambion;
 using NeoCambion.Collections;
 using NeoCambion.IO;
-using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.PersistentUID;
+using NeoCambion.Interpolation.Unity;
+
+#if UNITY_EDITOR
+using UnityEditor;
+using NeoCambion.Unity.Editor;
 
 [CustomEditor(typeof(EntityModel), true)]
 [CanEditMultipleObjects]
@@ -32,17 +35,21 @@ public class EntityModelEditor : Editor
                 PersistentUID_Utility.AssignPrefabUIDs(EntityModel.modelFolder);
                 EntityModel.CompileModelList();
             }
+            EditorGUILayout.Space();
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("oscillators"), new GUIContent("Oscillators"));
         }
         EditorElements.EndHorizVert();
+        serializedObject.ApplyModifiedProperties();
     }
 }
+#endif
 
 [RequireComponent(typeof(PrefabUID))]
 public class EntityModel : Core
 {
     #region [ OBJECTS / COMPONENTS ]
 
-
+    [SerializeField] OscillateTransform[] oscillators;
 
     #endregion
 
@@ -60,31 +67,23 @@ public class EntityModel : Core
 
     #endregion
 
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-    #region [ BUILT-IN UNITY FUNCTIONS ]
-
-    void Awake()
+    protected override void Initialise()
     {
-
-    }
-
-    void Start()
-    {
-
+        base.Initialise();
+        foreach (OscillateTransform osc in oscillators)
+        {
+            osc.Setup();
+        }
     }
 
     void Update()
     {
-
+        float dT = Time.deltaTime;
+        foreach (OscillateTransform osc in oscillators)
+        {
+            osc.Oscillate(dT);
+        }
     }
-
-    void FixedUpdate()
-    {
-
-    }
-
-    #endregion
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -128,6 +127,41 @@ public class EntityModel : Core
             }
         }
         return null;
+    }
+}
+
+[System.Serializable]
+public class OscillateTransform
+{
+    private static float cycleFactor = Mathf.PI * 2f;
+
+    public Transform target;
+    [Min(0.01f)]
+    public float cyclePeriod = 1f;
+    public Vector3 zeroPosition = Vector3.zero;
+    public Vector3 maxDisplacement = Vector3.zero;
+    [Range(0f, 1f)]
+    public float cycleOffset = 0f;
+
+    private Vector3 lerpMin => zeroPosition - maxDisplacement;
+    private Vector3 lerpMax => zeroPosition + maxDisplacement;
+    private float t, delta;
+
+    public void Setup()
+    {
+        t = cyclePeriod * cycleOffset;
+        target.localPosition = Vector3.Lerp(lerpMin, lerpMax, delta);
+    }
+
+    private float GetDelta(float input) => Mathf.Cos(input) / 2f + 0.5f;
+
+    public void Oscillate(float deltaTime)
+    {
+        t += deltaTime;
+        if (t > cyclePeriod)
+            t -= cyclePeriod;
+        delta = GetDelta(cycleFactor * (t / cyclePeriod));
+        target.localPosition = Vector3.Lerp(lerpMin, lerpMax, delta);
     }
 }
 

@@ -3,15 +3,18 @@ namespace NeoCambion.Unity.PersistentUID
     using System.Collections.Generic;
     using System.Linq;
     using UnityEngine;
-    using UnityEditor;
 
+#if UNITY_EDITOR
+    using UnityEditor;
     using NeoCambion.Unity.Editor;
+#endif
 
     public class ObjectUID : PersistentUID
     {
 
     }
 
+#if UNITY_EDITOR
     [CustomEditor(typeof(ObjectUID))]
     public class ObjectUIDEditor : Editor
     {
@@ -35,4 +38,5 @@ namespace NeoCambion.Unity.PersistentUID
             serializedObject.ApplyModifiedProperties();
         }
     }
+#endif
 }

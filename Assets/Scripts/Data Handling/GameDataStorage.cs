@@ -2,14 +2,31 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.UIElements;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 
 using NeoCambion;
 using NeoCambion.Collections;
+using NeoCambion.Encryption;
+using NeoCambion.IO;
+using UnityEngine.Playables;
+using JetBrains.Annotations;
 
 public class GameDataStorage
 {
-    public static GameDataStorage Data { get { return GameManager.Instance.GameDataStorage; } }
+    private static char pathSep => Application.isEditor ? '/' : Path.DirectorySeparatorChar;
+
+    public static GameDataStorage Data => GameManager.Instance.GameData;
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    private static string cacheFolder => Application.dataPath + "/Resources/Data/";
+    private static string cacheFile_Enemies = "_EnemyData.json";
+    private static string cachePath_Enemies => cacheFolder + cacheFile_Enemies;
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     private List<EnemyData> enemyData = null;
     public List<EnemyData> EnemyData
@@ -32,44 +49,38 @@ public class GameDataStorage
         }
     }
 
-    public void LoadData()
+    public void RuntimeLoad()
     {
-        List<EnemyData> enemyData = new List<EnemyData>();
-        List<ItemData> itemData = new List<ItemData>();
-        if (GameManager.applicationPlaying)
-        {
-            string enemyJson, itemJson;
-            string[] enemyStrings, itemStrings;
+        enemyData = new List<EnemyData>();
+        itemData = new List<ItemData>();
 
-            enemyJson = GameManager.Instance.dataJSON_enemies.text;
-            if (enemyJson != null && enemyJson.Length > 0)
-            {
-                enemyStrings = enemyJson.Split(System.Environment.NewLine, System.StringSplitOptions.RemoveEmptyEntries);
-                foreach (string dataString in enemyStrings)
-                {
-                    enemyData.Add(JsonUtility.FromJson<EnemyData>(dataString));
-                }
-            }
-            /*itemJson = GameManager.Instance.dataJSON_enemies.text;
-            if (itemJson != null && itemJson.Length > 0)
-            {
-                itemStrings = itemJson.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-                foreach (string dataString in itemStrings)
-                {
-                    itemData.Add(JsonUtility.FromJson<ItemData>(dataString));
-                }
-            }*/
-        }
-        else
+        string enemyJson, itemJson;
+        string[] enemyStrings, itemStrings;
+
+        enemyJson = GameManager.Instance.dataJSON_enemies.text;
+        if (enemyJson != null && enemyJson.Length > 0)
         {
-            enemyData = LoadEnemyCache();
+            enemyStrings = enemyJson.Split(System.Environment.NewLine, System.StringSplitOptions.RemoveEmptyEntries);
+            foreach (string dataString in enemyStrings)
+            {
+                enemyData.Add(JsonUtility.FromJson<EnemyData>(dataString));
+            }
         }
+        /*itemJson = GameManager.Instance.dataJSON_enemies.text;
+        if (itemJson != null && itemJson.Length > 0)
+        {
+            itemStrings = itemJson.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string dataString in itemStrings)
+            {
+                itemData.Add(JsonUtility.FromJson<ItemData>(dataString));
+            }
+        }*/
     }
 
-    private static string cacheFolder { get { return Application.dataPath + "/Resources/Data/"; } }
-
-    private static string cacheFile_Enemies = "_EnemyData.json";
-    private static string cachePath_Enemies { get { return cacheFolder + cacheFile_Enemies; } }
+    public void EditorLoad()
+    {
+        enemyData = LoadEnemyCache();
+    }
 
     public static void SaveEnemyCache(List<EnemyData> list)
     {
@@ -104,22 +115,182 @@ public class GameDataStorage
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    private static string appDirectory => (Application.isEditor ? (Application.dataPath + "/Resources/Data") : Application.persistentDataPath);
+    private static string metaDataExt => Application.isEditor ? ".metadata" : ".meta";
+    private static string metadata => appDirectory + pathSep + "data" + metaDataExt;
+
+    [System.Serializable]
+    public class MetaStorage
+    {
+        [SerializeField] int latestRun = -1;
+        public int LatestRun
+        {
+            get { return latestRun; }
+            set { latestRun = value; WriteMetadata(); }
+        }
+        [SerializeField] bool activeRun = false;
+        public bool ActiveRun
+        {
+            get { return activeRun; }
+            set { activeRun = value; WriteMetadata(); }
+        }
+        [SerializeField] Random.State? randState = null;
+        public Random.State? RandState
+        {
+            get { return randState; }
+            set { randState = value; WriteMetadata(); }
+        }
+        [SerializeField] RandTuningSaveData tuningData = null;
+        public RandTuningSaveData TuningData
+        {
+            get { return tuningData; }
+            set { tuningData = value; WriteMetadata(); }
+        }
+
+        public MetaStorage(int latestRun, bool activeRun, Random.State? randState, RandTuningSaveData tuningData)
+        {
+            this.latestRun = latestRun;
+            this.activeRun = activeRun;
+            this.randState = randState;
+            this.tuningData = tuningData;
+        }
+
+        public static MetaStorage New => new MetaStorage(0, false, null, null);
+    }
+    public static MetaStorage MetaData = null;
+    public static bool FreshInstall = true;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    public static void ReadMetadata()
+    {
+        FileHandler.ValidateFile(metadata);
+        MetaData = JsonUtility.FromJson<MetaStorage>(FileHandler.ReadString(metadata));
+        if (MetaData == null)
+        {
+            MetaData = MetaStorage.New;
+            WriteMetadata();
+        }
+    }
+
+    public static void WriteMetadata() => FileHandler.Write(JsonUtility.ToJson(MetaData), metadata);
+
+    public static void GetRandomState()
+    {
+        if (MetaData == null || MetaData.RandState == null)
+            Random.InitState((int)System.DateTime.Now.Ticks);
+        else
+            Random.state = MetaData.RandState.Value;
+    }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    private static string runDirectory => appDirectory + pathSep + "CurrentRun";
+    private static string currentMapGen => runDirectory + pathSep + "generation_latest.dat";
+    private static string currentLvlPop => runDirectory + pathSep + "population_latest.dat";
+    private static string runProgression => runDirectory + pathSep + "progression.dat";
+
+    private static string runArchive => appDirectory + pathSep + "RunArchive";
+    private static string RunArchive(int runIndex) => runArchive + pathSep + "Run_" + runIndex.ToString();
+    private static string runArchiveMetadata => runArchive + pathSep + "archive" + metaDataExt;
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public RunDataActive runData = RunDataActive.New();
     public PlayerData[] playerData = null;
-    public List<ItemCore> inventory = new List<ItemCore>();
+    //public List<ItemCore> inventory = new List<ItemCore>();
 
-    public void SavePlayData()
+    public static bool CheckForActiveRun()
     {
-
+        bool mapFile = File.Exists(currentMapGen);
+        bool popFile = File.Exists(currentLvlPop);
+        bool runFile = File.Exists(runProgression);
+        return mapFile && popFile && runFile;
     }
 
-    public void LoadPlayData()
+    public static void SavePlayData(MapGenSaveData mapGenData)
     {
+        if (!Directory.Exists(runDirectory))
+            Directory.CreateDirectory(runDirectory);
+        string[] dataStrings = mapGenData.DataStrings;
+        FileHandler.ValidateFile(currentMapGen);
+        FileHandler.Write(dataStrings, currentMapGen, true);
+    }
+    public static void SavePlayData(LevelPopSaveData lvlPopData)
+    {
+        if (!Directory.Exists(runDirectory))
+            Directory.CreateDirectory(runDirectory);
+        string[] dataStrings = lvlPopData.DataStrings;
+        FileHandler.ValidateFile(currentLvlPop);
+        FileHandler.Write(dataStrings, currentLvlPop, true);
+    }
+    public static void SavePlayData(RunSaveData runData)
+    {
+        if (!Directory.Exists(runDirectory))
+            Directory.CreateDirectory(runDirectory);
+        string[] dataStrings = runData.DataStrings;
+        FileHandler.ValidateFile(runProgression);
+        FileHandler.Write(dataStrings, runProgression, true);
+    }
 
+    public void SaveRunData() => SavePlayData(new RunSaveData(runData));
+    private void ValidateAchive(int runIndex)
+    {
+        string directory = RunArchive(runIndex);
+        if (!Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+            List<string> existingData = new List<string>(FileHandler.ReadLines(runArchiveMetadata)) { runIndex.ToString() + ">>" + directory };
+            FileHandler.Write(existingData.ToArray(), runArchiveMetadata);
+        }
+    }
+    public void ArchiveRun()
+    {
+        ValidateAchive(MetaData.LatestRun);
+        SaveRunData();
+        string[] fileContents = FileHandler.ReadLines(runProgression);
+        FileHandler.Write(fileContents, RunArchive(MetaData.LatestRun) + pathSep + "runInfo.dat");
+        MetaData.ActiveRun = false;
+        FileHandler.Delete(currentMapGen, currentLvlPop, runProgression);
+    }
+
+    public static SaveDataWrapper LoadPlayData()
+    {
+        if (!Directory.Exists(runDirectory))
+            Directory.CreateDirectory(runDirectory);
+        SaveDataWrapper saveData = new SaveDataWrapper();
+        saveData.mapGenData = MapGenSaveData.FromDataStrings(FileHandler.ReadLines(currentMapGen));
+        saveData.lvlPopData = LevelPopSaveData.FromDataStrings(FileHandler.ReadLines(currentLvlPop));
+        saveData.runData = RunSaveData.FromDataStrings(FileHandler.ReadLines(runProgression));
+
+        if (Data.runData == null)
+            Data.runData = new RunDataActive();
+        Data.GetStartingPlayerData();
+        Data.runData.GetFromSave(saveData.runData);
+        for (int i = 0; i < 4; i++)
+        {
+            Data.playerData[i].currentHealthPercent = Data.runData.p_healthPercentages[i];
+        }
+
+        if (MetaData.RandState != null)
+            Random.state = MetaData.RandState.Value;
+        Core.RandTuning.SetFromSaveData(MetaData.TuningData);
+        return saveData;
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void NewRunData()
+    {
+        GetStartingPlayerData();
+        for (int i = 0; i < 4; i++)
+        {
+            runData.p_healthValues[i] = new int[] { playerData[i].baseHealth, playerData[i].baseHealth };
+        }
+        Core.RandTuning.NewRandomness();
+        MetaData.LatestRun++;
+        MetaData.ActiveRun = true;
+        MetaData.TuningData = Core.RandTuning.CurrentToSaveData();
+    }
 
     public void GetStartingPlayerData()
     {
@@ -131,12 +302,12 @@ public class GameDataStorage
             modelHexUID = "8663CC29",
             friendly = true, playerControlled = true,
              baseHealth = 190,  healthScaling = 060,
-             baseAttack = 054,  attackScaling = 040,
+             baseAttack = 060,  attackScaling = 040,
             baseDefence = 015, defenceScaling = 020,
             speeds = new SpeedAtLevel[] { new SpeedAtLevel(0, 130) },
             attackType = DamageType.Type.None,
             actionSet = ActionSetName.PLAYER_A,
-            currentHealthPercent = 100f,
+            currentHealthPercent = 1f,
         };
         playerData[1] = new PlayerData()
         {
@@ -144,12 +315,12 @@ public class GameDataStorage
             modelHexUID = "E0E81A8C",
             friendly = true, playerControlled = true,
              baseHealth = 280,  healthScaling = 060,
-             baseAttack = 048,  attackScaling = 040,
+             baseAttack = 044,  attackScaling = 040,
             baseDefence = 015, defenceScaling = 020,
             speeds = new SpeedAtLevel[] { new SpeedAtLevel(0, 118) },
             attackType = DamageType.Type.None,
             actionSet = ActionSetName.PLAYER_B,
-            currentHealthPercent = 100f,
+            currentHealthPercent = 1f,
         };
         playerData[2] = new PlayerData()
         {
@@ -162,7 +333,7 @@ public class GameDataStorage
             speeds = new SpeedAtLevel[] { new SpeedAtLevel(0, 106) },
             attackType = DamageType.Type.None,
             actionSet = ActionSetName.PLAYER_C,
-            currentHealthPercent = 100f,
+            currentHealthPercent = 1f,
         };
         playerData[3] = new PlayerData()
         {
@@ -170,15 +341,78 @@ public class GameDataStorage
             modelHexUID = "ECBADC05",
             friendly = true, playerControlled = true,
              baseHealth = 250,  healthScaling = 060,
-             baseAttack = 030,  attackScaling = 040,
+             baseAttack = 036,  attackScaling = 040,
             baseDefence = 015, defenceScaling = 020,
             speeds = new SpeedAtLevel[] { new SpeedAtLevel(0, 098) },
             attackType = DamageType.Type.None,
             actionSet = ActionSetName.PLAYER_D,
-            currentHealthPercent = 100f,
+            currentHealthPercent = 1f,
         };
     }
 }
+
+public static class SaveDataUtility
+{
+    public static TileSaveData[] GetSaveData(this ICollection<LevelTile> tiles)
+    {
+        TileSaveData[] data = new TileSaveData[tiles.Count];
+        int i = 0;
+        foreach (LevelTile tile in tiles)
+        {
+            data[i++] = new TileSaveData(tile);
+        }
+        return data;
+    }
+    public static RoomSaveData[] GetSaveData(this ICollection<LevelRoom> rooms)
+    {
+        RoomSaveData[] data = new RoomSaveData[rooms.Count];
+        int i = 0;
+        foreach (LevelRoom room in rooms)
+        {
+            data[i++] = new RoomSaveData(room);
+        }
+        return data;
+    }
+    public static CorridorSaveData[] GetSaveData(this ICollection<LevelCorridor> corridors)
+    {
+        CorridorSaveData[] data = new CorridorSaveData[corridors.Count];
+        int i = 0;
+        foreach (LevelCorridor corridor in corridors)
+        {
+            data[i++] = new CorridorSaveData(corridor);
+        }
+        return data;
+    }
+    public static EnemySetSaveData[] GetSaveData(this ICollection<WorldEnemySet> enemies)
+    {
+        EnemySetSaveData[] result = new EnemySetSaveData[enemies.Count];
+        int i = 0;
+        foreach (WorldEnemySet set in enemies)
+        {
+            result[i++] = new EnemySetSaveData(set);
+        }
+        return result;
+    }
+    public static WorldItemSaveData[] GetSaveData(this ICollection<WorldItem> items)
+    {
+        WorldItemSaveData[] result = new WorldItemSaveData[items.Count];
+        int i = 0;
+        foreach (WorldItem item in items)
+        {
+            result[i++] = new WorldItemSaveData(item);
+        }
+        return result;
+    }
+}
+
+public class SaveDataWrapper
+{
+    public MapGenSaveData mapGenData;
+    public LevelPopSaveData lvlPopData;
+    public RunSaveData runData;
+}
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 public static class ElementDataUtility
 {
@@ -210,6 +444,7 @@ public static class ElementDataUtility
     }
 }
 
+#if UNITY_EDITOR
 [CustomPropertyDrawer(typeof(ElementList<>))]
 public class ElementListDrawer : PropertyDrawer
 {
@@ -225,6 +460,7 @@ public class ElementListDrawer : PropertyDrawer
         EditorGUI.EndProperty();
     }
 }
+#endif
 
 [System.Serializable]
 public struct ElementList<ElementData>
@@ -289,7 +525,7 @@ public class CombatantData : ElementData
 [System.Serializable]
 public class PlayerData : CombatantData
 {
-    public float currentHealthPercent = 100f;
+    public float currentHealthPercent = 1f;
     public Equipment equipment;
 }
 
@@ -299,10 +535,49 @@ public class EnemyData : CombatantData
     public EnemyClass Class;
     public bool wanderInWorld = true;
 
+    public static EnemyData[] DataFromPool(EnemyClass enemyClass, int count)
+    {
+        EnemyData[] dataOut = new EnemyData[count];
+        List<EnemyData>[] categorised = GameManager.Instance.GameData.EnemyData.Categorise();
+        switch (enemyClass)
+        {
+            default:
+                break;
+
+            case EnemyClass.Standard:
+                for (int i = 0; i < count; i++)
+                {
+                    dataOut[i] = categorised[0][Random.Range(0, categorised[0].Count)];
+                }
+                break;
+
+            case EnemyClass.Elite:
+                for (int i = 0; i < count; i++)
+                {
+                    dataOut[i] = categorised[1][Random.Range(0, categorised[1].Count)];
+                }
+                break;
+
+            case EnemyClass.Boss:
+                for (int i = 0; i < count; i++)
+                {
+                    dataOut[i] = categorised[2][Random.Range(0, categorised[2].Count)];
+                }
+                break;
+
+            case EnemyClass.Minion:
+                for (int i = 0; i < count; i++)
+                {
+                    dataOut[i] = categorised[3][Random.Range(0, categorised[3].Count)];
+                }
+                break;
+        }
+        return dataOut;
+    }
     public static EnemyData[] DataFromPool(EnemyClass[] classes)
     {
         EnemyData[] dataOut = new EnemyData[classes.Length];
-        List<EnemyData>[] categorised = GameManager.Instance.GameDataStorage.EnemyData.Categorise();
+        List<EnemyData>[] categorised = GameManager.Instance.GameData.EnemyData.Categorise();
         for (int i = 0; i < classes.Length; i++)
         {
             switch (classes[i])
@@ -329,6 +604,58 @@ public class EnemyData : CombatantData
         }
         return dataOut;
     }
+    public static int ClassDataInd(EnemyClass enemyClass)
+    {
+        List<EnemyData>[] categorised = GameManager.Instance.GameData.EnemyData.Categorise();
+        return enemyClass switch
+        {
+            EnemyClass.Standard => Random.Range(0, categorised[0].Count),
+            EnemyClass.Elite => Random.Range(0, categorised[1].Count),
+            EnemyClass.Boss => Random.Range(0, categorised[2].Count),
+            EnemyClass.Minion => Random.Range(0, categorised[3].Count),
+            _ => -1
+        };
+    }
+    public static int[] ClassDataInds(EnemyClass enemyClass, int count)
+    {
+        List<EnemyData>[] categorised = GameManager.Instance.GameData.EnemyData.Categorise();
+        int[] inds = new int[count];
+        switch (enemyClass)
+        {
+            case EnemyClass.Standard:
+                for (int i = 0; i < count; i++)
+                {
+                    inds[i] = Random.Range(0, categorised[0].Count);
+                }
+                break;
+
+            case EnemyClass.Elite:
+                for (int i = 0; i < count; i++)
+                {
+                    inds[i] = Random.Range(0, categorised[1].Count);
+                }
+                break;
+
+            case EnemyClass.Boss:
+                for (int i = 0; i < count; i++)
+                {
+                    inds[i] = Random.Range(0, categorised[2].Count);
+                }
+                break;
+
+            case EnemyClass.Minion:
+                for (int i = 0; i < count; i++)
+                {
+                    inds[i] = Random.Range(0, categorised[3].Count);
+                }
+                break;
+
+            default:
+                inds = new int[0];
+                break;
+        }
+        return inds;
+    }
 }
 
 /*[System.Serializable]
@@ -354,14 +681,14 @@ public class CombatantType
         get
         {
 #if UNITY_EDITOR
-            if (!Application.isPlaying && !EditorApplication.isPlaying)
+            if (!Application.isPlaying)
             {
                 GameManager.Instance.UpdateElementData();
             }
 #endif
-            if (!GameManager.Instance.GameDataStorage.EnemyData.InBounds(typeInd))
-                Debug.Log("No enemy data loaded! | " + typeInd + "/" + GameManager.Instance.GameDataStorage.EnemyData.Count);
-            List<EnemyData> enemies = GameManager.Instance.GameDataStorage.EnemyData;
+            if (!GameManager.Instance.GameData.EnemyData.InBounds(typeInd))
+                Debug.Log("No enemy data loaded! | " + typeInd + "/" + GameManager.Instance.GameData.EnemyData.Count);
+            List<EnemyData> enemies = GameManager.Instance.GameData.EnemyData;
             return enemies.InBounds(typeInd) ? enemies[typeInd] : null;
         }
     }
@@ -378,6 +705,7 @@ public class CombatantType
     }
 }
 
+#if UNITY_EDITOR
 [CustomPropertyDrawer(typeof(CombatantType))]
 public class CombatantTypeDrawer : PropertyDrawer
 {
@@ -409,6 +737,7 @@ public class CombatantTypeDrawer : PropertyDrawer
         EditorGUI.EndProperty();
     }
 }
+#endif
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -447,9 +776,9 @@ public class ItemType
                 GameManager.Instance.UpdateElementData();
             }
 #endif
-            if (!GameManager.Instance.GameDataStorage.ItemData.InBounds(typeInd))
-                Debug.Log("No item data loaded! | " + typeInd + "/" + GameManager.Instance.GameDataStorage.ItemData.Count);
-            List<ItemData> items = GameManager.Instance.GameDataStorage.ItemData;
+            if (!GameManager.Instance.GameData.ItemData.InBounds(typeInd))
+                Debug.Log("No item data loaded! | " + typeInd + "/" + GameManager.Instance.GameData.ItemData.Count);
+            List<ItemData> items = GameManager.Instance.GameData.ItemData;
             return items.InBounds(typeInd) ? items[typeInd] : null;
         }
     }
@@ -466,12 +795,13 @@ public class ItemType
     }
 }
 
+#if UNITY_EDITOR
 [CustomPropertyDrawer(typeof(ItemType))]
 public class ItemTypeDrawer : PropertyDrawer
 {
     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
     {
-        List<ItemData> data = GameManager.Instance.GameDataStorage.ItemData;
+        List<ItemData> data = GameManager.Instance.GameData.ItemData;
         string[] options = new string[data.Count];
         int[] optInds = new int[data.Count].IncrementalPopulate();
         int selected = property.FindPropertyRelative("typeInd").intValue;
@@ -497,6 +827,7 @@ public class ItemTypeDrawer : PropertyDrawer
         EditorGUI.EndProperty();
     }
 }
+#endif
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 

@@ -170,4 +170,14 @@ namespace NeoCambion
             return false;
         }
     }
+
+    namespace Unity
+    {
+        using UnityEngine.Events;
+
+        public static class UnityCallbackUtility
+        {
+            public static UnityAction UAction(this Callback callback) => new UnityAction(callback);
+        }
+    }
 }

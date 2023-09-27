@@ -1,21 +1,22 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEditor;
 
 using NeoCambion;
 using NeoCambion.Collections;
-using System.Runtime.CompilerServices;
-using Unity.VisualScripting;
-using NeoCambion.Unity.Interpolation;
+using NeoCambion.Collections.Unity;
+using NeoCambion.Interpolation;
 using NeoCambion.Maths;
-using UnityEditor;
-using UnityEngine.UIElements;
+using NeoCambion.Unity;
 
 public class WorldEnemy : WorldEntityCore
 {
+    private static List<EnemyData> EnemyData => GameManager.Instance.GameData.EnemyData;
+
     #region [ OBJECTS / COMPONENTS ]
 
-    public WorldEnemySet Set { get; private set; }
+    public WorldEnemySet Set { get; set; }
 
     #endregion
 
@@ -31,9 +32,19 @@ public class WorldEnemy : WorldEntityCore
     [Header("Combat Options")]
     [Range(1, 30)]
     public int level = 1;
-    public EnemyData enemyData;
+    public int dataIndex = -1;
+    private EnemyData _enemyData = null;
+    public EnemyData enemyData
+    {
+        get
+        {
+            if (_enemyData == null && EnemyData.InBounds(dataIndex))
+                _enemyData = EnemyData[dataIndex];
+            return _enemyData;
+        }
+    }
 
-    public EnemyClass Class { get { return enemyData.Class; } }
+    public EnemyClass Class { get { if (enemyData == null) Debug.Log("Data index: " + dataIndex); return enemyData.Class; } }
 
     //public WanderHandler wanderHandler;
     private List<Vector3> wanderPoints = new List<Vector3>();
@@ -50,27 +61,10 @@ public class WorldEnemy : WorldEntityCore
 
     #region [ BUILT-IN UNITY FUNCTIONS ]
 
-    protected override void Awake()
+    protected override void Initialise()
     {
-        base.Awake();
-    }
-
-    protected override void Start()
-    {
-        base.Start();
+        base.Initialise();
         GameManager.Instance.enemyListW.Add(this);
-
-    }
-
-    protected override void Update()
-    {
-        base.Update();
-    }
-
-    protected override void FixedUpdate()
-    {
-        base.FixedUpdate();
-
     }
 
     #endregion
@@ -90,9 +84,10 @@ public class WorldEnemy : WorldEntityCore
         for (int i = 0; i < 5; i++)
         {
             wanderPoints.Add(room.RandInternalPosition(closestTile));
+            if (wanderPoints.Last().x == float.NaN)
+                Debug.Log("Position adding failed!");
         }
 
-        LevelManager.AddEnemy(this);
         if (!disabled)
         {
             setupComplete = true;
@@ -100,11 +95,30 @@ public class WorldEnemy : WorldEntityCore
         }
     }
 
+    public void SetData(int index)
+    {
+        if (EnemyData.InBounds(index))
+        {
+            dataIndex = index;
+            _enemyData = EnemyData[index];
+            string modelPath = EntityModel.GetModelPathFromUID(enemyData.modelHexUID);
+            if (modelPath != null)
+            {
+                GameObject modelTemplate = Resources.Load<GameObject>(modelPath);
+                if (modelTemplate != null)
+                {
+                    model = modelTemplate.GetComponent<EntityModel>();
+                    UpdateModelObject(true);
+                }
+            }
+        }
+    }
     public void SetData(EnemyData data)
     {
         if (data != null)
         {
-            enemyData = data;
+            dataIndex = EnemyData.IndexOf(data);
+            _enemyData = data;
             string modelPath = EntityModel.GetModelPathFromUID(data.modelHexUID);
             if (modelPath != null)
             {
@@ -137,7 +151,12 @@ public class WorldEnemy : WorldEntityCore
             last = transform.position;
             target = wanderPoints[Random.Range(0, wanderPoints.Count)];
         }
+        if (last.x == float.NaN)
+            Debug.Log("Origin position invalid!");
+        if (target.x == float.NaN)
+            Debug.Log("Target position invalid!");
         float facing, dist, t, tMax, delta;
+        Vector3 deltaPos;
         while (!halt)
         {
             facing = (target - transform.position).Angle2D(DualAxis.XZ);
@@ -150,7 +169,12 @@ public class WorldEnemy : WorldEntityCore
                 yield return null;
                 t += Time.deltaTime;
                 delta = t / tMax;
-                transform.position = Vector3.Lerp(last, target, delta);
+                deltaPos = Vector3.Lerp(last, target, delta);
+                if (deltaPos.x == float.NaN)
+                    Debug.Log("Lerped position invalid!");
+                if (transform.position.x == float.NaN)
+                    Debug.Log("Current position invalid!");
+                transform.position = deltaPos;
             }
             if (!halt)
             {
@@ -187,36 +211,99 @@ public class WorldEnemySet
 {
     public LevelArea area;
 
-    public WorldEnemy[] enemies;
+    public List<WorldEnemy> enemies;
     public EnemyData[] enemyData => GetData();
-    public int Size { get { return enemies.Length; } }
+    public int[] dataIndices => GetDataIndices();
+    public int Size { get { return enemies.Count; } }
+
+    public bool defeated = false;
+
+    public WorldEnemySet(LevelArea area = null)
+    {
+        this.area = area;
+        enemies = new List<WorldEnemy>();
+    }
+    public WorldEnemySet(IList<WorldEnemy> toAdd, LevelArea area = null)
+    {
+        this.area = area;
+        enemies = new List<WorldEnemy>();
+        enemies.AddRange(toAdd);
+    }
 
     public WorldEnemy this[int index]
     {
         get { return enemies.InBounds(index) ? enemies[index] : null; }
         set { if (enemies.InBounds(index)) { enemies[index] = value; } }
     }
-
-    public WorldEnemySet(int setSize, LevelArea area)
+    public EnemyData GetData(int index)
     {
-        enemies = new WorldEnemy[setSize];
-        this.area = area;
+        if (enemies.InBounds(index))
+            return enemies[index].enemyData;
+        else
+            return null;
     }
-
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
+    public int GetDataIndex(int index)
+    {
+        if (enemies.InBounds(index))
+            return enemies[index].dataIndex;
+        else
+            return -1;
+    }
     public EnemyData[] GetData()
     {
-        EnemyData[] data = new EnemyData[enemies.Length];
-        for (int i = 0; i < enemies.Length; i++)
+        EnemyData[] data = new EnemyData[enemies.Count];
+        for (int i = 0; i < enemies.Count; i++)
         {
             data[i] = enemies[i].enemyData;
         }
         return data;
     }
+    public int[] GetDataIndices()
+    {
+        int[] indices = new int[enemies.Count];
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            indices[i] = enemies[i].dataIndex;
+        }
+        return indices;
+    }
+    public void Add(WorldEnemy newEnemy, Vector3 position)
+    {
+        enemies.Add(newEnemy);
+        newEnemy.Setup(new PositionInArea(area.ID, position), this);
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
     public void TriggerCombat() => GameManager.Instance.OnCombatStart(this);
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public void Reset()
+    {
+        if (enemies == null)
+            enemies = new List<WorldEnemy>();
+        else
+            enemies.ClearAndDestroy();
+    }
+
+    public void OnDefeated()
+    {
+        defeated = true;
+        foreach (WorldEnemy enemy in enemies)
+        {
+            if (enemy.enemyData.Class == EnemyClass.Standard)
+                GameDataStorage.Data.runData.e_killedInStage.standard++;
+            else if (enemy.enemyData.Class == EnemyClass.Elite)
+                GameDataStorage.Data.runData.e_killedInStage.standard++;
+            else if (enemy.enemyData.Class == EnemyClass.Boss)
+                GameDataStorage.Data.runData.e_killedInStage.standard++;
+        }
+        Reset();
+    }
 }
 
+#if UNITY_EDITOR
 [CustomEditor(typeof(WorldEnemy))]
 public class WorldEnemyEditor : Editor
 {
@@ -234,3 +321,4 @@ public class WorldEnemyEditor : Editor
         }
     }
 }
+#endif

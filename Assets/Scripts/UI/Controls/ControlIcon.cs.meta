@@ -3,9 +3,15 @@ guid: 77e698bdc43713d498a9b2976a20979f
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - fallback: {fileID: 21300000, guid: 60d1ab4ac9c482b42ab2f61ae3ce2867, type: 3}
+  - mouseAndKeyboard: {instanceID: 0}
+  - gamepadGeneric: {instanceID: 0}
+  - gamepadXbox: {instanceID: 0}
+  - gamepadPlaystation: {instanceID: 0}
+  - gamepadNintendo: {instanceID: 0}
   executionOrder: 0
-  icon: {instanceID: 0}
+  icon: {fileID: 2800000, guid: e2078613efd9e410c8771cbd2717f4e7, type: 3}
   userData: 
   assetBundleName: 
   assetBundleVariant: 

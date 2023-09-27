@@ -20,7 +20,7 @@ public class Minimap : UIObject
             this.markerSize = markerSize;
         }
 
-        public void Apply(Minimap minimap)
+        public readonly void Apply(Minimap minimap)
         {
             minimap.cam.rect = viewportRect;
             minimap.cam.orthographicSize = viewportSize;
@@ -50,6 +50,13 @@ public class Minimap : UIObject
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+    protected override void Initialise()
+    {
+        base.Initialise();
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
     public void SetState(MinimapState state)
     {
         if (state != currentState)
@@ -65,15 +72,15 @@ public class Minimap : UIObject
                     break;
 
                 case MinimapState.Corner:
-                    cornerFrame.gameObject.SetActive(true);
-                    fullviewFrame.gameObject.SetActive(false);
+                    cornerFrame.Show(true);
+                    fullviewFrame.Show(false);
                     cam.enabled = true;
                     corner.Apply(this);
                     break;
 
                 case MinimapState.Fullview:
-                    cornerFrame.gameObject.SetActive(false);
-                    fullviewFrame.gameObject.SetActive(true);
+                    cornerFrame.Show(false);
+                    fullviewFrame.Show(true);
                     cam.enabled = true;
                     fullview.Apply(this);
                     break;
@@ -83,6 +90,8 @@ public class Minimap : UIObject
 
     public override void Toggle()
     {
+        if (!visible)
+            Debug.Log("Minimap is currently set as hidden");
         switch (currentState)
         {
             default:
@@ -90,16 +99,16 @@ public class Minimap : UIObject
                 break;
 
             case MinimapState.Corner:
-                cornerFrame.gameObject.SetActive(false);
-                fullviewFrame.gameObject.SetActive(true);
+                cornerFrame.Show(false);
+                fullviewFrame.Show(true);
                 cam.gameObject.SetActive(true);
                 currentState = MinimapState.Fullview;
                 fullview.Apply(this);
                 break;
 
             case MinimapState.Fullview:
-                cornerFrame.gameObject.SetActive(true);
-                fullviewFrame.gameObject.SetActive(false);
+                cornerFrame.Show(true);
+                fullviewFrame.Show(false);
                 cam.gameObject.SetActive(true);
                 currentState = MinimapState.Corner;
                 corner.Apply(this);
@@ -107,6 +116,6 @@ public class Minimap : UIObject
         }
     }
 
-    protected override void OnShow() => SetState(MinimapState.Corner);
-    protected override void OnHide() => SetState(MinimapState.Hidden);
+    public override void OnShow() => SetState(MinimapState.Corner);
+    public override void OnHide() => SetState(MinimapState.Hidden);
 }

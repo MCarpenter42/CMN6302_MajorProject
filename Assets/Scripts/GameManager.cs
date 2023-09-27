@@ -3,110 +3,91 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using UnityEditor;
 
 using NeoCambion;
-using NeoCambion.IO;
-using NeoCambion.IO.Unity;
 using NeoCambion.Maths;
-using NeoCambion.Unity;
+#if UNITY_EDITOR
 using NeoCambion.Unity.Editor;
+#endif
+using NeoCambion.Collections;
+using NeoCambion.Unity;
 
 [RequireComponent(typeof(ControlsHandler))]
 [RequireComponent(typeof(RandTuning))]
-[RequireComponent(typeof(ProgressData))]
 public class GameManager : Core
 {
+#if UNITY_EDITOR
     public static string prefabPath { get { return AssetDatabase.GetAssetPath(Instance.gameObject); } }
+#endif
+    public static string surveyURL = "forms.gle/dFWUYRF98AFXvyUW7";
+    public static string LastRunCode = null;
+
+    public static Dictionary<Core, Callback> Initialisers = new Dictionary<Core, Callback>();
+    public void InitialiseAll()
+    {
+        foreach (KeyValuePair<Core, Callback> kvp in Initialisers)
+        {
+            if (kvp.Key.GetType() != typeof(LoadingScreen))
+                kvp.Value.Invoke();
+        }
+        Initialisers.Clear();
+    }
 
     #region [ OBJECTS / COMPONENTS ]
 
-    private static GameManager instance = null;
-
-    public SceneAttributes SceneAttributes = null;
-
-    private ControlsHandler _ControlsHandler = null;
-    public ControlsHandler ControlsHandler
-    {
-        get
-        {
-            if (_ControlsHandler == null)
-            {
-                _ControlsHandler = Instance.gameObject.GetComponent<ControlsHandler>();
-            }
-            return _ControlsHandler;
-        }
-    }
-    public GameDataStorage GameDataStorage = new GameDataStorage();
-
-    public UIManager UI { get { return UIManager; } }
-    public LevelManager Level { get { return LevelManager; } }
-
-    public WorldPlayer playerW = null;
-    public PlayerCam cameraW = null;
-
-    public List<WorldEnemy> enemyListW = new List<WorldEnemy>();
-
-    #endregion
+    public GameDataStorage GameData = new GameDataStorage();
 
     public TextAsset dataJSON_enemies;
     public TextAsset dataJSON_items;
 
-    #region [ PROPERTIES ]
+    public UIManager UI { get { return UIManager; } }
+    public LevelManager Level { get { return LevelManager; } }
+    public SceneAttributes SceneAttributes = null;
 
-    #region [ EDITOR DEBUG TOGGLES ]
-#if UNITY_EDITOR
-    public bool debugOnAwake;
-    public bool debugOnStart;
-    public bool debugOnUpdate;
-    public bool debugOnFixedUpdate;
-#endif
+    public WorldPlayer Player = null;
+    public Camera WorldCam = null;
+    public PlayerCam WorldCamPivot = null;
+
+    public List<WorldEnemy> enemyListW = new List<WorldEnemy>();
+
+    private LoadingScreen loadingScreen = null;
+    public LoadingScreen LoadingScreen
+    {
+        get
+        {
+            if (loadingScreen == null)
+                loadingScreen = GetComponentInChildren<Canvas>().GetComponentInChildren<LoadingScreen>();
+            return loadingScreen;
+        }
+        set { loadingScreen = value; }
+    }
+
     #endregion
 
-    public static bool onGameLoad = true;
+    #region [ PROPERTIES ]
 
-    public static bool applicationPlaying
-    {
-        get
-        {
-            bool playing = Application.isPlaying;
-#if UNITY_EDITOR
-            playing = playing || EditorApplication.isPlaying;
-#endif
-            return playing;
-        }
-    }
+    public static bool Initialised = false;
 
-    public static bool gamePaused = false;
-    public static bool allowPauseToggle = true;
-    private static ControlState _controlState = ControlState.World;
-    public static ControlState controlState
-    {
-        get
-        {
-            return _controlState;
-        }
-        set
-        {
-            switch (value)
-            {
-                default:
-                case ControlState.None:
-                    Cursor.lockState = CursorLockMode.None;
-                    break;
-                case ControlState.Menu:
-                    Cursor.lockState = CursorLockMode.None;
-                    break;
-                case ControlState.World:
-                    Cursor.lockState = CursorLockMode.Locked;
-                    break;
-                case ControlState.Combat:
-                    Cursor.lockState = CursorLockMode.None;
-                    break;
-            }
-            _controlState = value;
-        }
-    }
+    public static bool Runtime => Application.isPlaying;
+    public static bool GamePaused { get; private set; }
+    public static bool StageLoaded { get; private set; }
+    private bool sceneTransitionInProgress = false;
+    public static bool InSceneTransition => instance == null ? false : instance.sceneTransitionInProgress;
+
+    public static bool AllowPause =>
+    new bool[] {
+        LevelManager != null,
+        /*StageLoaded,*/
+        !InSceneTransition,
+        Instance.SceneAttributes.GameplayScene,
+    }.AND();
+
+    private static ControlState lastControlState = ControlState.None;
+    public static ControlState controlState { get; private set; }
+
+    public static bool lockPlayerPosition = true;
 
     public static Vector2 windowCentre { get { return new Vector2(Screen.width, Screen.height) / 2.0f; } }
 
@@ -118,6 +99,15 @@ public class GameManager : Core
 
     #endregion
 
+    #region [ EDITOR DEBUG TOGGLES ]
+#if UNITY_EDITOR
+    public bool debugOnAwake;
+    public bool debugOnStart;
+    public bool debugOnUpdate;
+    public bool debugOnFixedUpdate;
+#endif
+    #endregion
+
     #region [ CALLBACKS ]
 
     public UnityEvent callback_debugOnAwake;
@@ -127,9 +117,13 @@ public class GameManager : Core
 
     #endregion
 
-    #region [ COROUTINES ]
+    #region [ PROCESSES ]
 
+    private Coroutine c_SceneTransition = null;
     private Coroutine c_OnCombatEnd = null;
+
+    private AsyncOperation AsyncSceneLoad = null;
+    public bool SceneLoadComplete => AsyncSceneLoad == null || AsyncSceneLoad.isDone;
 
     #endregion
 
@@ -137,157 +131,149 @@ public class GameManager : Core
 
     #region [ SINGLETON CONTROL ]
 
-    public static GameManager Instance
+    private static GameManager instance = null;
+    public static GameManager Instance => GetInstance();
+
+    private static GameManager GetInstance()
     {
-        get
+        if (instance == null)
         {
+            instance = FindObjectOfType<GameManager>();
             if (instance == null)
-            {
-                GameManager inst = FindObjectOfType<GameManager>();
-                if (inst == null)
-                {
-                    GameObject obj = new GameObject("GameManager");
-                    instance = obj.AddComponent<GameManager>();
-
-                    instance.Init();
-
-                    // Prevents game manager from being destroyed on loading of a new scene
-                    DontDestroyOnLoad(obj);
-
-                    Debug.Log(obj.name);
-                }
-                instance = inst;
-            }
-            return instance;
+                instance = new GameObject("GameManager").AddComponent<GameManager>();
+            EnableScenePersistence(instance);
         }
+        return instance;
     }
 
-    // Initialiser function, serves a similar purpose to a constructor
-    private void Init()
+    private static void EnableScenePersistence(GameManager instance)
     {
-        //Setup();
+        DontDestroyOnLoad(instance);
+        for (int i = 0; i < instance.transform.childCount; i++)
+        {
+            DontDestroyOnLoad(instance.transform.GetChild(i).gameObject);
+        }
     }
 
     #endregion
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    public static void OnSceneLoad()
+    {
+        bool firstLoad = !Initialised;
+        if (firstLoad)
+            Instance.Initialise();
+
+        if (!InSceneTransition)
+        {
+            Instance.SceneAttributes = FindObjectOfType<SceneAttributes>().ExceptionIfNotFound(ObjectSearchException.Scene);
+            GetStaticReferences(firstLoad);
+            Instance.SceneSetup();
+        }
+        //StageLoaded = false;
+        if (GamePaused)
+            Resume();
+    }
+
+    public new void Initialise()
+    {
+        GameData = new GameDataStorage();
+        GetComponent<ControlsHandler>().AddListeners();
+        // LOAD DATA FROM DISK HERE
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+    
+    public static void GetStaticReferences(bool firstLoad)
+    {
+        if (firstLoad)
+        {
+            ControlsHandler = Instance.GetComponent<ControlsHandler>().ExceptionIfNotFound(ObjectSearchException.Component);
+            RandTuning = Instance.GetComponent<RandTuning>().ExceptionIfNotFound(ObjectSearchException.Component);
+        }
+
+        EventSystem = FindObjectOfType<EventSystem>().ExceptionIfNotFound(ObjectSearchException.Component);
+        LevelManager = FindObjectOfType<LevelManager>().ExceptionIfNotFound(ObjectSearchException.Scene);
+        UIManager = FindObjectOfType<UIManager>().ExceptionIfNotFound(ObjectSearchException.Scene);
+    }
+
+#if UNITY_EDITOR
+    public void UpdateElementData()
+    {
+        if (!Runtime)
+        {
+            Instance.GameData.EditorLoad();
+            PrefabUtility.ApplyObjectOverride(Instance, prefabPath, InteractionMode.AutomatedAction);
+            AssetDatabase.SaveAssets();
+        }
+    }
+#endif
+
+    public bool[] EditorObjectSearch()
+    {
+        return new bool[]
+        {
+            FindObjectOfType<UIManager>() != null,
+            FindObjectOfType<LevelManager>() != null,
+            FindObjectOfType<PlayerCam>() != null,
+            FindObjectOfType<WorldPlayer>() != null,
+        };
+    }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    #region [ BUILT-IN UNITY FUNCTIONS ]
-
-    void Awake()
+    new void Awake()
     {
         if (Application.isPlaying)
         {
             if (instance == null)
             {
+                Debug.Log("Setting static instance as self");
                 instance = this;
                 DontDestroyOnLoad(gameObject);
             }
-            else
+            else if (instance != this)
             {
                 Destroy(gameObject);
             }
-
-            if (onGameLoad)
-            {
-                Setup();
-            }
-            OnAwake();
+            if (!InSceneTransition)
+                OnAwake();
         }
-        
-        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-#if UNITY_EDITOR
-        if (debugOnAwake)
-            OnAwakeDebug();
-#endif
-    }
-
-    void Start()
-    {
-        
-
-        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-#if UNITY_EDITOR
-        if (debugOnStart)
-            OnStartDebug();
-#endif
-    }
-
-    void Update()
-    {
-
-
-        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-#if UNITY_EDITOR
-        if (debugOnUpdate)
-            OnUpdateDebug();
-#endif
-    }
-
-    void FixedUpdate()
-    {
-
-
-        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-#if UNITY_EDITOR
-        if (debugOnFixedUpdate)
-            OnFixedUpdateDebug();
-#endif
-    }
-
-    #endregion
-
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-    public void Setup()
-    {
-        onGameLoad = false;
     }
 
     public void OnAwake()
     {
-        GameDataStorage.LoadData();
-        // MAKE SURE THINGS PULL FROM THIS AT RUNTIME
-
-        /*float xPos = Camera.main.pixelWidth / 2.0f;
-        float yPos = Camera.main.pixelHeight / 2.0f;
-        windowCentre = new Vector3(xPos, yPos, 0.0f);*/
-
-        if (EventSystem == null)
-            EventSystem = FindObjectOfType<EventSystem>();
-        GetSceneState();
-
-        if (controlState == ControlState.Menu)
-        {
-
-        }
-        else if (controlState == ControlState.World)
-        {
-            enemyListW.Clear();
-            UI.HUD.ShowHUD(ControlState.World);
-        }
+        if (Runtime)
+            GameData.RuntimeLoad();
         else
-        {
-
-        }
+            GameData.EditorLoad();
+        SetControlState(SceneAttributes.InitialControlState);
     }
 
     public void OnPause()
     {
-        gamePaused = true;
-        Time.timeScale = 0.0f;
-        if (controlState == ControlState.World)
-            Cursor.lockState = CursorLockMode.None;
-        Debug.Log("Paused");
+        if (AllowPause && !GamePaused)
+        {
+            GamePaused = true;
+            Time.timeScale = 0.0f;
+            lastControlState = controlState;
+            SetControlState(ControlState.Menu);
+            Debug.Log("Paused");
+            UIManager.menu.Show(true);
+        }
     }
 
     public void OnResume()
     {
-        gamePaused = false;
-        Time.timeScale = 1.0f;
-        if (controlState == ControlState.World)
-            Cursor.lockState = CursorLockMode.Locked;
-        Debug.Log("Resumed");
+        if (GamePaused)
+        {
+            GamePaused = false;
+            Time.timeScale = 1.0f;
+            SetControlState(lastControlState);
+            Debug.Log("Resumed");
+            if (UIManager.menu != null)
+                UIManager.menu.Show(false);
+        }
     }
 
     public void OnLog()
@@ -297,78 +283,159 @@ public class GameManager : Core
 
     public static void SetControlState(ControlState state)
     {
-        controlState = state;
-        Instance.ControlsHandler.SetControlState(state);
+        if (state != controlState)
+        {
+            controlState = state;
+            ControlsHandler.SetControlState(state);
+            switch (state)
+            {
+                default:
+                    Cursor.lockState = CursorLockMode.None;
+                    break;
+
+                case ControlState.World:
+                    Cursor.lockState = CursorLockMode.Locked;
+                    break;
+            }
+        }
     }
 
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-    public void GetSceneState()
+    public void SceneSetup()
     {
-        SceneAttributes = FindObjectOfType<SceneAttributes>();
+        //Debug.Log("Setting up scene \"" + SceneInfo.Active.name + "\"");
+        if (SceneAttributes.GameplayScene)
+        {
+            //Debug.Log("Scene is tagged for gameplay, with an initial control state of " + SceneAttributes.InitialControlState.ToString());
+            Player = LevelManager.Player.ExceptionIfNotFound(ObjectSearchException.Generic);
+            WorldCam = LevelManager.camWorld.ExceptionIfNotFound(ObjectSearchException.Generic);
+            WorldCamPivot = WorldCam.transform.parent.parent.GetComponent<PlayerCam>().ExceptionIfNotFound(ObjectSearchException.Generic);
 
-        if (SceneAttributes == null)
-        {
-            new GameObject("Scene Attributes", typeof(SceneAttributes));
-        }
-
-        if (!SceneAttributes.levelScene)
-        {
-            controlState = ControlState.Menu;
-            cameraW = null;
-            playerW = null;
-        }
-        else if (Level == null)
-        {
-            controlState = ControlState.None;
-            playerW = null;
-            cameraW = null;
-            Debug.LogError("A LevelManager object must be prewent in any level scene!");
+            enemyListW.Clear();
+            UI.HUD.ShowHUD(ControlState.World);
         }
         else
         {
-            controlState = ControlState.World;
-            cameraW = FindObjectOfType<PlayerCam>();
-            playerW = FindObjectOfType<WorldPlayer>();
+            //Debug.Log("Scene is NOT tagged for gameplay, with an initial control state of " + SceneAttributes.InitialControlState.ToString());
+            Player = null;
+            WorldCam = null;
         }
     }
 
-    public void UpdateElementData()
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public static void GoToScene(SceneID scene)
     {
-        Instance.GameDataStorage.LoadData();
-        PrefabUtility.ApplyObjectOverride(Instance, prefabPath, InteractionMode.AutomatedAction);
-        AssetDatabase.SaveAssets();
+        int buildIndex = (int)scene;
+        try
+        {
+            SceneManager.GetSceneByBuildIndex(buildIndex);
+            Instance.SceneTransition(buildIndex);
+        }
+        catch
+        {
+            Debug.LogError("Build index " + buildIndex + " does not point to a valid scene!");
+        }
     }
 
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-    
-    public void StartNewGame()
+    public void SceneTransition(int buildIndex)
     {
-        GameDataStorage.GetStartingPlayerData();
+        if (c_SceneTransition != null)
+            StopCoroutine(c_SceneTransition);
+        c_SceneTransition = StartCoroutine(ISceneTransition(SceneInfo.Active.buildIndex, buildIndex, 4f));
+    }
+
+    private IEnumerator ISceneTransition(int fromScene, int toScene, float minDuration, float pauseRatio = 0.2f)
+    {
+        Initialisers.Clear();
+
+        sceneTransitionInProgress = true;
+
+        if (pauseRatio < 0.05f)
+            pauseRatio = 0.05f;
+        else if (pauseRatio > 0.95f)
+            pauseRatio = 0.95f;
+
+        float[] segments = new float[2];
+        segments[1] = minDuration * pauseRatio;
+        segments[0] = (minDuration - segments[1]) / 2f;
+
+        LoadingScreen.disableInit = true;
+        LoadingScreen.Show();
+        LoadingScreen.AlphaPulse(0f, 1f, minDuration * (1f - pauseRatio), () => !InSceneTransition, true);
+        yield return new WaitForSecondsRealtime(segments[0]);
+
+        AsyncSceneLoad = SceneManager.LoadSceneAsync(toScene, LoadSceneMode.Single);
+        yield return new WaitForSecondsRealtime(segments[1]);
+        yield return new WaitUntil(() => SceneLoadComplete);
+
+        if (GamePaused)
+            TogglePause();
+
+        SceneManager.SetActiveScene(SceneManager.GetSceneByBuildIndex(toScene));
+        SceneAttributes = FindObjectOfType<SceneAttributes>().ExceptionIfNotFound(ObjectSearchException.Scene);
+        GetStaticReferences(false);
+        SceneSetup();
+        OnAwake();
+        InitialiseAll();
+        sceneTransitionInProgress = false;
+        yield return new WaitForSecondsRealtime(segments[0]);
     }
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public void OnCombatStart(WorldEnemySet triggerGroup)
     {
-        if (GameDataStorage.playerData == null)
-            GameDataStorage.GetStartingPlayerData();
+        Player.ClearInteractions();
+        if (GameData.playerData == null)
+            GameData.GetStartingPlayerData();
         Level.SetAIPause(true);
         Level.CombatTransition(true, 1.0f);
-        Level.Combat.StartCombatDelayed(GameDataStorage.playerData, triggerGroup.enemyData, 0.5f);
+        Level.Combat.StartCombatDelayed(GameData.playerData, triggerGroup.enemyData, 0.5f);
+        Level.currentCombatRoom = triggerGroup.area.ID;
     }
 
     public void OnCombatEnd()
     {
         Level.CombatTransition(false, 1.0f);
         c_OnCombatEnd = StartCoroutine(IOnCombatEnd(1.0f));
+        Level.currentCombatRoom = LevelArea.NullID;
+        Player.FindInteractions();
     }
-
     private IEnumerator IOnCombatEnd(float duration)
     {
         yield return new WaitForSeconds(duration);
         Level.SetAIPause(false);
     }
+    
+    public void OnCombatEnd(bool playerWon, float delay = 0f) => c_OnCombatEnd = StartCoroutine(IOnCombatEnd(playerWon, delay, 1f));
+    private IEnumerator IOnCombatEnd(bool playerWon, float delay, float duration)
+    {
+        UIManager.HUD.CombatEndScreen(true, delay - 1f + duration / 2f);
+        yield return new WaitForSeconds(delay);
+        Level.CombatTransition(false, duration);
+        if (playerWon)
+        {
+            Debug.Log("Player won combat!");
+            Level.ClearCurrentCombatRoom();
+            Level.currentCombatRoom = LevelArea.NullID;
+            Player.FindInteractions(0.1f);
+        }
+        else
+        {
+            Debug.Log("Player lost combat!");
+        }
+        GameData.SaveRunData();
+        Debug.Log("- - - - -");
+        yield return new WaitForSeconds(duration);
+        if (GameData.runData.p_allAlive)
+            Level.SetAIPause(false);
+        else
+            LevelManager.OnRunLost();
+    }
+
+    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+    public static void OpenSurvey() => Application.OpenURL("https://" + surveyURL);
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -415,6 +482,7 @@ public class GameManager : Core
     #endregion
 }
 
+#if UNITY_EDITOR
 [CustomEditor(typeof(GameManager))]
 [CanEditMultipleObjects]
 public class GameManagerEditor : Editor
@@ -470,11 +538,11 @@ public class GameManagerEditor : Editor
     private Rect elementRect;
     private GUIContent label = new GUIContent();
 
-    private bool showElementData;
-    private bool showRequiredObjects;
-    private bool[] objectsFound;
-    private bool[] objectsNecessary;
-    private bool showDebug;
+    private static bool showElementData;
+    private static bool showRequiredObjects;
+    private static bool[] objectsFound;
+    private static bool[] objectsNecessary;
+    private static bool showDebug;
 
     public override void OnInspectorGUI()
     {
@@ -488,45 +556,41 @@ public class GameManagerEditor : Editor
 
         bool[] bools = new bool[5] { false, false, false, false, false };
 
+        label.tooltip = null;
         EditorElements.BeginHorizVert(EditorStylesExtras.noMarginsNoPadding, GUIStyle.none);
         {
             label.text = "Enemy JSON Data";
-            label.tooltip = null;
-
             EditorGUILayout.PropertyField(serializedObject.FindProperty("dataJSON_enemies"), label);
             
             label.text = "Item JSON Data";
-            label.tooltip = null;
-
             EditorGUILayout.PropertyField(serializedObject.FindProperty("dataJSON_items"), label);
 
             EditorGUILayout.Space(4.0f);
 
-            label.text = "Game Element Data";
-            label.tooltip = null;
+            /*label.text = "Loading Screen";
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("LoadingScreen"), label);
 
+            EditorGUILayout.Space(4.0f);*/
+
+            label.text = "Game Element Data";
             if (showElementData = EditorGUILayout.Foldout(showElementData, label, true, EditorStylesExtras.foldoutLabel))
             {
                 EditorElements.BeginSubSection(10.0f, 0);
                 {
                     label.text = "Enemy Entries";
-                    label.tooltip = null;
-
                     elementRect = EditorElements.PrefixLabel(label);
-                    EditorGUI.LabelField(elementRect, targ.GameDataStorage.EnemyData.Count.ToString());
+                    EditorGUI.LabelField(elementRect, targ.GameData.EnemyData.Count.ToString());
 
                     label.text = "Item Entries";
-                    label.tooltip = null;
-
                     elementRect = EditorElements.PrefixLabel(label);
-                    EditorGUI.LabelField(elementRect, targ.GameDataStorage.ItemData.Count.ToString());
+                    EditorGUI.LabelField(elementRect, targ.GameData.ItemData.Count.ToString());
                 }
                 EditorElements.EndSubSection();
             }
 
             EditorGUILayout.Space(8.0f);
 
-            label.text = "Scene Objects";
+            /*label.text = "Scene Objects";
             label.tooltip = null;
                  
             EditorElements.SectionHeader(label);
@@ -537,11 +601,9 @@ public class GameManagerEditor : Editor
                 elementRect.height += 6;
                 if (GUI.Button(elementRect, "Search For Objects"))
                 {
-                    targ.GetSceneState();
+                    objectsFound = targ.EditorObjectSearch();
                 }
-
-                objectsFound = new bool[] { targ.UI != null, targ.Level != null, targ.cameraW != null, targ.playerW != null };
-                objectsNecessary = new bool[] { true, true, (targ.Level == null ? false : targ.SceneAttributes.levelScene), (targ.Level == null ? false : targ.SceneAttributes.levelScene) };
+                objectsNecessary = new bool[] { true, true, (targ.Level == null ? false : targ.SceneAttributes.GameplayScene), (targ.Level == null ? false : targ.SceneAttributes.GameplayScene) };
 
                 EditorGUILayout.Space(6.0f);
 
@@ -600,11 +662,9 @@ public class GameManagerEditor : Editor
             }
             EditorElements.EndSubSection();
 
-            EditorGUILayout.Space(8.0f);
+            EditorGUILayout.Space(8.0f);*/
 
             label.text = "Debugging";
-            label.tooltip = null;
-                
             if (showDebug = EditorGUILayout.Foldout(showDebug, label, true, EditorStylesExtras.foldoutLabel))
             {
                 EditorElements.BeginSubSection(10.0f, 0);
@@ -679,13 +739,14 @@ public class GameManagerEditor : Editor
         }
         EditorElements.EndHorizVert();
 
-        bools[0] |= serializedObject.hasModifiedProperties;
+        bools[0] |= serializedObject.hasModifiedProperties && PrefabUtility.IsPartOfPrefabInstance(target);
         serializedObject.ApplyModifiedProperties();
         if (bools[0])
             PrefabUtility.ApplyPrefabInstance(targ.gameObject, InteractionMode.AutomatedAction);
     }
 
 }
+#endif
 
 public class TestClass
 {

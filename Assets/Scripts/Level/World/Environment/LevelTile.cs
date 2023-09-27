@@ -2,14 +2,16 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using UnityEngine;
-using UnityEditor;
 
 using NeoCambion;
 using NeoCambion.Collections;
 using NeoCambion.Maths;
 using NeoCambion.Unity;
+
+#if UNITY_EDITOR
+using UnityEditor;
 using NeoCambion.Unity.Editor;
-using Unity.VisualScripting;
+#endif
 
 public class LevelTile : Core
 {
@@ -84,6 +86,10 @@ public class LevelTile : Core
             }
         }
 
+        public HexConnections(ConnectionState[] values)
+        {
+            _values = values;
+        }
         public HexConnections(ConnectionState setAllTo = ConnectionState.None)
         {
             _values = new ConnectionState[6];
@@ -109,6 +115,24 @@ public class LevelTile : Core
         public bool Connected(int index) => !(values[index.WrapClamp(0, 5)] == ConnectionState.None || values[index.WrapClamp(0, 5)] == ConnectionState.Block);
         public bool Connected(HexGridDirection direction) => !(this[direction] == ConnectionState.None || this[direction] == ConnectionState.Block);
 
+        public void Overwrite(IList<int> newValues)
+        {
+            if (_values == null)
+                values = new ConnectionState[6];
+            for (int i = 0; i < _values.Length && i < newValues.Count; i++)
+            {
+                _values[i] = (ConnectionState)newValues[i];
+            }
+        }
+        public void Overwrite(IList<ConnectionState> newValues)
+        {
+            if (_values == null)
+                values = new ConnectionState[6];
+            for (int i = 0; i < _values.Length && i < newValues.Count; i++)
+            {
+                _values[i] = newValues[i];
+            }
+        }
         public void Replace(ConnectionState replace = ConnectionState.None, ConnectionState replaceWith = ConnectionState.Block)
         {
             for (int i = 0; i < Length; i++)
@@ -146,11 +170,10 @@ public class LevelTile : Core
 
     public TileType type = TileType.None;
     public bool emptySpace { get { return type == TileType.None || type == TileType.Empty; } }
+    public float chanceForEmpty = 0f;
 
     public HexConnections connections = new HexConnections();
     public bool fullyMerged => connections.fullyMerged;
-
-    public float chanceForEmpty = 0.0f;
 
     public bool isCorridorEndcap
     {
@@ -173,12 +196,14 @@ public class LevelTile : Core
     public Vector3 localPosition { get { return gameObject.transform.localPosition; } set { gameObject.transform.localPosition = value; } }
     public Vec2Int gridPosition { get; private set; }
 
-    public Mesh mesh { get { return gameObject.GetComponent<MeshFilter>().sharedMesh; } set { gameObject.GetComponent<MeshFilter>().sharedMesh = value; } }
-    public MeshFilter meshFilter { get { return gameObject.GetComponent<MeshFilter>(); } }
-    public MeshRenderer meshRenderer { get { return gameObject.GetComponent<MeshRenderer>(); } }
+    public Mesh mesh { get { return GetComponent<MeshFilter>().sharedMesh; } set { GetComponent<MeshFilter>().sharedMesh = value; } }
+    public MeshFilter meshFilter => GetComponent<MeshFilter>();
+    public MeshRenderer meshRenderer => GetComponent<MeshRenderer>();
+    public Material material { get { return meshRenderer.sharedMaterial; } set { meshRenderer.sharedMaterial = value; } }
 
-    private GameObject colliderObj = null;
-    private MeshCollider mCollider = null;
+    private GameObject _colliderObj = null;
+    public GameObject colliderObj => _colliderObj ?? (_colliderObj = NewObject("Collider", transform, transform.position, typeof(MeshFilter), typeof(MeshCollider)));
+    public Mesh colliderMesh { get { return colliderObj.GetComponent<MeshCollider>().sharedMesh; } set { colliderObj.GetComponent<MeshCollider>().sharedMesh = value; } }
 
     public List<string> additionalInfo { get; private set; }
 
@@ -223,35 +248,46 @@ public class LevelTile : Core
 
     public void SetVisuals(Mesh mesh, Material material)
     {
-        gameObject.GetOrAddComponent<MeshFilter>().sharedMesh = mesh;
-        gameObject.GetOrAddComponent<MeshRenderer>().sharedMaterial = material;
+        this.mesh = mesh;
+        this.material = material;
     }
 
-    public void SetCollider(Mesh mesh)
-    {
-        if (colliderObj == null)
-        {
-            colliderObj = NewObject("Collider", transform, transform.position, typeof(MeshFilter), typeof(MeshCollider));
-            mCollider = colliderObj.GetComponent<MeshCollider>();
-        }
-        mCollider.sharedMesh = mesh;
-    }
+    public void SetCollider(Mesh mesh) => colliderMesh = mesh;
     
+    public void SetMeshesAndMaterial()
+    {
+        Mesh mesh = null, cMesh = null;
+        Material material = null;
+        if (type == TileType.Corridor)
+        {
+            (mesh, cMesh) = LevelManager.Generator.CorridorTileMesh(connections);
+            material = LevelManager.Generator.MatWallCorridor;
+        }
+        else if (type == TileType.Room)
+        {
+            (mesh, cMesh) = LevelManager.Generator.RoomTileMesh(connections);
+            material = LevelManager.Generator.MatWallRoom;
+        }
+        GetComponent<MeshFilter>().sharedMesh = mesh;
+        colliderObj.GetComponent<MeshCollider>().sharedMesh = cMesh;
+        GetComponent<MeshRenderer>().sharedMaterial = material;
+    }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public GameObject miniTile { get; private set; }
 
-    public void SpawnMiniTile(Transform parentTransform, Material miniTileMat)
+    public void SpawnMiniTile(Transform parentTransform, Material miniTileMat, bool revealed = false)
     {
         miniTile = NewObject(objName + " (Minimap)", parentTransform, typeof(MeshFilter), typeof(MeshRenderer));
         miniTile.GetComponent<MeshFilter>().sharedMesh = meshFilter.sharedMesh;
         MeshRenderer renderer = miniTile.GetComponent<MeshRenderer>();
-        renderer.sharedMaterial = miniTileMat == null ? UnityExt_Material.DefaultDiffuse : miniTileMat;
+        renderer.sharedMaterial = miniTileMat == null ? Ext_Material.DefaultDiffuse : miniTileMat;
         renderer.receiveShadows = false;
         renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         miniTile.transform.localPosition = position;
         miniTile.transform.localScale = Vector3.one;
-        ShowMiniTile(false);
+        ShowMiniTile(revealed);
     }
 
     public void ShowMiniTile(bool show)
@@ -262,9 +298,10 @@ public class LevelTile : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    public float distToPlayer => (GameManager.Instance.playerW.transform.position - transform.position).magnitude;
+    public float distToPlayer => (GameManager.Instance.Player.transform.position - transform.position).magnitude;
 }
 
+#if UNITY_EDITOR
 [CustomEditor(typeof(LevelTile))]
 public class LevelTileEditor : Editor
 {
@@ -294,5 +331,71 @@ public class LevelTileEditor : Editor
             EditorGUILayout.EndVertical();
         }
         EditorGUILayout.EndHorizontal();
+    }
+}
+#endif
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+public class TileSaveData
+{
+    public Vec2Int gridPosition;
+    public LevelTile.TileType type;
+    public LevelTile.ConnectionState[] connections;
+    public string DataString => ToDataString();
+
+    public TileSaveData(Vec2Int gridPosition, LevelTile.TileType type, LevelTile.ConnectionState[] connections)
+    {
+        this.gridPosition = gridPosition;
+        this.type = type;
+        this.connections = connections;
+    }
+    public TileSaveData(LevelTile source)
+    {
+        gridPosition = source.gridPosition;
+        type = source.type;
+        connections = source.connections.values;
+    }
+
+    public static TileSaveData FromDataString(string dataString)
+    {
+        if (dataString[0] == '{')
+            dataString = dataString[1..^1];
+
+        Vec2Int gridPosition = Vec2Int.zero;
+        LevelTile.TileType type;
+        LevelTile.ConnectionState[] connections = new LevelTile.ConnectionState[6];
+
+        int i = 0, search = 0, delim = dataString.IndexOf(',', search);
+        gridPosition.x = dataString.RangeToInt(search, delim);
+        search = delim + 1; delim = dataString.IndexOf(';', search);
+        gridPosition.y = dataString.RangeToInt(search, delim);
+
+        search = delim + 1; delim = dataString.IndexOf(';', search);
+        type = (LevelTile.TileType)dataString.RangeToInt(search, delim);
+        
+        search = delim + 1; delim = dataString.IndexOf(',', search);
+        connections[0] = (LevelTile.ConnectionState)dataString.RangeToInt(search, delim);
+        search = delim + 1; delim = dataString.IndexOf(',', search);
+        connections[1] = (LevelTile.ConnectionState)dataString.RangeToInt(search, delim);
+        search = delim + 1; delim = dataString.IndexOf(',', search);
+        connections[2] = (LevelTile.ConnectionState)dataString.RangeToInt(search, delim);
+        search = delim + 1; delim = dataString.IndexOf(',', search);
+        connections[3] = (LevelTile.ConnectionState)dataString.RangeToInt(search, delim);
+        search = delim + 1; delim = dataString.IndexOf(',', search);
+        connections[4] = (LevelTile.ConnectionState)dataString.RangeToInt(search, delim);
+        search = delim + 1; delim = dataString.IndexOf(';', search);
+        connections[5] = (LevelTile.ConnectionState)dataString.RangeToInt(search, delim);
+
+        return new TileSaveData(gridPosition, type, connections);
+    }
+    public string ToDataString()
+    {
+        string dataString = "{" + gridPosition.x + ',' + gridPosition.y + ';' + (int)type + ';' + (int)(connections[0]);
+        for (int i = 1; i < connections.Length; i++)
+        {
+            dataString += "" + ',' + (int)(connections[i]);
+        }
+        return dataString += ";}";
     }
 }

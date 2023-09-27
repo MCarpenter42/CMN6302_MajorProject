@@ -639,7 +639,9 @@ namespace NeoCambion
     {
         using UnityEngine;
         using UnityEditor;
+#if UNITY_EDITOR
         using NeoCambion.Unity.Editor;
+#endif
 
         public static class VecUtilityUnity
         {
@@ -664,6 +666,7 @@ namespace NeoCambion
             }
         }
 
+#if UNITY_EDITOR
         [CustomPropertyDrawer(typeof(IVec2Int))]
         public class UVec2IntDrawer : PropertyDrawer
         {
@@ -688,5 +691,6 @@ namespace NeoCambion
                 EditorGUI.EndProperty();
             }
         }
+#endif
     }
 }

@@ -6,7 +6,6 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
-using UnityEditor;
 using TMPro;
 
 using NeoCambion;
@@ -14,6 +13,7 @@ using NeoCambion.Collections;
 using NeoCambion.Collections.Unity;
 using NeoCambion.Encryption;
 using NeoCambion.Heightmaps;
+using NeoCambion.Interpolation;
 using NeoCambion.IO;
 using NeoCambion.IO.Unity;
 using NeoCambion.Maths;
@@ -24,16 +24,20 @@ using NeoCambion.Sorting;
 using NeoCambion.TaggedData;
 using NeoCambion.TaggedData.Unity;
 using NeoCambion.Unity;
-using NeoCambion.Unity.Editor;
 using NeoCambion.Unity.Events;
 using NeoCambion.Unity.Geometry;
-using NeoCambion.Unity.Interpolation;
+#if UNITY_EDITOR
+
+using UnityEditor;
+using NeoCambion.Unity.Editor;
+#endif
+
+[System.Serializable]
+public enum Var2Bit { Min, Low, High, Max }
 
 [System.Serializable]
 public class RandTuning : Core
 {
-    public enum Var2Bit { Min, Low, High, Max }
-
     #region [ LEVEL GENERATION ] - 15
 
     private bool varMap_iterations = false;
@@ -142,15 +146,12 @@ public class RandTuning : Core
 
     #endregion
 
-    // Total bits used by all settings = 32
-
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public bool randOnAwake = false;
 
-    void Awake()
+    protected override void Initialise()
     {
-        SetRef_RandTuning(this);
         if (randOnAwake)
         {
             NewRandomness();
@@ -186,6 +187,53 @@ public class RandTuning : Core
         varDmg_critScale = (Var2Bit)Random.Range(0, 4);
     }
 
+    public RandTuningSaveData CurrentToSaveData()
+    {
+        return new RandTuningSaveData()
+        {
+            varMap_iterations = varMap_iterations,
+            varMap_roomStructure = varMap_roomStructure,
+            varMap_corridorStructure = varMap_corridorStructure,
+            varMap_connectToExisting = varMap_connectToExisting,
+
+            varLvl_enemyDensity = varLvl_enemyDensity,
+            varLvl_itemDensity = varLvl_itemDensity,
+
+            varBhv_selection = varBhv_selection,
+            varBhv_targeting = varBhv_targeting,
+
+            varSts_health = varSts_health,
+            varSts_defence = varSts_defence,
+            varSts_speed = varSts_speed,
+
+            varDmg_base = varDmg_base,
+            varDmg_critRate = varDmg_critRate,
+            varDmg_critScale = varDmg_critScale,
+        };
+    }
+
+    public void SetFromSaveData(RandTuningSaveData data)
+    {
+        varMap_iterations = data.varMap_iterations;
+        varMap_roomStructure = data.varMap_roomStructure;
+        varMap_corridorStructure = data.varMap_corridorStructure;
+        varMap_connectToExisting = data.varMap_connectToExisting;
+
+        varLvl_enemyDensity = data.varLvl_enemyDensity;
+        varLvl_itemDensity = data.varLvl_itemDensity;
+
+        varBhv_selection = data.varBhv_selection;
+        varBhv_targeting = data.varBhv_targeting;
+
+        varSts_health = data.varSts_health;
+        varSts_defence = data.varSts_defence;
+        varSts_speed = data.varSts_speed;
+
+        varDmg_base = data.varDmg_base;
+        varDmg_critRate = data.varDmg_critRate;
+        varDmg_critScale = data.varDmg_critScale;
+    }
+
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     // 1 character (base 64) --> 6 bits
@@ -199,7 +247,6 @@ public class RandTuning : Core
         lShift -= 1;
         return (var ? 1ul : 0ul) << lShift;
     }
-
     private ulong Shift(Var2Bit var)
     {
         lShift -= 2;
@@ -376,6 +423,30 @@ public struct GenerationSettings
     public float itemMax => itemDensity.upper;
 }
 
+[System.Serializable]
+public class RandTuningSaveData
+{
+    public bool varMap_iterations = false;
+    public Var2Bit varMap_roomStructure = Var2Bit.Min;
+    public Var2Bit varMap_corridorStructure = Var2Bit.Min;
+    public bool varMap_connectToExisting = true;
+
+    public Var2Bit varLvl_enemyDensity = Var2Bit.Min;
+    public Var2Bit varLvl_itemDensity = Var2Bit.Min;
+
+    public Var2Bit varBhv_selection = Var2Bit.Min;
+    public Var2Bit varBhv_targeting = Var2Bit.Min;
+
+    public Var2Bit varSts_health = Var2Bit.Min;
+    public Var2Bit varSts_defence = Var2Bit.Min;
+    public bool varSts_speed = false;
+
+    public Var2Bit varDmg_base = Var2Bit.Min;
+    public Var2Bit varDmg_critRate = Var2Bit.Min;
+    public Var2Bit varDmg_critScale = Var2Bit.Min;
+}
+
+#if UNITY_EDITOR
 [CustomEditor(typeof(RandTuning))]
 [CanEditMultipleObjects]
 public class RandTuningEditor : Editor
@@ -395,3 +466,4 @@ public class RandTuningEditor : Editor
             serializedObject.ApplyModifiedProperties();
     }
 }
+#endif

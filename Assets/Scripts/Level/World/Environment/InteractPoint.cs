@@ -16,7 +16,7 @@ public class InteractPoint : Core
 
     #region [ PROPERTIES ]
 
-    public float distanceToPlayer { get { return (player.posInteract - transform.position).magnitude; } }
+    public Vector3 flatPosition { get { return new Vector3(transform.position.x, 0f, transform.position.z); } }
     [HideInInspector] public bool inRange = false;
     [HideInInspector] public bool active = false;
 
@@ -30,39 +30,10 @@ public class InteractPoint : Core
 
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-    #region [ BUILT-IN UNITY FUNCTIONS ]
-
-    void Awake()
+    protected override void Initialise()
     {
-        
+        player = GameManager.Instance.Player;
     }
-
-    void Start()
-    {
-        player = GameManager.Instance.playerW;
-        if (player != null)
-            player.AddInteraction(this);
-    }
-
-    void Update()
-    {
-
-    }
-
-    void FixedUpdate()
-    {
-
-    }
-
-    void OnDestroy()
-    {
-        if (player != null)
-            player.RemoveInteraction(this);
-    }
-
-    #endregion
-
-    /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
     public void Trigger()
     {

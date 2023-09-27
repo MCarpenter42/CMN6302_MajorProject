@@ -3,12 +3,10 @@ namespace NeoCambion
     using System;
     using System.Collections;
     using System.Collections.Generic;
-    using System.ComponentModel;
     using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
     using System.Runtime.Serialization;
-    using System.Text;
 
     #region [ ENUMERATION TYPES ]
 
@@ -166,20 +164,20 @@ namespace NeoCambion
 
     public static class Ext_Char
     {
-        public static char[] Decimal = new char[]
+        public static readonly char[] Decimal = new char[]
         {
             '0', '1', '2', '3', '4',
             '5', '6', '7', '8', '9',
             '.', ',',
         };
         
-        public static char[] DecimalInt = new char[]
+        public static readonly char[] DecimalInt = new char[]
         {
             '0', '1', '2', '3', '4',
             '5', '6', '7', '8', '9',
         };
         
-        public static char[] Hexadecimal = new char[]
+        public static readonly char[] Hexadecimal = new char[]
         {
             '0', '1', '2', '3',
             '4', '5', '6', '7',
@@ -187,7 +185,7 @@ namespace NeoCambion
             'C', 'D', 'E', 'F',
         };
         
-        public static char[] AlphaNumeric = new char[]
+        public static readonly char[] AlphaNumeric = new char[]
         {
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
             'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
@@ -196,7 +194,7 @@ namespace NeoCambion
             'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
         };
 
-        public static char[] AlphaNumUnderscore = new char[]
+        public static readonly char[] AlphaNumUnderscore = new char[]
         {
             '_', '-',
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -206,19 +204,19 @@ namespace NeoCambion
             'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
         };
 
-        public static char[] LatinBasicLowercase = new char[]
+        public static readonly char[] LatinBasicLowercase = new char[]
         {
             'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
             'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
         };
 
-        public static char[] LatinBasicUppercase = new char[]
+        public static readonly char[] LatinBasicUppercase = new char[]
         {
             'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
             'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
         };
 
-        public static char[] Base64 = new char[]
+        public static readonly char[] Base64 = new char[]
         {
         '0', '1', '2', '3', '4', '5', '6', '7',
         '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
@@ -409,14 +407,30 @@ namespace NeoCambion
         }
     }
 
+    // https://stackoverflow.com/questions/16960555/how-do-i-cast-a-generic-enum-to-int
+    public static class EnumToInt
+    {
+        public static Func<T, int> Converter<T>()
+        {
+            if (!typeof(T).IsEnum)
+                throw new InvalidCastException("Argument is not an enumerated type!");
+            ParameterExpression inputParameter = Expression.Parameter(typeof(T));
+            UnaryExpression body = Expression.Convert(Expression.Parameter(typeof(T)), typeof(int));
+            Expression<Func<T, int>> lambda = Expression.Lambda<Func<T, int>>(body, inputParameter);
+            return lambda.Compile();
+        }
+    }
+
     public static class Ext_Enum
     {
-        public static int GetCount(this Type enumType) 
+        private static InvalidCastException ArgIsNotEnum => new InvalidCastException("Argument is not an enumerated type!");
+
+        public static int GetCount(this Type enumType)
         {
             if (enumType.IsEnum)
                 return Enum.GetNames(enumType).Length;
             else
-                return -1;
+                throw ArgIsNotEnum;
         }
 
         public static string[] GetNames(this Type enumType)
@@ -424,7 +438,32 @@ namespace NeoCambion
             if (enumType.IsEnum)
                 return Enum.GetNames(enumType);
             else
-                return null;
+                throw ArgIsNotEnum;
+        }
+
+        /*public static bool CheckFlags<T>(this T value, T flags) where T : struct, Enum
+        {
+            Func<T, int> converter = EnumToInt.Converter<T>();
+            if (typeof(T).IsEnum)
+            {
+                int vInt = converter(value), fInt = converter(flags);
+                return (vInt & fInt) == fInt;
+            }
+            else
+                throw ArgIsNotEnum;
+        }*/
+
+        public static bool HasAnyFlag<T>(this T enumValue, params T[] flags) where T : struct, Enum
+        {
+            if (flags.Length > 0)
+            {
+                foreach (T flag in flags)
+                {
+                    if (enumValue.HasFlag(flag))
+                        return true;
+                }
+            }
+            return false;
         }
     }
 
@@ -536,6 +575,18 @@ namespace NeoCambion
             }
             return valOut;
         }
+
+        public static int MinSets(this int setSize, int itemsToFit)
+        {
+            if (setSize < 1)
+                throw new ArgumentException("Set size must be greater than 0!");
+            if (itemsToFit < 1)
+                return 0;
+            if (setSize > itemsToFit)
+                return 1;
+            int rem = itemsToFit % setSize;
+            return (itemsToFit - rem) / setSize + (rem > 0 ? 1 : 0);
+        }
     }
     
     public static class Ext_Long
@@ -552,7 +603,7 @@ namespace NeoCambion
             return (value & (1l << (63 - index))) != 0;
         }
 
-        private static ulong right32 = 4294967295;
+        private const ulong right32 = 4294967295;
         public static string BitString(this long value)
         {
             bool sign = value < 0;
@@ -626,6 +677,8 @@ namespace NeoCambion
             return t.IsNullable();
         }
 
+        public static PropertyInfo GetProperty<T>(string propertyName) => typeof(T).GetProperty(propertyName);
+        public static PropertyInfo GetProperty(this Type T, string propertyName) => T.GetProperty(propertyName);
         public static PropertyInfo GetProperty<T>(this object obj, string propertyName) => typeof(T).GetProperty(propertyName);
 
         public static object GetPropertyValue<T>(this T obj, string propertyName) => typeof(T).GetProperty(propertyName).GetValue(obj);
@@ -690,7 +743,7 @@ namespace NeoCambion
         {
             if (str.Length > 8)
                 str = str.Substring(0, 8);
-            byte[] bytes = Encoding.Unicode.GetBytes(str);
+            byte[] bytes = System.Text.Encoding.Unicode.GetBytes(str);
             return bytes.ToLong();
         }
 
@@ -1067,6 +1120,101 @@ namespace NeoCambion
             }
             return str;
         }
+
+        public static (int, int) IndicesOfPair(this string str, char boundingChar)
+        {
+            int indStart = str.IndexOf(boundingChar);
+            if (indStart > -1 && indStart < str.Length - 1)
+            {
+                int indEnd = str.IndexOf(boundingChar, indStart + 1);
+                if (indEnd > indStart)
+                {
+                    return (indStart, indEnd);
+                }
+            }
+            return (indStart, -1);
+        }
+        public static (int, int) IndicesOfPair(this string str, char startChar, char endChar)
+        {
+            int indStart = str.IndexOf(startChar);
+            if (indStart > -1 && indStart < str.Length - 1)
+            {
+                int indEnd = str.IndexOf(endChar, indStart + 1);
+                if (indEnd > indStart)
+                {
+                    return (indStart, indEnd);
+                }
+            }
+            return (indStart, -1);
+        }
+
+        public static float RangeToFloat(this string str, int indexStart)
+        {
+            if (indexStart < 0 || indexStart >= str.Length)
+                throw new IndexOutOfRangeException("Maximum index must be non-negative and less than to the size of the string!");
+
+            try
+            {
+                return float.Parse(str[indexStart..^0]);
+            }
+            catch
+            {
+                throw new FormatException("String not valid for float conversion: " + indexStart + "-END --> " + str[indexStart..^0]);
+            }
+        }
+        public static float RangeToFloat(this string str, int indexMinInclusive, int indexMaxExclusive)
+        {
+            if (indexMinInclusive > indexMaxExclusive)
+                (indexMinInclusive, indexMaxExclusive) = (indexMaxExclusive, indexMinInclusive);
+
+            if (indexMinInclusive < 0)
+                throw new IndexOutOfRangeException("Minimum index must be non-negative and less than the size of the string! (Value passed: " + indexMinInclusive + " | String size: " + str.Length + ")");
+            else if (indexMaxExclusive >= str.Length)
+                throw new IndexOutOfRangeException("Maximum index must be non-negative and less than or equal to the size of the string! (Value passed: " + indexMaxExclusive + " | String size: " + str.Length + ")");
+
+            try
+            {
+                return float.Parse(str[indexMinInclusive..indexMaxExclusive]);
+            }
+            catch
+            {
+                throw new FormatException("String not valid for float conversion: " + indexMinInclusive + "-" + indexMaxExclusive + " --> " + str[indexMinInclusive..indexMaxExclusive]);
+            }
+        }
+
+        public static int RangeToInt(this string str, int indexStart)
+        {
+            if (indexStart < 0 || indexStart >= str.Length)
+                throw new IndexOutOfRangeException("Maximum index must be non-negative and less than to the size of the string!");
+
+            try
+            {
+                return int.Parse(str[indexStart..^0]);
+            }
+            catch
+            {
+                throw new FormatException("String not valid for int conversion: " + indexStart + "-END --> " + str[indexStart..^0]);
+            }
+        }
+        public static int RangeToInt(this string str, int indexMinInclusive, int indexMaxExclusive)
+        {
+            if (indexMinInclusive > indexMaxExclusive)
+                (indexMinInclusive, indexMaxExclusive) = (indexMaxExclusive, indexMinInclusive);
+
+            if (indexMinInclusive < 0)
+                throw new IndexOutOfRangeException("Minimum index must be non-negative and less than the size of the string! Input: " + indexMinInclusive + " / String size: " + str.Length);
+            else if (indexMaxExclusive >= str.Length)
+                throw new IndexOutOfRangeException("Maximum index must be non-negative and less than or equal to the size of the string! Input: " + indexMaxExclusive + " / String size: " + str.Length);
+
+            try
+            {
+                return int.Parse(str[indexMinInclusive..indexMaxExclusive]);
+            }
+            catch
+            {
+                throw new FormatException("String not valid for int conversion: " + indexMinInclusive + "-" + indexMaxExclusive + " --> " + str[indexMinInclusive..indexMaxExclusive]);
+            }
+        }
     }
 
     public static class Ext_Short
@@ -1138,6 +1286,36 @@ namespace NeoCambion
 
     public static class Ext_Type
     {
+        public static readonly Type[] SystemNumeric = new Type[]
+        {
+            typeof(sbyte),  typeof(byte),
+            typeof(short),  typeof(ushort),
+            typeof(int),    typeof(uint),
+            typeof(long),   typeof(ulong),
+            typeof(nint),   typeof(nuint),
+            typeof(float),  typeof(double), typeof(decimal)
+        };
+        public static bool IsNumeric<T>() => SystemNumeric.Contains(typeof(T));
+        public static bool IsNumeric(this Type T) => SystemNumeric.Contains(T);
+
+        public static readonly Type[] SystemIntegral = new Type[]
+        {
+            typeof(sbyte),  typeof(byte),
+            typeof(short),  typeof(ushort),
+            typeof(int),    typeof(uint),
+            typeof(long),   typeof(ulong),
+            typeof(nint),   typeof(nuint),
+        };
+        public static bool IsIntegral<T>() => SystemIntegral.Contains(typeof(T));
+        public static bool IsIntegral(this Type T) => SystemIntegral.Contains(T);
+
+        public static readonly Type[] SystemFloatingPoint = new Type[]
+        {
+            typeof(float),  typeof(double), typeof(decimal)
+        };
+        public static bool IsFloatingPoint<T>() => SystemFloatingPoint.Contains(typeof(T));
+        public static bool IsFloatingPoint(this Type T) => SystemFloatingPoint.Contains(T);
+
         public static bool IsNullable(this Type type) => Nullable.GetUnderlyingType(type) != null;
 
         public static bool HasDefaultConstructor(this Type type) => type.IsValueType || type.GetConstructor(Type.EmptyTypes) != null;
@@ -1452,7 +1630,9 @@ namespace NeoCambion
             }
         }
 
-        public static class UnityExt_Float
+        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+        public static class UExt_Float
         {
             public static string[] StopwatchTime(this float time)
             {
@@ -1479,45 +1659,19 @@ namespace NeoCambion
             }
         }
 
-        public static class UnityExt_GameObject
+        public static class UExt_String
         {
-            public static void DestroyThis(this GameObject obj, float t = 0.0f)
-            {
-                GameObject.Destroy(obj, t);
-            }
-            
-            public static void DestroyThisImmediate(this GameObject obj, bool allowDestroyingAssets = false)
-            {
-                GameObject.DestroyImmediate(obj, allowDestroyingAssets);
-            }
+            public static void CopyToClipboard(this string str) => GUIUtility.systemCopyBuffer = str;
+        }
 
-            public static bool Exists(this GameObject obj)
-            {
-                return obj != null;
-            }
+        /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-            public static bool HasComponent<T>(this GameObject obj) where T : Component
-            {
-                return obj.GetComponent<T>() != null;
-            }
-            public static bool HasComponent(this GameObject obj, System.Type T)
-            {
-                return obj.GetComponent(T) != null;
-            }
+        public static class Ext_Component
+        {
+            public static bool HasComponent<T>(this Component obj) where T : Component => obj.GetComponent<T>() != null;
+            public static bool HasComponent(this Component obj, Type T) => obj.GetComponent(T) != null;
 
-            public static T GetOrAddComponent<T>(this GameObject obj) where T : Component
-            {
-                if (obj.GetComponent<T>() != null)
-                {
-                    return obj.GetComponent<T>();
-                }
-                else
-                {
-                    return obj.AddComponent<T>();
-                }
-            }
-
-            public static List<T> GetComponents<T>(this GameObject[] objects)
+            public static List<T> GetComponents<T>(this Component[] objects)
             {
                 List<T> componentsInObjects = new List<T>();
                 for (int i = 0; i < objects.Length; i++)
@@ -1529,7 +1683,7 @@ namespace NeoCambion
                 }
                 return componentsInObjects;
             }
-            public static List<T> GetComponents<T>(this IList<GameObject> objects)
+            public static List<T> GetComponents<T>(this IList<Component> objects)
             {
                 List<T> componentsInObjects = new List<T>();
                 for (int i = 0; i < objects.Count; i++)
@@ -1541,8 +1695,46 @@ namespace NeoCambion
                 }
                 return componentsInObjects;
             }
+        }
 
-            public static List<GameObject> GetObjectsWithComponent<T>(this GameObject[] objects)
+        public static class Ext_GameObject
+        {
+            public static void DestroyThis(this GameObject obj, float t = 0.0f) => Object.Destroy(obj, t);
+            
+            public static void DestroyThisImmediate(this GameObject obj, bool allowDestroyingAssets = false) => Object.DestroyImmediate(obj, allowDestroyingAssets);
+
+            public static bool Exists(this GameObject obj) => obj != null;
+
+            public static bool HasComponent<T>(this GameObject obj) where T : Component => obj.GetComponent<T>() != null;
+            public static bool HasComponent(this GameObject obj, Type T)
+            {
+                if (T.IsSubclassOf(typeof(Component)))
+                    return obj.GetComponent(T) == null;
+                return false;
+            }
+
+            public static T GetOrAddComponent<T>(this GameObject obj) where T : Component => obj.TryGetComponent(out T component) ? component : obj.AddComponent<T>();
+
+            public static T[] GetComponents<T>(this GameObject[] objects) where T : Component
+            {
+                T[] components = new T[objects.Length];
+                for (int i = 0; i < objects.Length; i++)
+                {
+                    components[i] = (objects[i] == null ? null : objects[i].GetComponent<T>());
+                }
+                return components;
+            }
+            public static T[] GetComponents<T>(this IList<GameObject> objects) where T : Component
+            {
+                T[] components = new T[objects.Count];
+                for (int i = 0; i < objects.Count; i++)
+                {
+                    components[i] = (objects[i] == null ? null : objects[i].GetComponent<T>());
+                }
+                return components;
+            }
+
+            public static List<GameObject> GetObjectsWithComponent<T>(this GameObject[] objects) where T : Component
             {
                 List<GameObject> itemsWithComponent = new List<GameObject>();
                 if (objects.Length > 0)
@@ -1550,17 +1742,31 @@ namespace NeoCambion
                     for (int i = 0; i < objects.Length; i++)
                     {
                         GameObject item = objects[i];
-                        T itemComponent = item.GetComponent<T>();
-                        if (!itemComponent.Equals(null))
-                        {
+                        if (item.HasComponent<T>())
                             itemsWithComponent.Add(item);
-                        }
                     }
                 }
-
                 return itemsWithComponent;
             }
-            public static List<GameObject> GetObjectsWithComponent<T>(this IList<GameObject> objects)
+            public static List<GameObject> GetObjectsWithComponent(this GameObject[] objects, Type T)
+            {
+                if (T.IsSubclassOf(typeof(Component)))
+                {
+                    List<GameObject> itemsWithComponent = new List<GameObject>();
+                    if (objects.Length > 0)
+                    {
+                        for (int i = 0; i < objects.Length; i++)
+                        {
+                            GameObject item = objects[i];
+                            if (item.HasComponent(T))
+                                itemsWithComponent.Add(item);
+                        }
+                    }
+                    return itemsWithComponent;
+                }
+                return null;
+            }
+            public static List<GameObject> GetObjectsWithComponent<T>(this IList<GameObject> objects) where T : Component
             {
                 List<GameObject> itemsWithComponent = new List<GameObject>();
                 if (objects.Count > 0)
@@ -1568,15 +1774,29 @@ namespace NeoCambion
                     for (int i = 0; i < objects.Count; i++)
                     {
                         GameObject item = objects[i];
-                        T itemComponent = item.GetComponent<T>();
-                        if (!itemComponent.Equals(null))
-                        {
+                        if (item.HasComponent<T>())
                             itemsWithComponent.Add(item);
-                        }
                     }
                 }
-
                 return itemsWithComponent;
+            }
+            public static List<GameObject> GetObjectsWithComponent(this IList<GameObject> objects, Type T)
+            {
+                if (T.IsSubclassOf(typeof(Component)))
+                {
+                    List<GameObject> itemsWithComponent = new List<GameObject>();
+                    if (objects.Count > 0)
+                    {
+                        for (int i = 0; i < objects.Count; i++)
+                        {
+                            GameObject item = objects[i];
+                            if (item.HasComponent(T))
+                                itemsWithComponent.Add(item);
+                        }
+                    }
+                    return itemsWithComponent;
+                }
+                return null;
             }
 
             public static List<GameObject> GetObjectsWithTag(this GameObject[] objects, string tag)
@@ -1779,7 +1999,7 @@ namespace NeoCambion
             public static Mesh GetMesh(this GameObject obj) => obj == null ? null : (obj.HasComponent<MeshFilter>() ? obj.GetComponent<MeshFilter>().sharedMesh : null);
         }
 
-        public static class UnityExt_Transform
+        public static class Ext_Transform
         {
             public static Transform[] GetChildren(this Transform trn)
             {
@@ -2296,9 +2516,17 @@ namespace NeoCambion
                     trn.localScale = scale;
                 }
             }
+
+            public static void DestroyAllChildren(this Transform trn)
+            {
+                for (int i = trn.childCount - 1; i >= 0; i--)
+                {
+                    trn.GetChild(i).gameObject.DestroyThis();
+                }
+            }
         }
 
-        public static class UnityExt_Rect
+        public static class Ext_Rect
         {
             public static Rect SetProperty(this Rect rect, RectProperty property, float value)
             {
@@ -2347,7 +2575,7 @@ namespace NeoCambion
             }
         }
 
-        public static class UnityExt_Vector2
+        public static class Ext_Vector2
         {
             public static Vector2 Closest(this Vector2 origin, Vector2[] points)
             {
@@ -2589,7 +2817,7 @@ namespace NeoCambion
             }
         }
 
-        public static class UnityExt_Vector3
+        public static class Ext_Vector3
         {
             public static Vector3 RestrictRotVector(this Vector3 rotVect)
             {
@@ -2833,7 +3061,7 @@ namespace NeoCambion
             }
         }
 
-        public static class UnityExt_Coroutine
+        public static class Ext_Coroutine
         {
             public static void Stop(this Coroutine routine)
             {
@@ -2857,7 +3085,7 @@ namespace NeoCambion
             }*/
         }
 
-        public static class UnityExt_Mesh
+        public static class Ext_Mesh
         {
             public static Mesh CalculateDefaultUVs(this Mesh mesh)
             {
@@ -3112,7 +3340,7 @@ namespace NeoCambion
             }
         }
 
-        public static class UnityExt_Color
+        public static class Ext_Color
         {
             public static bool ApproximatelyEquals(this Color clr, Color comparison, float marginOfError = 0.05f)
             {
@@ -3145,10 +3373,13 @@ namespace NeoCambion
             {
                 return new Color(r / 255f, g / 255f, b / 255f, a);
             }
+
+            public static Color AdjustAlpha(this Color clr, float newAlpha) => new Color(clr.r, clr.g, clr.b, newAlpha);
         }
 
-        public static class UnityExt_Object
+        public static class Ext_Object
         {
+#if UNITY_EDITOR
             public static bool IsInResourcesFolder(this Object assetObj)
             {
                 string path = AssetDatabase.GetAssetPath(assetObj);
@@ -3158,6 +3389,7 @@ namespace NeoCambion
                 else
                     return true;
             }
+#endif
 
             public static Object Clone(this Object original) => Object.Instantiate(original);
             public static Object Clone(this Object original, Transform parent) => Object.Instantiate(original, parent);
@@ -3171,9 +3403,9 @@ namespace NeoCambion
             public static T Clone<T>(this T original, Vector3 position, Quaternion rotation, Transform parent) where T : Object => Object.Instantiate(original as Object, position, rotation, parent) as T;
         }
 
-        public static class UnityExt_Material
+        public static class Ext_Material
         {
-            public static Material DefaultDiffuse => AssetDatabase.GetBuiltinExtraResource<Material>("Default-Diffuse.mat");
+            public static Material DefaultDiffuse => new Material(Shader.Find("Default-Diffuse")) { color = Color.white };
         }
     }
 
@@ -3183,6 +3415,7 @@ namespace NeoCambion
         using NeoCambion.Collections;
         using UnityEngine;
         using UnityEngine.Rendering;
+        using UnityEngine.SceneManagement;
 
         public struct ObjectMeshInfo
         {
@@ -3288,24 +3521,6 @@ namespace NeoCambion
                 get { return _receiveShadows; }
                 set { if (!isNull) _receiveShadows = value; }
             }
-            private ReceiveGI _receiveGI;
-            public ReceiveGI receiveGI
-            {
-                get { return _receiveGI; }
-                set { if (!isNull) _receiveGI = value; }
-            }
-            private float _scaleInLightmap;
-            public float scaleInLightmap
-            {
-                get { return _scaleInLightmap; }
-                set { if (!isNull) _scaleInLightmap = value; }
-            }
-            private bool _stitchLightmapSeams;
-            public bool stitchLightmapSeams
-            {
-                get { return _stitchLightmapSeams; }
-                set { if (!isNull) _stitchLightmapSeams = value; }
-            }
             private ObjectLightProbeInfo _lightProbes;
             public ObjectLightProbeInfo lightProbes
             {
@@ -3333,18 +3548,12 @@ namespace NeoCambion
                 {
                     _shadowCastingMode = ShadowCastingMode.On;
                     _receiveShadows = true;
-                    _receiveGI = ReceiveGI.LightProbes;
-                    _scaleInLightmap = 1;
-                    _stitchLightmapSeams = true;
                     _lightProbes = ObjectLightProbeInfo.Empty;
                 }
                 else
                 {
                     _shadowCastingMode = meshRenderer.shadowCastingMode;
                     _receiveShadows = meshRenderer.receiveShadows;
-                    _receiveGI = meshRenderer.receiveGI;
-                    _scaleInLightmap = meshRenderer.scaleInLightmap;
-                    _stitchLightmapSeams = meshRenderer.stitchLightmapSeams;
                     _lightProbes = new ObjectLightProbeInfo(meshRenderer);
                 }
             }
@@ -3355,9 +3564,6 @@ namespace NeoCambion
                 this.isNull = true;
                 _shadowCastingMode = (ShadowCastingMode)(-1);
                 _receiveShadows = false;
-                _receiveGI = (ReceiveGI)(-1);
-                _scaleInLightmap = 0;
-                _stitchLightmapSeams = false;
                 _lightProbes = ObjectLightProbeInfo.Null;
             }
             public static ObjectLightingInfo Empty { get { return new ObjectLightingInfo(0); } }
@@ -3366,9 +3572,6 @@ namespace NeoCambion
                 isNull = true;
                 _shadowCastingMode = ShadowCastingMode.On;
                 _receiveShadows = true;
-                _receiveGI = ReceiveGI.LightProbes;
-                _scaleInLightmap = 1;
-                _stitchLightmapSeams = true;
                 _lightProbes = ObjectLightProbeInfo.Empty;
             }
         }
@@ -3458,6 +3661,33 @@ namespace NeoCambion
                 _reflectionUsage = ReflectionProbeUsage.BlendProbes;
                 _probeAnchor = null;
             }
+        }
+
+        public struct SceneInfo
+        {
+            public int buildIndex;
+            public string name;
+            public string path;
+            public int rootCount;
+            public readonly bool isNull => buildIndex < 0 && name == null && path == null && rootCount < 0;
+
+            public SceneInfo(int buildIndex, string name, string path, int rootCount)
+            {
+                this.buildIndex = buildIndex;
+                this.name = name;
+                this.path = path;
+                this.rootCount = rootCount;
+            }
+            public SceneInfo(Scene source)
+            {
+                buildIndex = source.buildIndex;
+                name = source.name;
+                path = source.path;
+                rootCount = source.rootCount;
+            }
+
+            public static SceneInfo Null => new SceneInfo(-1, null, null, -1);
+            public static SceneInfo Active => new SceneInfo(SceneManager.GetActiveScene());
         }
     }
 }

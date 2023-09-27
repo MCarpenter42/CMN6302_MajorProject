@@ -225,6 +225,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5fd346a0ea8a3a349b9b8d9c2f9fccb7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!1 &3802729551661969561
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6358411718272468311}
+  m_Layer: 0
+  m_Name: Damage Text Anchor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6358411718272468311
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3802729551661969561}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1, z: -0.6}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8223221085521994544}
+  m_RootOrder: 5
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4488573281915675032
 GameObject:
   m_ObjectHideFlags: 0
@@ -259,6 +290,7 @@ Transform:
   - {fileID: 1899227574293707546}
   - {fileID: 568186552846906747}
   - {fileID: 8562512009298054085}
+  - {fileID: 6358411718272468311}
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -274,28 +306,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ae7d4a2f37e95a149857740963a0100f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  baseData:
-    displayName: 
-    modelHexUID: 
-    friendly: 0
-    playerControlled: 0
-    baseHealth: 50
-    healthScaling: 0
-    baseAttack: 0
-    attackScaling: 0
-    baseDefence: 0
-    defenceScaling: 0
-    speeds: []
-    inflictChance: 40
-    inflictResist: 0
-    attackType: 0
-    weakAgainst: 000000000000000000
-    actionSet: 0
   modelObj: {fileID: 0}
   pivot: {fileID: 9128667364437754372}
-  healthBar: {fileID: 4367372128746395417}
+  healthBar: {fileID: 4646432237600763617}
   targetingArrow: {fileID: 6785503072887424697}
   cameraViewAnchor: {fileID: 1899227574293707546}
+  damageTextAnchor: {fileID: 6358411718272468311}
   gotData: 0
   index: -1
   displayName: 
@@ -725,7 +741,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 568186552846906747}
-  - component: {fileID: 4367372128746395417}
+  - component: {fileID: 4646432237600763617}
   m_Layer: 0
   m_Name: Health Bar
   m_TagString: Untagged
@@ -751,7 +767,7 @@ Transform:
   m_Father: {fileID: 8223221085521994544}
   m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &4367372128746395417
+--- !u!114 &4646432237600763617
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -760,7 +776,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 7846674899088214641}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7d7b95577a9e49a4c9931891704e276d, type: 3}
+  m_Script: {fileID: 11500000, guid: bb7923020df13f84a880f8fd3a1b9551, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   rotateTarget: {fileID: 0}
